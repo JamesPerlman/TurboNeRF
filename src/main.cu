@@ -8,7 +8,7 @@
 // Declare a global device function
 __global__ void helloCuda(void)
 {
-    printf("Hello World from GPU!\n");
+    printf("Hello World from GPU!!\n");
 }
 
 int main()
