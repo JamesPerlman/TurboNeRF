@@ -3,9 +3,9 @@
 #
 cmake_minimum_required (VERSION 3.24)
 
-project (NeRFRenderCore LANGUAGES CXX CUDA)
-
 cmake_policy(SET CMP0104 NEW)
+
+project (NeRFRenderCore LANGUAGES CXX CUDA)
 
 # CUDA
 include(FindCUDA/select_compute_arch)
@@ -20,8 +20,7 @@ SET(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_LIST})
 add_subdirectory(src)
 add_subdirectory(includes)
 
-message("SETTING")
-
 # includes
-target_link_libraries(NeRFRenderCore nlohmann_json)
-target_link_libraries(NeRFRenderCore tiny-cuda-nn)
+target_link_libraries(${PROJECT_NAME} nlohmann_json)
+target_link_libraries(${PROJECT_NAME} eigen)
+target_link_libraries(${PROJECT_NAME} tiny-cuda-nn)

@@ -3,18 +3,28 @@
 #
 
 # Add source to this project's executable.
-add_executable(NeRFRenderCore
-	main.cu
+
+set(HEADERS
+	common.h
 	main.h
 )
 
-if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET NeRFRenderCore PROPERTY CXX_STANDARD 20)
-endif()
+set(SOURCES
+	main.cu	
+)
+
+add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+
+include_directories(
+	data-loader
+	json-bindings
+)
+
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 
 # CUDA includes / linkage
 
 find_package(CUDA 12.0 REQUIRED)
 include_directories(${CUDA_INCLUDE_DIRS})
 
-target_link_libraries(NeRFRenderCore ${CUDA_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${CUDA_LIBRARIES})
