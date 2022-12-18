@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 
 #include <tiny-cuda-nn/common.h>
+#include <nlohmann/json.hpp>
 
 #include "main.h"
 

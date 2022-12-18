@@ -1,3 +1,6 @@
 [submodule "includes/tiny-cuda-nn"]
 	path = includes/tiny-cuda-nn
 	url = https://github.com/NVLabs/tiny-cuda-nn
+[submodule "includes/json"]
+	path = includes/json
+	url = git@github.com:nlohmann/json

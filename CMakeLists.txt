@@ -23,4 +23,5 @@ add_subdirectory(includes)
 message("SETTING")
 
 # includes
+target_link_libraries(NeRFRenderCore nlohmann_json)
 target_link_libraries(NeRFRenderCore tiny-cuda-nn)
