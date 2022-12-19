@@ -7,3 +7,5 @@ https://github.com/NVlabs/tiny-cuda-nn [[LICENSE](https://github.com/NVlabs/tiny
 https://github.com/nlohmann/json [[LICENSE](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT)]
 https://gitlab.com/libeigen/eigen [[LICENSE](https://gitlab.com/libeigen/eigen/-/blob/master/COPYING.APACHE)]
 https://github.com/nothings/stb [[LICENSE](https://github.com/nothings/stb/blob/master/LICENSE)]
+https://github.com/bmild/nerf [[LICENSE](https://github.com/bmild/nerf/blob/master/LICENSE)]
+https://github.com/nerfstudio-project/nerfstudio [[LICENSE](https://github.com/nerfstudio-project/nerfstudio/blob/main/LICENSE)]
