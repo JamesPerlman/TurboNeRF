@@ -7,18 +7,21 @@
 set(HEADERS
 	common.h
 	main.h
+	models/camera.hpp
+	models/dataset.hpp
+	models/ray.hpp
+	models/training-image.hpp
+	models/json-bindings/eigen-json.hpp
 )
 
 set(SOURCES
 	main.cu	
+	models/camera.cpp
+	models/dataset.cpp
+	models/training-image.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-
-include_directories(
-	data-loader
-	json-bindings
-)
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 

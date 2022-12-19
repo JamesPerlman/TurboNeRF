@@ -1,4 +1,5 @@
-﻿#include <iostream>
+﻿#include <stdio.h>
+#include <iostream>
 #include <cuda_runtime.h>
 
 #include <nlohmann/json.hpp>
@@ -6,7 +7,7 @@
 
 #include "common.h"
 #include "main.h"
-#include "json-bindings/eigen-json.hpp"
+#include "models/dataset.hpp"
 
 
 // Declare a global device function
@@ -17,7 +18,14 @@ __global__ void helloCuda(void)
 
 int main()
 {
-    Eigen::Matrix4f e = nrc::from_json({});
+	nrc::Dataset dataset = nrc::Dataset::from_file("E:\\2022\\nerf-library\\FascinatedByFungi2022\\hydnellum-peckii-cluster\\transforms.json");
+    
+	for (auto& image : dataset.images) {
+		printf("image: %s\n", image.filepath.c_str());
+        dataset.images[0].load();
+	}
+
+    
     // Launch the "helloCuda" kernel on the device
     helloCuda<<<1, 1>>> ();
 

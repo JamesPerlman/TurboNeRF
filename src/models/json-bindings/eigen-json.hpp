@@ -1,9 +1,9 @@
+#pragma once
+
 #include "../common.h"
 
 #include <Eigen/Dense>
 #include <nlohmann/json.hpp>
-
-#pragma once
 
 NRC_NAMESPACE_BEGIN
 

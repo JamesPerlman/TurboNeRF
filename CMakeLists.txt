@@ -20,6 +20,9 @@ SET(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_LIST})
 add_subdirectory(src)
 add_subdirectory(includes)
 
+include_directories(includes/stb)
+link_directories(includes/stb)
+
 # includes
 target_link_libraries(${PROJECT_NAME} nlohmann_json)
 target_link_libraries(${PROJECT_NAME} eigen)
