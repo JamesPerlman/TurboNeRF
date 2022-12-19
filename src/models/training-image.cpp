@@ -15,7 +15,6 @@ TrainingImage::TrainingImage(string filepath, Eigen::Vector2i size) {
 }
 
 void TrainingImage::load() {
-
 	data = stbi_load(filepath.c_str(), &size.x(), &size.y(), &channels, 0);
 }
 

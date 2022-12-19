@@ -21,6 +21,7 @@ struct Dataset {
 	vector<TrainingImage> images;
 
 	static Dataset from_file(string file_path);
+	void Dataset::load_images_in_parallel();
 };
 
 NRC_NAMESPACE_END

@@ -4,6 +4,9 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <atomic>
+#include <iostream>
+#include <cstddef>
 
 #include "json-bindings/eigen-json.hpp"
 #include "dataset.hpp"
@@ -49,4 +52,26 @@ Dataset Dataset::from_file(string file_path) {
     dataset.images = images;
 
     return dataset;
+}
+
+void Dataset::load_images_in_parallel() {
+    const size_t num_threads = std::thread::hardware_concurrency(); // get the number of available hardware threads
+
+    std::vector<std::thread> threads;
+    std::atomic<std::size_t> index{ 0 }; // atomic variable to track the next image to be loaded
+    for (size_t i = 0; i < num_threads; ++i) {
+        // create a new thread to load images
+        threads.emplace_back([&] {
+            std::size_t local_index;
+            while ((local_index = index.fetch_add(1)) < images.size()) {
+                images[local_index].load();
+                std::cout << local_index + 1 << '/' << images.size() << " images loaded" << '\n';
+            }
+        });
+    }
+
+    // wait for all threads to complete
+    for (auto& thread : threads) {
+        thread.join();
+    }
 }
