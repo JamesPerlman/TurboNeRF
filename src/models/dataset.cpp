@@ -30,7 +30,10 @@ Dataset Dataset::from_file(string file_path) {
 
     // TODO: per-camera focal length
     Vector2f focal_length(json_data["fl_x"], json_data["fl_y"]);
-
+    Vector2f view_angle(json_data["camera_angle_x"], json_data["camera_angle_y"]);
+    Vector2f angle_tans(view_angle.array().tan());
+    Vector2f sensor_size = 2.0f * focal_length.cwiseProduct(0.5f * angle_tans);
+    
     path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
 
     for (json frame : json_data["frames"]) {
@@ -38,8 +41,9 @@ Dataset Dataset::from_file(string file_path) {
         float far = frame["far"];
 
         Matrix4f camera_matrix = nrc::from_json(frame["transform_matrix"]);
+        
         // TODO: per-camera dimensions
-        cameras.emplace_back(near, far, dimensions, focal_length, camera_matrix);
+        cameras.emplace_back(near, far, focal_length, dimensions, sensor_size, camera_matrix);
 
         // images
         string file_path = frame["file_path"];
