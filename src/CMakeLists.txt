@@ -12,13 +12,15 @@ set(HEADERS
 	models/ray.hpp
 	models/training-image.hpp
 	models/json-bindings/eigen-json.hpp
+	models/workspace.cuh
 )
 
 set(SOURCES
 	main.cu	
-	models/camera.cpp
+	models/camera.cu
 	models/dataset.cpp
 	models/training-image.cpp
+	models/workspace.cu
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
