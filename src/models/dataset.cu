@@ -7,9 +7,8 @@
 #include <atomic>
 #include <iostream>
 #include <cstddef>
-
-#include "json-bindings/eigen-json.hpp"
-#include "dataset.hpp"
+#include "json-bindings/eigen-json.h"
+#include "dataset.h"
 
 using namespace Eigen;
 using namespace std;
@@ -27,7 +26,7 @@ Dataset Dataset::from_file(string file_path) {
     vector<TrainingImage> images;
 
     Vector2i dimensions(json_data["w"], json_data["h"]);
-
+    
     // TODO: per-camera focal length
     Vector2f focal_length(json_data["fl_x"], json_data["fl_y"]);
     Vector2f view_angle(json_data["camera_angle_x"], json_data["camera_angle_y"]);
@@ -37,8 +36,8 @@ Dataset Dataset::from_file(string file_path) {
     path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
 
     for (json frame : json_data["frames"]) {
-        float near = frame["near"];
-        float far = frame["far"];
+        float near = frame.value("near", 0.1f);
+        float far = frame.value("far", 16.0f);
 
         Matrix4f camera_matrix = nrc::from_json(frame["transform_matrix"]);
         
@@ -69,6 +68,7 @@ void Dataset::load_images_in_parallel() {
             std::size_t local_index;
             while ((local_index = index.fetch_add(1)) < images.size()) {
                 images[local_index].load();
+                // TODO: some sort of progress update here
                 std::cout << local_index + 1 << '/' << images.size() << " images loaded" << '\n';
             }
         });
@@ -78,4 +78,12 @@ void Dataset::load_images_in_parallel() {
     for (auto& thread : threads) {
         thread.join();
     }
+    
+    update_dataset_properties();
+}
+
+void Dataset::update_dataset_properties() {
+	for (auto image : images) {
+		n_pixels_per_image = image.dimensions.x() * image.dimensions.y();
+	}
 }

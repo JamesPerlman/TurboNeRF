@@ -1,6 +1,6 @@
 #pragma once
 
-#include <src/common.h>
+#include "../common.h"
 #include <Eigen/Dense>
 
 NRC_NAMESPACE_BEGIN

@@ -4,3 +4,10 @@
 #define NRC_NAMESPACE_END }
 
 #define NRC_HOST_DEVICE __host__ __device__
+
+#define CUDA_ASSERT_SUCCESS(call) { \
+	cudaError_t err = call; \
+	if (err != cudaSuccess) { \
+		throw std::runtime_error(cudaGetErrorString(err)); \
+	} \
+}

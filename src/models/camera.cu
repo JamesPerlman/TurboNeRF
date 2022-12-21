@@ -1,15 +1,14 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-
-#include "camera.hpp"
-#include "ray.hpp"
+#include "camera.h"
+#include "ray.h"
 
 
 using namespace nrc;
 using namespace Eigen;
 
 // init_rays CUDA kernel
-NRC_HOST_DEVICE void init_rays_pinhole(
+__global__ void init_rays_pinhole(
 	uint32_t n_rays,
 	Camera cam,
 	Ray* rays_out
@@ -26,9 +25,10 @@ NRC_HOST_DEVICE void init_rays_pinhole(
 	auto uv = Vector2f(
 		float(x) / (float(cam.pixel_dims.x()) + 0.5f),
 		float(y) / (float(cam.pixel_dims.y()) + 0.5f)
-	) - Vector2f(0.5f);
+	) - Vector2f(0.5f, 0.5f);
 
-	auto pix_pos = Vector3f(uv * cam.sensor_size, 1.0f);
+	auto uv_scaled = uv.cwiseProduct(cam.sensor_size);
+	auto pix_pos = Vector3f(uv_scaled.x(), uv_scaled.y(), 1.0f);
 	
 	auto cam_origin = cam.transform.block<3, 1>(0, 3);
 

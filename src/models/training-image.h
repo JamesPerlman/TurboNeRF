@@ -11,12 +11,12 @@ using namespace std;
 NRC_NAMESPACE_BEGIN
 
 struct TrainingImage {
-	Eigen::Vector2i size;
+	Eigen::Vector2i dimensions;
 	string filepath;
 	unsigned char* data;
 	int channels;
 
-	TrainingImage(string filepath, Eigen::Vector2i size);
+	TrainingImage(string filepath, Eigen::Vector2i dimensions);
 	void load();
 };
 
