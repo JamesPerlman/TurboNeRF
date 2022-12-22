@@ -12,7 +12,6 @@ using namespace nrc;
 using namespace tcnn;
 using namespace nlohmann;
 
-
 NeRFTrainingController::NeRFTrainingController(
 	const Dataset& dataset,
 	const uint32_t& num_layers,
@@ -32,7 +31,6 @@ NeRFTrainingController::NeRFTrainingController(
 	double per_level_scale = 1.4472692012786865;
 
 	// Create the Direction Encoding
-	
 	json direction_encoding_config = {
 		{"otype", "SphericalHarmonics"},
 		{"degree", 4},
@@ -43,7 +41,6 @@ NeRFTrainingController::NeRFTrainingController(
 	);
 	
 	// Create the Density MLP
-	
 	json density_mlp_encoding_config = {
 		{"otype", "HashGrid"},
 		{"n_levels", 16},
@@ -76,7 +73,6 @@ NeRFTrainingController::NeRFTrainingController(
 		{"n_neurons", hidden_dim_color},
 		{"n_hidden_layers", num_layers_color - 1},
 	};
-
 	
 	color_mlp = std::shared_ptr<tcnn::cpp::Module>(
 		tcnn::cpp::create_network(color_mlp_in_dim, 3, color_mlp_network_config)
@@ -102,14 +98,37 @@ NeRFTrainingController::~NeRFTrainingController() {
 	curandDestroyGenerator(rng);
 }
 
-__global__ void resizeFloatsToUInt32(uint32_t n_elements, float* floats, uint32_t* uints, float range_max) {
+__global__ void generate_training_image_indices(
+	const uint32_t n_elements,
+	const uint32_t n_images,
+	uint32_t* __restrict__ image_indices
+) {
 	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx < n_elements) {
-		float resized_val = floats[idx] * range_max;
-		uints[idx] = (uint32_t)resized_val;
-	}
+	
+	if (idx > n_elements) return;
+	
+	image_indices[idx] = idx / n_images;
 }
 
+__global__ void resize_floats_to_uint32_with_max(
+	const uint32_t n_elements,
+	const float* __restrict__ floats,
+	uint32_t* __restrict__ uints,
+	const float range_max
+) {
+	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+	
+	if (idx < n_elements) return;
+	
+	float resized_val = floats[idx] * range_max;
+	uints[idx] = (uint32_t)resized_val;
+}
+
+/*__global__ void select_pixels_and_rays_from_training_data(
+	const uint32_t n_elements,
+	const uint32_t* __restrict__ pixel_indices,
+	const uint32_t* __restrict__ image_indices,
+)*/
 
 void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream, uint32_t training_step, uint32_t batch_size) {
 	workspace.enlarge(stream, dataset.n_pixels_per_image, dataset.images.size(), batch_size);
@@ -117,9 +136,24 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream, u
 	vector<uint32_t> random_indices_host(workspace.batch_size);
 	// next, pull rays from the dataset 
 	curandGenerateUniform(rng, workspace.random_floats, workspace.batch_size);
-	resizeFloatsToUInt32<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(workspace.batch_size, workspace.random_floats, workspace.random_indices, dataset.n_pixels_per_image);
+	resize_floats_to_uint32_with_max<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
+		workspace.batch_size, workspace.random_floats, workspace.pixel_indices, dataset.n_pixels_per_image
+	);
 
-	cudaMemcpyAsync(random_indices_host.data(), workspace.random_indices, workspace.batch_size * sizeof(uint32_t), cudaMemcpyDeviceToHost, stream);
+	// need a kernel that selects ray & pixel indices from the training images
+
+
+	generate_training_image_indices<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
+		workspace.batch_size,
+		dataset.images.size(),
+		workspace.image_indices
+	);
+	// select_pixels_and_rays_from_training_data<<<n_block_linear(workspace.batch_size), n_threads_linear>>> (
+	//
+	//);
+	
+	// debug code (check indices are random)
+	cudaMemcpyAsync(random_indices_host.data(), workspace.image_indices, workspace.batch_size * sizeof(uint32_t), cudaMemcpyDeviceToHost, stream);
 	cudaStreamSynchronize(stream);
 	
 	printf("%ld", random_indices_host.size());
