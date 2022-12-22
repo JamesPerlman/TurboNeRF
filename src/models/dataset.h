@@ -6,7 +6,7 @@
 #include <string>
 
 #include <Eigen/Dense>
-#include <nlohmann/json.hpp>
+#include <json/json.hpp>
 
 #include "camera.h"
 #include "training-image.h"

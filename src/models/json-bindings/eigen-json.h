@@ -3,7 +3,7 @@
 #include "../common.h"
 
 #include <Eigen/Dense>
-#include <nlohmann/json.hpp>
+#include <json/json.hpp>
 
 NRC_NAMESPACE_BEGIN
 

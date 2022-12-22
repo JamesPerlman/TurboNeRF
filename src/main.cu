@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-#include <nlohmann/json.hpp>
+#include <json/json.hpp>
 #include <Eigen/Dense>
 
 #include "common.h"
