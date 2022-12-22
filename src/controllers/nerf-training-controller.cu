@@ -1,10 +1,9 @@
 
 #include <device_launch_parameters.h>
-#include <nlohmann/json.hpp>
+#include <json/json.hpp>
 #include <tiny-cuda-nn/common.h>
-#include <tiny-cuda-nn/cpp_api.h>
 #include <tiny-cuda-nn/config.h>
-#include <tiny-cuda-nn/trainer.h>
+#include <tiny-cuda-nn/encoding.h>
 
 #include <memory>
 #include "nerf-training-controller.h"
@@ -33,13 +32,15 @@ NeRFTrainingController::NeRFTrainingController(
 	double per_level_scale = 1.4472692012786865;
 
 	// Create the Direction Encoding
-	/*
+	
 	json direction_encoding_config = {
 		{"otype", "SphericalHarmonics"},
 		{"degree", 4},
 	};
 	
-	direction_encoding = std::shared_ptr<cpp::Module>(cpp::create_encoding(3, direction_encoding_config, cpp::preferred_precision()));
+	direction_encoding = std::shared_ptr<Encoding<network_precision_t>>(
+		tcnn::create_encoding<network_precision_t>((uint32_t)3, direction_encoding_config)
+	);
 	
 	// Create the Density MLP
 	
@@ -59,12 +60,14 @@ NeRFTrainingController::NeRFTrainingController(
 		{"n_neurons", hidden_dim},
 		{"n_hidden_layers", num_layers - 1},
 	};
-	
-	auto density_mlp = cpp::create_network_with_input_encoding(3, 1 + geo_feat_dim, density_mlp_encoding_config, density_mlp_network_config);
+
+	density_mlp = std::shared_ptr<tcnn::cpp::Module>(
+		tcnn::cpp::create_network_with_input_encoding(3, 1 + geo_feat_dim, density_mlp_encoding_config, density_mlp_network_config)
+	);
 	
 	// Create the Color MLP
 	
-	uint32_t color_mlp_in_dim = direction_encoding->n_output_dims() + geo_feat_dim;
+	uint32_t color_mlp_in_dim = direction_encoding->padded_output_width() + geo_feat_dim;
 		
 	json color_mlp_network_config = {
 		{"otype", "FullyFusedMLP"},
@@ -73,9 +76,12 @@ NeRFTrainingController::NeRFTrainingController(
 		{"n_neurons", hidden_dim_color},
 		{"n_hidden_layers", num_layers_color - 1},
 	};
-	
-	color_mlp = std::shared_ptr<cpp::Module>(cpp::create_network(color_mlp_in_dim, 3, color_mlp_network_config));
 
+	
+	color_mlp = std::shared_ptr<tcnn::cpp::Module>(
+		tcnn::cpp::create_network(color_mlp_in_dim, 3, color_mlp_network_config)
+	);
+	
 	// Set up Optimizer
 	
 	json optimizer_config = {
@@ -84,9 +90,10 @@ NeRFTrainingController::NeRFTrainingController(
 		{"epsilon", 1e-15},
 	};
 	
-	optimizer = std::shared_ptr<Optimizer<tcnn::network_precision_t>>(create_optimizer<network_precision_t>(optimizer_config));
-	*/
-
+	optimizer = std::shared_ptr<Optimizer<tcnn::network_precision_t>>(
+		create_optimizer<network_precision_t>(optimizer_config)
+	);
+	
 	// RNG
 	curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_PHILOX4_32_10);
 }

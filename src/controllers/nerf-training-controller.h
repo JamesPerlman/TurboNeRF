@@ -5,6 +5,8 @@
 #include <tiny-cuda-nn/common.h>
 #include <tiny-cuda-nn/encoding.h>
 #include <tiny-cuda-nn/optimizer.h>
+#include <tiny-cuda-nn/network.h>
+#include <tiny-cuda-nn/network_with_input_encoding.h>
 
 #include "../common.h"
 #include "../models/bounding-box.h"
@@ -36,7 +38,7 @@ private:
 	uint32_t hidden_dim_color;
 
 	// network objects
-	std::shared_ptr<tcnn::cpp::Module> direction_encoding;
+	std::shared_ptr<tcnn::Encoding<tcnn::network_precision_t>> direction_encoding;
 	std::shared_ptr<tcnn::cpp::Module> density_mlp;
 	std::shared_ptr<tcnn::cpp::Module> color_mlp;
 	std::shared_ptr<tcnn::Optimizer<tcnn::network_precision_t>> optimizer;
