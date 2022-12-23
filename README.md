@@ -17,3 +17,4 @@ https://github.com/KAIR-BAIR/nerfacc [[LICENSE](https://github.com/KAIR-BAIR/ner
 Extreme thank yous to these subscribers on Twitch (https://twitch.tv/jperldev) who support this project's development!
 
 madclawgonzo - Requested a haiku written by ChatGPT: "Madclawgonzo / Subscribing to your stream / Software project."
+anonymous
