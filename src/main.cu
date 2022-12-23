@@ -21,13 +21,13 @@ __global__ void helloCuda(void)
 
 int main()
 {
-	nrc::Dataset dataset = nrc::Dataset::from_file("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json");
-    dataset.load_images_in_parallel();
-
+	nrc::Dataset dataset = nrc::Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json");
     auto controller = nrc::NeRFTrainingController(dataset);
-
+    
     cudaStream_t stream;
-	CUDA_ASSERT_SUCCESS(cudaStreamCreate(&stream));
+	CUDA_CHECK_THROW(cudaStreamCreate(&stream));
+
+    controller.prepare_for_training(stream, 1024);
     
     controller.train_step(stream);
     

@@ -5,7 +5,7 @@
 
 #define NRC_HOST_DEVICE __host__ __device__
 
-#define CUDA_ASSERT_SUCCESS(call) { \
+#define CUDA_CHECK_THROW(call) { \
 	cudaError_t err = call; \
 	if (err != cudaSuccess) { \
 		throw std::runtime_error(cudaGetErrorString(err)); \

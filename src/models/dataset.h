@@ -1,12 +1,13 @@
 #pragma once
 
-#include "../common.h"
-
-#include <vector>
+#include <functional>
 #include <string>
+#include <vector>
 
 #include <Eigen/Dense>
 #include <json/json.hpp>
+
+#include "../common.h"
 
 #include "camera.h"
 #include "training-image.h"
@@ -20,12 +21,12 @@ struct Dataset {
 	vector<Camera> cameras;
 	vector<TrainingImage> images;
 	uint32_t n_pixels_per_image;
+	uint32_t n_channels_per_image;
+	Eigen::Vector2i image_dimensions;
 
-	static Dataset from_file(string file_path);
-	void Dataset::load_images_in_parallel();
-
-private:
-	void update_dataset_properties();
+	Dataset(string file_path);
+	Dataset() = default;
+	void Dataset::load_images_in_parallel(std::function<void(const size_t, const TrainingImage&)> post_load_image = {});
 };
 
 NRC_NAMESPACE_END

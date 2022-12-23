@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../common.h"
+#include "ray.h"
 
 #include <Eigen/Dense>
 
@@ -23,6 +24,9 @@ struct Camera {
 		this->sensor_size = sensor_size;
 		this->transform = transform;
 	}
+
+	// member functions
+	NRC_HOST_DEVICE Ray Camera::get_ray_at_pixel_xy(uint32_t x, uint32_t y);
 };
 
 NRC_NAMESPACE_END

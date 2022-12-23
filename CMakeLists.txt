@@ -25,14 +25,11 @@ include_directories(${CUDA_INCLUDE_DIRS})
 
 # Include sub-projects.
 add_subdirectory(includes/eigen)
-add_subdirectory(includes/json)
 
 set(TCNN_BUILD_EXAMPLES OFF)
 set(TCNN_BUILD_BENCHMARK OFF)
 add_subdirectory(includes/tiny-cuda-nn)
 
-include_directories(includes/stb)
-link_directories(includes/stb)
 
 # src project
 

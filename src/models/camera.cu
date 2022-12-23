@@ -1,7 +1,6 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include "camera.h"
-#include "ray.h"
 
 
 using namespace nrc;
@@ -15,26 +14,33 @@ __global__ void init_rays_pinhole(
 ) {
 	int32_t x = blockIdx.x * blockDim.x + threadIdx.x;
 	int32_t y = blockIdx.y * blockDim.y + threadIdx.y;
-	
+
 	int32_t idx = x * gridDim.x + y;
-	
+
 	if (idx >= n_rays) {
 		return;
 	}
+	
+	Ray ray = cam.get_ray_at_pixel_xy(x, y);
+	
+	rays_out[idx] = ray;
+}
+
+NRC_HOST_DEVICE Ray Camera::get_ray_at_pixel_xy(uint32_t x, uint32_t y) {
+	
 	// uv ranges [-0.5f, 0.5f] in both dimensions, and is centered on this pixel
-	auto uv = Vector2f(
-		float(x) / (float(cam.pixel_dims.x()) + 0.5f),
-		float(y) / (float(cam.pixel_dims.y()) + 0.5f)
+	Vector2f uv = Vector2f(
+		float(x) / (float(pixel_dims.x()) + 0.5f),
+		float(y) / (float(pixel_dims.y()) + 0.5f)
 	) - Vector2f(0.5f, 0.5f);
 
-	auto uv_scaled = uv.cwiseProduct(cam.sensor_size);
-	auto pix_pos = Vector3f(uv_scaled.x(), uv_scaled.y(), 1.0f);
-	
-	auto cam_origin = cam.transform.block<3, 1>(0, 3);
+	Vector2f uv_scaled = uv.cwiseProduct(sensor_size);
+	Vector3f pix_pos = Vector3f(uv_scaled.x(), uv_scaled.y(), 1.0f);
 
-	auto ray_d = pix_pos - cam_origin;
-	auto ray_o = cam_origin + cam.near * ray_d;
+	Vector3f cam_origin = transform.block<3, 1>(0, 3);
 
-	Ray ray = { ray_o, ray_d };
-	rays_out[idx] = ray;
+	Vector3f ray_d = pix_pos - cam_origin;
+	Vector3f ray_o = cam_origin + near * ray_d;
+
+	return Ray{ ray_o, ray_d };
 }
