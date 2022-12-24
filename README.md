@@ -18,3 +18,4 @@ Extreme thank yous to these subscribers on Twitch (https://twitch.tv/jperldev) w
 
 madclawgonzo - Requested a haiku written by ChatGPT: "Madclawgonzo / Subscribing to your stream / Software project."
 anonymous
+gusround - https://github.com/candidogustavo
