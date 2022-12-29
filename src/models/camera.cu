@@ -26,7 +26,7 @@ __global__ void init_rays_pinhole(
 	rays_out[idx] = ray;
 }
 
-NRC_HOST_DEVICE Ray Camera::get_ray_at_pixel_xy(uint32_t x, uint32_t y) {
+NRC_HOST_DEVICE Ray Camera::get_ray_at_pixel_xy(const uint32_t& x, const uint32_t& y) const {
 	
 	// uv ranges [-0.5f, 0.5f] in both dimensions, and is centered on this pixel
 	Vector2f uv = Vector2f(

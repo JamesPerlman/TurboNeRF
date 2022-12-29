@@ -26,7 +26,7 @@ struct Camera {
 	}
 
 	// member functions
-	NRC_HOST_DEVICE Ray Camera::get_ray_at_pixel_xy(uint32_t x, uint32_t y);
+	NRC_HOST_DEVICE Ray Camera::get_ray_at_pixel_xy(const uint32_t& x, const uint32_t& y) const;
 };
 
 NRC_NAMESPACE_END

@@ -28,42 +28,34 @@ public:
 	tcnn::network_precision_t* density_input;
 	tcnn::network_precision_t* density_output;
 
-	tcnn::network_precision_t* color_output_r;
-	tcnn::network_precision_t* color_output_g;
-	tcnn::network_precision_t* color_output_b;
+	tcnn::network_precision_t* color_output_rgb;
 
 	float* random_floats;
 	uint32_t* img_index;
-	uint32_t* ray_index; // index of ray inside the batch
 	uint32_t* pix_index; // index of randomly selected pixel in image
 
-	uint32_t* n_steps;
+	uint32_t* n_steps[2];
 
-	float* pix_r[2];
-	float* pix_g[2];
-	float* pix_b[2];
-	float* pix_a[2];
+	// ground-truth pixel color components
+	float* pix_rgba[2];
+	// ray estimated color components
+	float* ray_rgba;
 	
-	float* ray_r;
-	float* ray_g;
-	float* ray_b;
-	float* ray_a;
-	
-	float* ori_x[2];
-	float* ori_y[2];
-	float* ori_z[2];
+	// ray origin components
+	float* ori_xyz[2];
 
-	float* dir_x[2];
-	float* dir_y[2];
-	float* dir_z[2];
+	// ray direction components
+	float* dir_xyz[2];
 
-	float* idir_x;
-	float* idir_y;
-	float* idir_z;
+	// ray inverse direction components
+	float* idir_xyz;
 
-	float* ray_t; // t_mid
+	// ray t components
 	float* ray_t0; // t_start
 	float* ray_t1; // t_end
+
+	// sample position components
+	float* pos_xyz;
 
 	uint32_t n_occupancy_grid_elements;
 	CascadedOccupancyGrid* occupancy_grid;

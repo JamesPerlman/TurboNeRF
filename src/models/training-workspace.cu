@@ -26,7 +26,7 @@ void TrainingWorkspace::enlarge(
 		BoundingBox,				// bounding_box
 		stbi_uc,					// image_data
 		network_precision_t,		// density_input
-		network_precision_t,		// color_output_r, color_output_g, color_outbut_b
+		network_precision_t,		// color_output_rgb
 		float,						// random_floats
 		
 		uint32_t,					// img_index
@@ -34,18 +34,16 @@ void TrainingWorkspace::enlarge(
 
 		uint32_t,					// n_steps
 		
-		float,						// pix_r, pix_g, pix_b, pix_a
-		
-		float,						// ori_x, ori_y, ori_z
-		
-		float,						// dir_x, dir_y, dir_z
+		float,						// pix_rgba
+		float,						// ray_rgba
 
-		float, 						// idir_x, idir_y, idir_z
+		float,						// ori_xyz
+		float,						// dir_xyz
+		float, 						// idir_xyz
 		
-		float,						// ray_r, ray_g, ray_b, ray_a
-
 		float,						// ray_t0
 		float,						// ray_t1
+		float, 						// pos_xyz
 
 		CascadedOccupancyGrid,		// occupancy_grid
 		uint8_t						// occupancy_grid_bitfield
@@ -61,18 +59,16 @@ void TrainingWorkspace::enlarge(
 
 		2 * batch_size,				// n_steps (double buffer)
 		
-		2 * 4 * batch_size,			// pix_r, pix_g, pix_b, pix_a (double buffer)
+		2 * 4 * batch_size,			// pix_rgba (double buffer)
+		4 * batch_size,				// ray_rgba
 		
-		2 * 3 * batch_size,			// ori_x, ori_y, ori_z (double buffer)
-		
-		2 * 3 * batch_size,			// dir_x, dir_y, dir_z (double buffer)
-
-		2 * 3 * batch_size, 		// idir_x, idir_y, idir_z
-		
-		4 * batch_size,				// ray_r, ray_g, ray_b, ray_a
+		2 * 3 * batch_size,			// ori_xyz (double buffer)
+		2 * 3 * batch_size,			// dir_xyz (double buffer)
+		2 * 3 * batch_size, 		// idir_xyz
 
 		batch_size,					// ray_t0
 		batch_size,					// ray_t1
+		3 * batch_size, 			// pos_xyz
 
 		1,							// occupancy_grid
 		n_grid_bitfield_bytes		// occupancy_grid.bitfield
@@ -83,56 +79,34 @@ void TrainingWorkspace::enlarge(
 	image_data = std::get<1>(data);
 	density_input = std::get<2>(data);
 	
-	color_output_r = std::get<3>(data);
-	color_output_g = color_output_r + batch_size;
-	color_output_b = color_output_g + batch_size;
+	color_output_rgb = std::get<3>(data);
 
 	random_floats = std::get<4>(data);
 	
 	img_index = std::get<5>(data);
 	pix_index = std::get<6>(data);
 
-	n_steps = std::get<7>(data);
+	n_steps[0] = std::get<7>(data);
+	n_steps[1] = n_steps[0] + batch_size;
 	
 	// carefully note how double-buffered pointers are set up
-	pix_r[0] = std::get<8>(data);
-	pix_g[0] = pix_r[0] + batch_size;
-	pix_b[0] = pix_g[0] + batch_size;
-	pix_a[0] = pix_b[0] + batch_size;
+	pix_rgba[0] = std::get<8>(data);
+	pix_rgba[1] = pix_rgba[0] + 4 * batch_size;
 
-	pix_r[1] = pix_a[0] + batch_size;
-	pix_g[1] = pix_r[1] + batch_size;
-	pix_b[1] = pix_g[1] + batch_size;
-	pix_a[1] = pix_b[1] + batch_size;
+	ray_rgba = std::get<9>(data);
 	
-	ori_x[0] = std::get<9>(data);
-	ori_y[0] = ori_x[0] + batch_size;
-	ori_z[0] = ori_y[0] + batch_size;
-
-	ori_x[1] = ori_z[0] + batch_size;
-	ori_y[1] = ori_x[1] + batch_size;
-	ori_z[1] = ori_y[1] + batch_size;
+	ori_xyz[0] = std::get<10>(data);
+	ori_xyz[1] = ori_xyz[0] + 3 * batch_size;
 	
-	dir_x[0] = std::get<10>(data);
-	dir_y[0] = dir_x[0] + batch_size;
-	dir_z[0] = dir_y[0] + batch_size;
-
-	dir_x[1] = dir_z[0] + batch_size;
-	dir_y[1] = dir_x[1] + batch_size;
-	dir_z[1] = dir_y[1] + batch_size;
+	dir_xyz[0] = std::get<11>(data);
+	dir_xyz[1] = dir_xyz[0] + 3 * batch_size;
 	
-	ray_r = std::get<11>(data);
-	ray_g = ray_r + batch_size;
-	ray_b = ray_g + batch_size;
-	ray_a = ray_b + batch_size;
-
-	idir_x = std::get<12>(data);
-	idir_y = idir_x + batch_size;
-	idir_z = idir_y + batch_size;
+	idir_xyz = std::get<12>(data);
 
 	ray_t0 = std::get<13>(data);
 	ray_t1 = std::get<14>(data);
+	pos_xyz = std::get<15>(data);
 
-	occupancy_grid = std::get<15>(data);
-	occupancy_grid_bitfield = std::get<16>(data);
+	occupancy_grid = std::get<16>(data);
+	occupancy_grid_bitfield = std::get<17>(data);
 }

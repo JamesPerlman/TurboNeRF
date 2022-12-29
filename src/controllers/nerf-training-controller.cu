@@ -53,7 +53,7 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 		cudaMemsetAsync(
 			workspace.occupancy_grid_bitfield,
 			(uint8_t)0b11111111, // set all bits to 1
-			workspace.n_occupancy_grid_elements / sizeof(uint8_t),
+			workspace.n_occupancy_grid_elements / 8,
 			stream
 		)
 	);
@@ -101,6 +101,11 @@ void NeRFTrainingController::load_images(cudaStream_t stream) {
 	printf("All images loaded to GPU.\n");
 }
 
+#define CHECK_DATA(varname, data_type, data_ptr, data_size) \
+	std::vector<data_type> varname(data_size); \
+	CUDA_CHECK_THROW(cudaMemcpyAsync(varname.data(), data_ptr, data_size * sizeof(data_type), cudaMemcpyDeviceToHost, stream)); \
+	cudaStreamSynchronize(stream);
+
 /**
  * Based on my understanding of the instant-ngp paper and some help from NerfAcc,
   * we must do the following to generate a batch of fixed number of samples with a dynamic number of rays
@@ -139,11 +144,15 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.image_data,
 		workspace.img_index,
 		workspace.pix_index,
-		workspace.pix_r[0], workspace.pix_g[0], workspace.pix_b[0], workspace.pix_a[0],
-		workspace.ori_x[0], workspace.ori_y[0], workspace.ori_z[0],
-		workspace.dir_x[0], workspace.dir_y[0], workspace.dir_z[0],
-		workspace.idir_x, workspace.idir_y, workspace.idir_z
+		workspace.pix_rgba[0],
+		workspace.ori_xyz[0],
+		workspace.dir_xyz[0],
+		workspace.idir_xyz
 	);
+
+	CHECK_DATA(dirx1, float, workspace.dir_xyz[0] + 0 * workspace.batch_size, workspace.batch_size);
+	CHECK_DATA(diry1, float, workspace.dir_xyz[0] + 1 * workspace.batch_size, workspace.batch_size);
+	CHECK_DATA(dirz1, float, workspace.dir_xyz[0] + 2 * workspace.batch_size, workspace.batch_size);
 
 	/* Begin volumetric sampling of the previous network outputs */
 	
@@ -161,64 +170,61 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		cone_angle,
 		dt_min,
 		dt_max,
-		workspace.ori_x[0], workspace.ori_y[0], workspace.ori_z[0],
-		workspace.dir_x[0], workspace.dir_y[0], workspace.dir_z[0],
-		workspace.idir_x, workspace.idir_y, workspace.idir_z,
-		workspace.n_steps
+		workspace.ori_xyz[0],
+		workspace.dir_xyz[0],
+		workspace.idir_xyz,
+		workspace.n_steps[0]
 	);
 
+	CHECK_DATA(nsteps1, uint32_t, workspace.n_steps[0], workspace.batch_size);
+
 	// Grab some references to the double-buffered n_steps array
-	thrust::device_vector<uint32_t> n_steps_in(workspace.n_steps, workspace.n_steps + workspace.batch_size);
-	thrust::device_vector<uint32_t> n_steps_cum(workspace.n_steps + workspace.batch_size, workspace.n_steps + 2 * workspace.batch_size);
+	thrust::device_ptr<uint32_t> n_steps_in_ptr(workspace.n_steps[0]);
+	thrust::device_ptr<uint32_t> n_steps_cum_ptr(workspace.n_steps[1]);
 
 	// Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch
-	thrust::inclusive_scan(n_steps_in.begin(), n_steps_in.end(), n_steps_cum.begin());
+	thrust::inclusive_scan(thrust::cuda::par.on(stream), n_steps_in_ptr, n_steps_in_ptr + workspace.batch_size, n_steps_cum_ptr);
+
+	CHECK_DATA(nsteps2, uint32_t, workspace.n_steps[1], workspace.batch_size);
 
 	// Populate the t0 and t1 buffers with the starts and ends of each ray's samples.
 	// Also copy and compact other output buffers to help with coalesced memory access in future kernels.
 	march_and_generate_samples_and_compact_buffers_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
 		workspace.batch_size,
-		workspace.n_steps[0],
 		workspace.bounding_box,
 		workspace.occupancy_grid,
 		dt_min, dt_max,
 		cone_angle,
 		
 		// input buffers
-		workspace.pix_r[0], workspace.pix_g[0], workspace.pix_b[0], workspace.pix_a[0],
-		workspace.ori_x[0], workspace.ori_y[0], workspace.ori_z[0],
-		workspace.dir_x[0], workspace.dir_y[0], workspace.dir_z[0],
-		workspace.idir_x, workspace.idir_y, workspace.idir_z,
-		workspace.n_steps,
-		n_steps_cum.data().get(),
+		workspace.pix_rgba[0],
+		workspace.ori_xyz[0],
+		workspace.dir_xyz[0],
+		workspace.idir_xyz,
+		workspace.n_steps[0],
+		workspace.n_steps[1],
 
 		// output buffers
-		workspace.pix_r[1], workspace.pix_g[1], workspace.pix_b[1], workspace.pix_a[1],
-		workspace.ori_x[1], workspace.ori_y[1], workspace.ori_z[1],
-		workspace.dir_x[1], workspace.dir_y[1], workspace.dir_z[1],
+		workspace.pix_rgba[1],
+		workspace.ori_xyz[1],
+		workspace.dir_xyz[1],
 		workspace.ray_t0, workspace.ray_t1
 	);
+
+	CHECK_DATA(rayt01, float, workspace.ray_t0, workspace.batch_size);
+	CHECK_DATA(rayt11, float, workspace.ray_t1, workspace.batch_size);
 
 	// Generate stratified sampling positions
 	generate_stratified_sample_positions_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
 		workspace.batch_size,
 		workspace.ray_t0, workspace.ray_t1,
 		workspace.random_floats,
-		workspace.ori_x[1], workspace.ori_y[1], workspace.ori_z[1]
+		workspace.ori_xyz[1],
+		workspace.dir_xyz[1],
+		workspace.pos_xyz
 	);
 
 	// if this works im amazing
-
-	// debug code (check indices are random)
-	vector<uint32_t> random_indices_host(workspace.batch_size);
-	CUDA_CHECK_THROW(cudaMemcpyAsync(random_indices_host.data(), workspace.ray_index, workspace.batch_size * sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
-
-	vector<float> pixel_batch_host(3 * 1024);
-	//CUDA_CHECK_THROW(cudaMemcpyAsync(pixel_batch_host.data(), workspace.rgb_batch, 3 * 1024 * sizeof(float), cudaMemcpyDeviceToHost, stream));
-	
-	vector<stbi_uc> first_img_host(800 * 800 * 4);
-	CUDA_CHECK_THROW(cudaMemcpyAsync(first_img_host.data(), workspace.image_data, 800 * 800 * 4 * sizeof(stbi_uc), cudaMemcpyDeviceToHost, stream));
-	
 	CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
 }
 
