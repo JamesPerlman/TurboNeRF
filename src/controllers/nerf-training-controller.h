@@ -9,50 +9,49 @@
 #include <tiny-cuda-nn/network_with_input_encoding.h>
 
 #include "../common.h"
-#include "../models/bounding-box.h"
+#include "../models/bounding-box.cuh"
+#include "../models/cascaded-occupancy-grid.cuh"
 #include "../models/dataset.h"
+#include "../models/nerf-network.h"
 #include "../models/training-workspace.h"
 
 NRC_NAMESPACE_BEGIN
 
 struct NeRFTrainingController {
 	// constructor
-	NeRFTrainingController(
-		Dataset& dataset,
-		const uint32_t& num_layers = 2,
-		const uint32_t& hidden_dim = 64,
-		const uint32_t& geo_feat_dim = 15,
-		const uint32_t& num_layers_color = 3,
-		const uint32_t& hidden_dim_color = 64
-	);
+	NeRFTrainingController(Dataset& dataset);
 	~NeRFTrainingController();
+	
+	// public properties
 
 	// public methods
 	void prepare_for_training(cudaStream_t stream, uint32_t batch_size);
 	void load_images(cudaStream_t stream);
 	void train_step(cudaStream_t stream);
 
+	uint32_t get_training_step() const {
+		return training_step;
+	}
+
 private:
-	// property members
+	// private properties
 	Dataset dataset;
-	uint32_t num_layers;
-	uint32_t hidden_dim;
-	uint32_t geo_feat_dim;
-	uint32_t num_layers_color;
-	uint32_t hidden_dim_color;
+	uint32_t training_step;
+
+	// configuration properties
+	uint32_t batch_size;
+	uint32_t n_occupancy_grid_levels = 5;
+	uint32_t occupancy_grid_resolution = 128;
 
 	// network objects
-	std::shared_ptr<tcnn::Encoding<tcnn::network_precision_t>> direction_encoding;
-	std::shared_ptr<tcnn::cpp::Module> density_mlp;
-	std::shared_ptr<tcnn::cpp::Module> color_mlp;
-	std::shared_ptr<tcnn::Optimizer<tcnn::network_precision_t>> optimizer;
+	NerfNetwork network;
 
 	// workspace
 	TrainingWorkspace workspace;
 	curandGenerator_t rng;
 	
 	// private methods
-	void generate_next_training_batch(cudaStream_t stream, uint32_t training_step);
+	void generate_next_training_batch(cudaStream_t stream);
 };
 
 NRC_NAMESPACE_END

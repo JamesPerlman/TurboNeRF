@@ -9,6 +9,7 @@
 #include "common.h"
 #include "main.h"
 #include "models/dataset.h"
+#include "models/cascaded-occupancy-grid.cuh"
 #include "controllers/nerf-training-controller.h"
 
 
@@ -22,6 +23,10 @@ __global__ void helloCuda(void)
 int main()
 {
 	nrc::Dataset dataset = nrc::Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json");
+    
+    // nrc::OccupancyGrid grid(1);
+
+    // printf("%lu", grid.max_index());
     auto controller = nrc::NeRFTrainingController(dataset);
     
     cudaStream_t stream;

@@ -9,6 +9,7 @@
 
 #include "../common.h"
 
+#include "bounding-box.cuh"
 #include "camera.h"
 #include "training-image.h"
 
@@ -23,6 +24,7 @@ struct Dataset {
 	uint32_t n_pixels_per_image;
 	uint32_t n_channels_per_image;
 	Eigen::Vector2i image_dimensions;
+	BoundingBox bounding_box;
 
 	Dataset(string file_path);
 	Dataset() = default;

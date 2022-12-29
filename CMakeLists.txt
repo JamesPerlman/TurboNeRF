@@ -35,13 +35,19 @@ add_subdirectory(includes/tiny-cuda-nn)
 
 set(HEADERS
 	src/controllers/nerf-training-controller.h
-	src/models/bounding-box.h
+	src/models/bounding-box.cuh
 	src/models/camera.h
+	src/models/cascaded-occupancy-grid.cuh
 	src/models/dataset.h
+	src/models/nerf-network.h
 	src/models/ray.h
 	src/models/training-image.h
-	src/models/json-bindings/eigen-json.h
 	src/models/training-workspace.h
+	src/utils/gpu_image.h
+	src/utils/bit-utils.cuh
+	src/utils/json-bindings/eigen-json.h
+	src/utils/training-batch-kernels.cuh
+	src/utils/volumetric-rendering.cuh
 	src/common.h
 	src/main.h
 )
@@ -50,9 +56,10 @@ set(SOURCES
 	src/controllers/nerf-training-controller.cu
 	src/models/camera.cu
 	src/models/dataset.cu
+	src/models/nerf-network.cu
 	src/models/training-image.cu
 	src/models/training-workspace.cu
-	src/utils/embedder.cu
+	src/utils/gpu_image.cu
 	src/main.cu	
 )
 

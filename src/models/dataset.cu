@@ -8,8 +8,8 @@
 #include <thread>
 #include <vector>
 
-#include "json-bindings/eigen-json.h"
 #include "dataset.h"
+#include "../utils/json-bindings/eigen-json.h"
 
 using namespace Eigen;
 using namespace std;
@@ -36,6 +36,9 @@ Dataset::Dataset(string file_path) {
     Vector2f view_angle(json_data["camera_angle_x"], json_data["camera_angle_y"]);
     Vector2f angle_tans(view_angle.array().tan());
     Vector2f sensor_size = 2.0f * focal_length.cwiseProduct(0.5f * angle_tans);
+
+    uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
+    bounding_box = BoundingBox((float)aabb_size);
     
     path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
 
@@ -57,6 +60,7 @@ Dataset::Dataset(string file_path) {
 
 }
 
+// this method was written (mostly) by ChatGPT!
 void Dataset::load_images_in_parallel(std::function<void(const size_t, const TrainingImage&)> post_load_image) {
     const size_t num_threads = std::thread::hardware_concurrency(); // get the number of available hardware threads
 

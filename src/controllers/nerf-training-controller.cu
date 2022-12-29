@@ -2,199 +2,84 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <json/json.hpp>
-#include <tiny-cuda-nn/common.h>
-#include <tiny-cuda-nn/config.h>
-#include <tiny-cuda-nn/encoding.h>
 #include <Eigen/Dense>
+#include <memory>
+#include <thrust/device_vector.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stbi/stb_image.h>
 #include <stbi/stb_image_write.h>
 
-#include <memory>
 #include "nerf-training-controller.h"
+#include "../models/cascaded-occupancy-grid.cuh"
+#include "../utils/training-batch-kernels.cuh"
 
 using namespace nrc;
 using namespace Eigen;
 using namespace tcnn;
 using namespace nlohmann;
 
-NeRFTrainingController::NeRFTrainingController(
-	Dataset& dataset,
-	const uint32_t& num_layers,
-	const uint32_t& hidden_dim,
-	const uint32_t& geo_feat_dim,
-	const uint32_t& num_layers_color,
-	const uint32_t& hidden_dim_color
-) {
+NeRFTrainingController::NeRFTrainingController(Dataset& dataset) {
 	this->dataset = dataset;
-	this->num_layers = num_layers;
-	this->hidden_dim = hidden_dim;
-	this->geo_feat_dim = geo_feat_dim;
-	this->num_layers_color = num_layers_color;
-	this->hidden_dim_color = hidden_dim_color;
 	
-	// TODO: set this properly based on the aabb
-	double per_level_scale = 1.4472692012786865;
+	network = NerfNetwork();
 
-	// Create the Direction Encoding
-	json direction_encoding_config = {
-		{"otype", "SphericalHarmonics"},
-		{"degree", 4},
-	};
-	
-	direction_encoding = std::shared_ptr<Encoding<network_precision_t>>(
-		tcnn::create_encoding<network_precision_t>(3, direction_encoding_config)
-	);
-	
-	// Create the Density MLP
-	json density_mlp_encoding_config = {
-		{"otype", "HashGrid"},
-		{"n_levels", 16},
-		{"n_features_per_level", 2},
-		{"log2_hashmap_size", 19},
-		{"base_resolution", 16},
-		{"per_level_scale", per_level_scale},
-	};
-	
-	json density_mlp_network_config = {
-		{"otype", "FullyFusedMLP"},
-		{"activation", "ReLU"},
-		{"output_activation", "None"},
-		{"n_neurons", hidden_dim},
-		{"n_hidden_layers", num_layers - 1},
-	};
-
-	density_mlp = std::shared_ptr<tcnn::cpp::Module>(
-		tcnn::cpp::create_network_with_input_encoding(3, 1 + geo_feat_dim, density_mlp_encoding_config, density_mlp_network_config)
-	);
-	
-	// Create the Color MLP
-	
-	uint32_t color_mlp_in_dim = direction_encoding->padded_output_width() + geo_feat_dim;
-		
-	json color_mlp_network_config = {
-		{"otype", "FullyFusedMLP"},
-		{"activation", "ReLU"},
-		{"output_activation", "Sigmoid"},
-		{"n_neurons", hidden_dim_color},
-		{"n_hidden_layers", num_layers_color - 1},
-	};
-	
-	color_mlp = std::shared_ptr<tcnn::cpp::Module>(
-		tcnn::cpp::create_network(color_mlp_in_dim, 3, color_mlp_network_config)
-	);
-	
-	// Set up Optimizer
-	
-	json optimizer_config = {
-		{"otype", "Adam"},
-		{"learning_rate", 1e-2},
-		{"epsilon", 1e-15},
-	};
-	
-	optimizer = std::shared_ptr<Optimizer<tcnn::network_precision_t>>(
-		create_optimizer<network_precision_t>(optimizer_config)
-	);
-	
 	// RNG
 	// todo: CURAND_ASSERT_SUCCESS
 	curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_PHILOX4_32_10);
 	curandGenerateSeeds(rng);
+
 }
 
 NeRFTrainingController::~NeRFTrainingController() {
 	curandDestroyGenerator(rng);
 }
 
-// Training data kernels
-
-__global__ void stbi_uchar_to_float(
-	const uint32_t n_elements,
-	const stbi_uc* __restrict__ src,
-	float* __restrict__ dst
-) {
-	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-	
-	if (idx < n_elements) {
-		dst[idx] = (float)src[idx] / 255.0f;
-	}
-}
-
-__global__ void generate_training_image_indices(
-	const uint32_t n_elements,
-	const uint32_t n_images,
-	uint32_t* __restrict__ image_indices
-) {
-	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-	
-	if (idx >= n_elements) return;
-	
-	image_indices[idx] = idx * n_images / n_elements;
-}
-
-__global__ void resize_floats_to_uint32_with_max(
-	const uint32_t n_elements,
-	const float* __restrict__ floats,
-	uint32_t* __restrict__ uints,
-	const float range_max
-) {
-	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-	
-	if (idx >= n_elements) return;
-	
-	float resized_val = floats[idx] * range_max;
-	uints[idx] = (uint32_t)resized_val;
-}
-
-// generates rays and RGBs for training, assigns them to an array of contiguous data
-__global__ void select_pixels_and_rays_from_training_data(
-	const uint32_t n_batch_elements,
-	const uint32_t n_images,
-	const uint32_t image_data_stride,
-	const Vector2i image_dimensions,
-	const Camera* __restrict__ cameras,
-	const stbi_uc* __restrict__ image_data,
-	const uint32_t* __restrict__ pixel_indices,
-	const uint32_t* __restrict__ image_indices,
-	float* __restrict__ ray_rgbs,
-	float* __restrict__ ray_dirs
-) {
-	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx >= n_batch_elements) return;
-	
-	uint32_t image_idx = 0;// image_indices[idx];
-	uint32_t pixel_idx = pixel_indices[idx];
-	
-	uint32_t pixel_x = pixel_idx % image_dimensions.x();
-	uint32_t pixel_y = pixel_idx / image_dimensions.x();
-	uint32_t x = pixel_x;
-	uint32_t y = pixel_y;
-	Camera cam = cameras[image_idx];
-	
-	uint32_t img_offset = image_idx * image_data_stride;
-	Ray ray = cam.get_ray_at_pixel_xy(x, y);
-
-	ray_dirs[0 * n_batch_elements + idx] = ray.d.x();
-	ray_dirs[1 * n_batch_elements + idx] = ray.d.y();
-	ray_dirs[2 * n_batch_elements + idx] = ray.d.z();
-
-	stbi_uc r = image_data[img_offset + 3 * pixel_idx + 0];
-	stbi_uc g = image_data[img_offset + 3 * pixel_idx + 1];
-	stbi_uc b = image_data[img_offset + 3 * pixel_idx + 2];
-	
-	ray_rgbs[0 * n_batch_elements + idx] = (float)r / 255.0f;
-	ray_rgbs[1 * n_batch_elements + idx] = (float)g / 255.0f;
-	ray_rgbs[2 * n_batch_elements + idx] = (float)b / 255.0f;
-}
-
 // NeRFTrainingController member functions
 
 void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t batch_size) {
-	// todo: init workspace from dataset?
-	workspace.enlarge(stream, dataset.n_pixels_per_image, dataset.n_channels_per_image, dataset.images.size(), batch_size);
-	// todo: manage cameras inside the workspace?
+	// This allocates memory for all the elements we need during training
+	workspace.enlarge(stream,
+		dataset.n_pixels_per_image,
+		dataset.n_channels_per_image,
+		dataset.images.size(),
+		batch_size,
+		n_occupancy_grid_levels,
+		occupancy_grid_resolution
+	);
+
+	// Initialize occupancy grid bitfield (all bits set to 1)
+	CUDA_CHECK_THROW(
+		cudaMemsetAsync(
+			workspace.occupancy_grid_bitfield,
+			(uint8_t)0b11111111, // set all bits to 1
+			workspace.n_occupancy_grid_elements / sizeof(uint8_t),
+			stream
+		)
+	);
+
+	// Create a CascadedOccupancyGrid object and copy it to the GPU
+	CascadedOccupancyGrid occupancy_grid_tmp(n_occupancy_grid_levels, workspace.occupancy_grid_bitfield, occupancy_grid_resolution);
+	CUDA_CHECK_THROW(
+		cudaMemcpyAsync(workspace.occupancy_grid, &occupancy_grid_tmp, sizeof(CascadedOccupancyGrid), cudaMemcpyHostToDevice, stream)
+	);
+
+	// Copy dataset's BoundingBox to the GPU
+	CUDA_CHECK_THROW(
+		cudaMemcpyAsync(workspace.bounding_box, &dataset.bounding_box, sizeof(BoundingBox), cudaMemcpyHostToDevice, stream)
+	);
+
+	// Training image indices will be reused for each batch.  We select the same number of rays from each image in the dataset.
+	generate_training_image_indices<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
+		workspace.batch_size,
+		dataset.images.size(),
+		workspace.img_index
+	);
+	
+	// Copy training cameras to the GPU
 	workspace.cameras.resize_and_copy_from_host(dataset.cameras);
+
+	// Load all images into GPU memory!
 	load_images(stream);
 }
 
@@ -203,128 +88,146 @@ void NeRFTrainingController::load_images(cudaStream_t stream) {
 	uint32_t image_size = dataset.n_channels_per_image * dataset.n_pixels_per_image * sizeof(stbi_uc);
 	dataset.load_images_in_parallel(
 		[this, &image_size, &stream](const size_t& image_index, const TrainingImage& image) {
-			if (image_index == 0) {
-				cudaError_t error = cudaMemcpyAsync(
-					workspace.image_data,
-					image.data_cpu.get(),
-					image_size,
-					cudaMemcpyHostToDevice,
-					stream
-				);
-				if (error != cudaSuccess) {
-					printf("image error: %d", image_index);
-				}
-			}
+			CUDA_CHECK_THROW(cudaMemcpyAsync(
+				workspace.image_data,
+				image.data_cpu.get(),
+				image_size,
+				cudaMemcpyHostToDevice,
+				stream
+			));
 		}
 	);
 
 	printf("All images loaded to GPU.\n");
 }
 
-void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream, uint32_t training_step) {
+/**
+ * Based on my understanding of the instant-ngp paper and some help from NerfAcc,
+  * we must do the following to generate a batch of fixed number of samples with a dynamic number of rays
+  * 
+  * 0. Generate rays and pixels
+  * 1. Count the number of steps each ray will take
+  * 2. Determine the maximum number of rays that will fill the batch with samples
+  * 3. Generate the samples (t0, t1)
+  * 4. Apply stratified sampling to get an array of t-values
+  * 5. Run the network forward and get the predicted color and alpha for each sample
+  * 6. Accumulate the colors and alphas from the color network output, along each ray
+  * 7. Calculate the loss and backpropagate
+ */
+
+void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	
-	// next, pull rays from the dataset 
+	// Generate random floats for use in training
 	
 	curandStatus_t status = curandGenerateUniform(rng, workspace.random_floats, workspace.batch_size);
 	if (status != CURAND_STATUS_SUCCESS) {
 		printf("Error generating random floats for training batch.\n");
 	}
 	
+	// Convert floats to uint32_t which will be interpreted as pixel indices for any training image
 	resize_floats_to_uint32_with_max<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
-		workspace.batch_size, workspace.random_floats, workspace.pixel_indices, dataset.n_pixels_per_image
+		workspace.batch_size, workspace.random_floats, workspace.pix_index, dataset.n_pixels_per_image
 	);
 
-	// need a kernel that selects ray & pixel indices from the training images
-	generate_training_image_indices<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
-		workspace.batch_size,
-		dataset.images.size(),
-		workspace.image_indices
-	);
-
-	select_pixels_and_rays_from_training_data<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
+	// Populate pixel buffers and ray data buffers based on the random numbers we generated
+	initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
 		workspace.batch_size,
 		dataset.images.size(),
 		dataset.n_pixels_per_image * dataset.n_channels_per_image,
 		dataset.image_dimensions,
 		workspace.cameras.data(),
 		workspace.image_data,
-		workspace.pixel_indices,
-		workspace.image_indices,
-		workspace.rgb_batch,
-		workspace.ray_dir_batch
+		workspace.img_index,
+		workspace.pix_index,
+		workspace.pix_r[0], workspace.pix_g[0], workspace.pix_b[0], workspace.pix_a[0],
+		workspace.ori_x[0], workspace.ori_y[0], workspace.ori_z[0],
+		workspace.dir_x[0], workspace.dir_y[0], workspace.dir_z[0],
+		workspace.idir_x, workspace.idir_y, workspace.idir_z
 	);
+
+	/* Begin volumetric sampling of the previous network outputs */
 	
+	// TODO: calculate these accurately
+
+	float dt_min = 0.01f;
+	float dt_max = 1.0f;
+	float cone_angle = 1.0f;
+
+	// Count the number of steps each ray would take
+	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
+		workspace.batch_size,
+		workspace.bounding_box,
+		workspace.occupancy_grid,
+		cone_angle,
+		dt_min,
+		dt_max,
+		workspace.ori_x[0], workspace.ori_y[0], workspace.ori_z[0],
+		workspace.dir_x[0], workspace.dir_y[0], workspace.dir_z[0],
+		workspace.idir_x, workspace.idir_y, workspace.idir_z,
+		workspace.n_steps
+	);
+
+	// Grab some references to the double-buffered n_steps array
+	thrust::device_vector<uint32_t> n_steps_in(workspace.n_steps, workspace.n_steps + workspace.batch_size);
+	thrust::device_vector<uint32_t> n_steps_cum(workspace.n_steps + workspace.batch_size, workspace.n_steps + 2 * workspace.batch_size);
+
+	// Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch
+	thrust::inclusive_scan(n_steps_in.begin(), n_steps_in.end(), n_steps_cum.begin());
+
+	// Populate the t0 and t1 buffers with the starts and ends of each ray's samples.
+	// Also copy and compact other output buffers to help with coalesced memory access in future kernels.
+	march_and_generate_samples_and_compact_buffers_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
+		workspace.batch_size,
+		workspace.n_steps[0],
+		workspace.bounding_box,
+		workspace.occupancy_grid,
+		dt_min, dt_max,
+		cone_angle,
+		
+		// input buffers
+		workspace.pix_r[0], workspace.pix_g[0], workspace.pix_b[0], workspace.pix_a[0],
+		workspace.ori_x[0], workspace.ori_y[0], workspace.ori_z[0],
+		workspace.dir_x[0], workspace.dir_y[0], workspace.dir_z[0],
+		workspace.idir_x, workspace.idir_y, workspace.idir_z,
+		workspace.n_steps,
+		n_steps_cum.data().get(),
+
+		// output buffers
+		workspace.pix_r[1], workspace.pix_g[1], workspace.pix_b[1], workspace.pix_a[1],
+		workspace.ori_x[1], workspace.ori_y[1], workspace.ori_z[1],
+		workspace.dir_x[1], workspace.dir_y[1], workspace.dir_z[1],
+		workspace.ray_t0, workspace.ray_t1
+	);
+
+	// Generate stratified sampling positions
+	generate_stratified_sample_positions_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
+		workspace.batch_size,
+		workspace.ray_t0, workspace.ray_t1,
+		workspace.random_floats,
+		workspace.ori_x[1], workspace.ori_y[1], workspace.ori_z[1]
+	);
+
+	// if this works im amazing
+
 	// debug code (check indices are random)
 	vector<uint32_t> random_indices_host(workspace.batch_size);
-	CUDA_CHECK_THROW(cudaMemcpyAsync(random_indices_host.data(), workspace.pixel_indices, workspace.batch_size * sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
+	CUDA_CHECK_THROW(cudaMemcpyAsync(random_indices_host.data(), workspace.ray_index, workspace.batch_size * sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
 
 	vector<float> pixel_batch_host(3 * 1024);
-	CUDA_CHECK_THROW(cudaMemcpyAsync(pixel_batch_host.data(), workspace.rgb_batch, 3 * 1024 * sizeof(float), cudaMemcpyDeviceToHost, stream));
+	//CUDA_CHECK_THROW(cudaMemcpyAsync(pixel_batch_host.data(), workspace.rgb_batch, 3 * 1024 * sizeof(float), cudaMemcpyDeviceToHost, stream));
 	
 	vector<stbi_uc> first_img_host(800 * 800 * 4);
 	CUDA_CHECK_THROW(cudaMemcpyAsync(first_img_host.data(), workspace.image_data, 800 * 800 * 4 * sizeof(stbi_uc), cudaMemcpyDeviceToHost, stream));
 	
 	CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
-	uint32_t n_nonzero_elements = 0;
-	for (const auto& f : first_img_host) {
-		if (f > 0.0001f) {
-			++n_nonzero_elements;
-		}
-	}
-	printf("%d\n", n_nonzero_elements);
-
-	vector<stbi_uc> random_pixels(800 * 800 * 3);
-	for (const auto& i : random_indices_host) {
-		random_pixels[3 * i + 0] = stbi_uc(first_img_host[3 * i + 0] * 255.0f);
-		random_pixels[3 * i + 1] = stbi_uc(first_img_host[3 * i + 1] * 255.0f);
-		random_pixels[3 * i + 2] = stbi_uc(first_img_host[3 * i + 2] * 255.0f);
-	}
-
-	int w = 800;
-	int h = 800;
-	int c;
-	auto x = stbi_failure_reason();
-	std::string filename = "C:\\Users\\bizon\\Developer\\NeRFRenderCore\\random_px_step_1" + std::to_string(training_step) + ".png";
-
-	auto data_cpu = stbi_loadf("E:\\2022\\nerf-library\\testdata\\lego\\train\\r_0.png", &w, &h, &c, 4);
-	
-	std::vector<stbi_uc> im_uc(w * h * c);
-	for (uint32_t i = 0; i < w; ++i) {
-		for (uint32_t j = 0; j < h; ++j) {
-			for (uint32_t k = 0; k < c; ++k) {
-				uint32_t idx = (i * w + j) * c + k;
-				im_uc[idx] = (stbi_uc)(first_img_host[idx] * 255.f);
-			}
-		}
-	}
-	auto xy = stbi_failure_reason();
-	stbi_write_png(filename.c_str(), w, h, c, first_img_host.data(), w * c * sizeof(stbi_uc));
 }
 
 void NeRFTrainingController::train_step(cudaStream_t stream) {
 	
 	// Train the model (batch_size must be a multiple of tcnn::batch_size_granularity)
 	uint32_t batch_size = tcnn::next_multiple((uint32_t)1000, tcnn::batch_size_granularity);
-	for (int i = 0; i < 1; ++i) {
-		generate_next_training_batch(stream, i);
-	}
-	/*
-	GPUMatrix<float> network_input(workspace.network_input);
-	GPUMatrix<float> network_output(workspace.network_output);
-
-	for (int i = 0; i < n_training_steps; ++i) {
-		generate_training_batch(&training_batch_inputs, &training_batch_targets); // <-- your code
-
-		float loss;
-		model.trainer->training_step(training_stream, training_batch_inputs, training_batch_targets);
-		std::cout << "iteration=" << i << " loss=" << loss << std::endl;
-	}
-
-	// Use the model
-	GPUMatrix<float> inference_inputs(n_input_dims, batch_size);
-	generate_inputs(&inference_inputs); // <-- your code
-
-	GPUMatrix<float> inference_outputs(n_output_dims, batch_size);
-	model.network->inference(inference_inputs, inference_outputs);
-	*/
+	generate_next_training_batch(stream);
+	
+	// network.train(stream, batch_size, workspace.rgb_batch, workspace.dir_batch);
+	
 }
