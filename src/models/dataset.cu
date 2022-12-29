@@ -35,7 +35,8 @@ Dataset::Dataset(string file_path) {
     Vector2f focal_length(json_data["fl_x"], json_data["fl_y"]);
     Vector2f view_angle(json_data["camera_angle_x"], json_data["camera_angle_y"]);
     Vector2f angle_tans(view_angle.array().tan());
-    Vector2f sensor_size = 2.0f * focal_length.cwiseProduct(0.5f * angle_tans);
+    // sensor size is the size of the sensor at distance 1 from the camera's origin
+    Vector2f sensor_size = angle_tans;//2.0f * focal_length.cwiseProduct(0.5f * angle_tans);
 
     uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
     bounding_box = BoundingBox((float)aabb_size);
