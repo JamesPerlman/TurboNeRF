@@ -196,7 +196,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const float* __restrict__ in_dir_x, const float* __restrict__ in_dir_y, const float* __restrict__ in_dir_z,
 	const float* __restrict__ in_idir_x, const float* __restrict__ in_idir_y, const float* __restrict__ in_idir_z,
 	const uint32_t* __restrict__ n_ray_steps, 		// one per ray
-	const uint32_t* __restrict__ n_total_steps_cum, // one per ray
+	const uint32_t* __restrict__ n_steps_cum, // one per ray
 
 	// output buffers
 	float* __restrict__ out_pix_r, float* __restrict__ out_pix_g, float* __restrict__ out_pix_b, float* __restrict__ out_pix_a,
@@ -210,6 +210,14 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	// check if thread is out of bounds
 	if (i >= n_rays) return;
 
+
+	// if the total number of cumulative steps is greater than the number of rays, we exit early to avoid overflowing any buffers
+	const uint32_t n_total_steps_cum = n_steps_cum[i];
+
+	if (n_total_steps_cum >= n_rays) return;
+
+	// References to input buffers
+
 	const float o_x = in_ori_x[i];
 	const float o_y = in_ori_y[i];
 	const float o_z = in_ori_z[i];
@@ -222,12 +230,12 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const float id_y = in_idir_y[i];
 	const float id_z = in_idir_z[i];
 
-	/** n_total_steps_cum[i] is the cumulative number of steps taken by any ray up to and including ray i
+	/** n_total_steps_cum is the cumulative number of steps taken by any ray up to and including ray i
 	  * to get the offset of the data buffer holding samples for this ray,
 	  * we must subtract the number of steps taken by this ray.
 	  */
 	
-	uint32_t sample_offset = n_total_steps_cum[i] - n_ray_steps[i];
+	uint32_t sample_offset = n_total_steps_cum - n_ray_steps[i];
 
 	/**
 	 * Store pointers to the sub-location for compacted data to be placed
@@ -248,6 +256,8 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 
 	float* __restrict__ compacted_t0 = out_t0 + sample_offset;
 	float* __restrict__ compacted_t1 = out_t1 + sample_offset;
+
+	// Perform raymarching
 
 	float t = 0.0f;
 	uint32_t n_steps_taken = 0;
