@@ -4,6 +4,3 @@
 [submodule "includes/eigen"]
 	path = includes/eigen
 	url = https://gitlab.com/libeigen/eigen.git
-[submodule "includes/stb"]
-	path = includes/stb
-	url = https://github.com/nothings/stb.git
