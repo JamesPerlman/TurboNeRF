@@ -45,6 +45,7 @@ set(HEADERS
 	src/models/training-workspace.h
 	src/utils/gpu_image.h
 	src/utils/bit-utils.cuh
+	src/utils/coordinate-transformations.cuh
 	src/utils/json-bindings/eigen-json.h
 	src/utils/training-batch-kernels.cuh
 	src/utils/volumetric-rendering.cuh
