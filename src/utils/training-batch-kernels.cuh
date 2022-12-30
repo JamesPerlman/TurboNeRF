@@ -387,7 +387,63 @@ __global__ void generate_stratified_sample_positions_kernel(
 	out_xyz[i_offset_0] = o_x + t * d_x;
 	out_xyz[i_offset_1] = o_y + t * d_y;
 	out_xyz[i_offset_2] = o_z + t * d_z;
+}
 
+
+/**
+ * Accumulate the sample colors by ray.
+ */
+
+__global__ void accumulate_ray_colors_from_samples_kernel(
+	uint32_t n_rays, // n_rays is not necessarily the batch size here
+	uint32_t batch_size,
+	const uint32_t* __restrict__ n_samples_per_ray,
+	const uint32_t* __restrict__ n_samples_cum,
+	const float* __restrict__ sample_rgba, 	// organized based on the cumulative steps
+	float* __restrict__ ray_rgba
+) {
+	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= n_rays) {
+		return;
+	}
+
+	// Grab local references to global data
+
+	const uint32_t n_samples = n_samples_per_ray[i];
+	
+	const uint32_t sample_offset_0 = n_samples_cum[i] - n_samples;
+	const uint32_t sample_offset_1 = sample_offset_0 + batch_size;
+	const uint32_t sample_offset_2 = sample_offset_1 + batch_size;
+	const uint32_t sample_offset_3 = sample_offset_2 + batch_size;
+
+	// Calculate loss
+	float loss = 0.0f;
+
+	float ray_r = 0.0f;
+	float ray_g = 0.0f;
+	float ray_b = 0.0f;
+	float ray_a = 0.0f;
+
+	for (uint32_t j = 0; j < n_samples; ++j) {
+		const float sample_r = sample_rgba[sample_offset_0 + j];
+		const float sample_g = sample_rgba[sample_offset_1 + j];
+		const float sample_b = sample_rgba[sample_offset_2 + j];
+		const float sample_a = sample_rgba[sample_offset_3 + j];
+
+		// use alpha compositing here.  accumulated ray color is the foreground and the new sample is the background
+		
+		ray_a += sample_a * (1.0f - ray_a);
+		
+		ray_r = (ray_r * ray_a + sample_r * sample_a * (1.0f - ray_a)) / ray_a;
+		ray_g = (ray_g * ray_a + sample_g * sample_a * (1.0f - ray_a)) / ray_a;
+		ray_b = (ray_b * ray_a + sample_b * sample_a * (1.0f - ray_a)) / ray_a;
+	}
+	
+	// write out the accumulated ray color
+	ray_rgba[i + 0 * batch_size] = ray_r;
+	ray_rgba[i + 1 * batch_size] = ray_g;
+	ray_rgba[i + 2 * batch_size] = ray_b;
+	ray_rgba[i + 3 * batch_size] = ray_a;
 }
 
 NRC_NAMESPACE_END
