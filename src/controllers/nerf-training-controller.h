@@ -39,7 +39,6 @@ private:
 	uint32_t training_step;
 
 	// configuration properties
-	uint32_t batch_size;
 	uint32_t n_occupancy_grid_levels = 5;
 	uint32_t occupancy_grid_resolution = 128;
 

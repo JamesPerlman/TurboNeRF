@@ -224,16 +224,19 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.pos_xyz
 	);
 
-	// if this works im amazing
-	CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
+	CHECK_DATA(posx1, float, workspace.pos_xyz + 0 * workspace.batch_size, workspace.batch_size);
+	CHECK_DATA(posy1, float, workspace.pos_xyz + 1 * workspace.batch_size, workspace.batch_size);
+	CHECK_DATA(posz1, float, workspace.pos_xyz + 2 * workspace.batch_size, workspace.batch_size);
+
+	
 }
 
 void NeRFTrainingController::train_step(cudaStream_t stream) {
 	
-	// Train the model (batch_size must be a multiple of tcnn::batch_size_granularity)
-	uint32_t batch_size = tcnn::next_multiple((uint32_t)1000, tcnn::batch_size_granularity);
+	// Generate training batch
 	generate_next_training_batch(stream);
 	
-	// network.train(stream, batch_size, workspace.rgb_batch, workspace.dir_batch);
+	// generate_training_batch should have populated pos_xyz, dir_xyz[1], and pix_rgba[1] with data correlated by ray
+	network.train(stream, workspace.batch_size, workspace.pos_xyz, workspace.dir_xyz[1], workspace.pix_rgba[1]);
 	
 }
