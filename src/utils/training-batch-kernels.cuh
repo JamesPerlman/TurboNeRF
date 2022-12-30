@@ -36,7 +36,7 @@ __global__ void generate_training_image_indices(
 	
 	if (idx >= n_elements) return;
 	
-	image_indices[idx] = idx * n_images / n_elements;
+	image_indices[idx] = idx % n_images;
 }
 
 __global__ void resize_floats_to_uint32_with_max(
