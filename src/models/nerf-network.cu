@@ -196,25 +196,6 @@ void NerfNetwork::forward(
 	);
 }
 
-void NerfNetwork::train(
-	cudaStream_t stream,
-	uint32_t batch_size,
-	float* pos_batch,
-	float* dir_batch,
-	float* rgb_batch
-) {
-	enlarge_batch_memory_if_needed(batch_size);
-
-	// Forward pass
-
-	forward(stream, batch_size, pos_batch, dir_batch);
-
-	// Backward pass
-
-	
-
-}
-
 void NerfNetwork::enlarge_batch_memory_if_needed(uint32_t batch_size) {
 	uint32_t density_network_output_size = density_network->padded_output_width() * batch_size;
 	uint32_t direction_encoding_output_size = direction_encoding->padded_output_width() * batch_size;

@@ -236,7 +236,9 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 	// Generate training batch
 	generate_next_training_batch(stream);
 	
+	network.enlarge_batch_memory_if_needed(workspace.batch_size);
+	
 	// generate_training_batch should have populated pos_xyz, dir_xyz[1], and pix_rgba[1] with data correlated by ray
-	network.train(stream, workspace.batch_size, workspace.pos_xyz, workspace.dir_xyz[1], workspace.pix_rgba[1]);
+	network.forward(stream, workspace.batch_size, workspace.pos_xyz, workspace.dir_xyz[1]);
 	
 }
