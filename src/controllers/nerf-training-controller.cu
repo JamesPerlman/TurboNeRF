@@ -87,6 +87,11 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 
 	// Load all images into GPU memory!
 	load_images(stream);
+
+	// Since there is no previous step here, we set the number of previous rays to the batch size
+	// so that the training batch generator will generate a full batch of rays
+	n_prev_rays_used = workspace.batch_size;
+	training_step = 0;
 }
 
 void NeRFTrainingController::load_images(cudaStream_t stream) {
@@ -135,9 +140,18 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.batch_size, workspace.random_floats, workspace.pix_index, dataset.n_pixels_per_image
 	);
 
-	// Populate pixel buffers and ray data buffers based on the random numbers we generated
-	initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
-		workspace.batch_size,
+	/**
+	 * Generate rays and pixels for training
+	 * 
+	 * We can take a shortcut here and generate only the data needed to fill the batch back up.
+	 * If not all the previous batch's rays were used, then we can reuse the unused rays.
+	 * AKA, n_prev_rays_used is the number of spent rays that need to be regenerated.
+	 * 
+	 * Huzzah, optimization!
+	 * 
+	 */
+	initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(n_prev_rays_used), n_threads_linear>>>(
+		n_prev_rays_used,
 		dataset.images.size(),
 		dataset.n_pixels_per_image * dataset.n_channels_per_image,
 		dataset.image_dimensions,
@@ -163,9 +177,9 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	float dt_max = 1.0f;
 	float cone_angle = 1.0f;
 
-	// Count the number of steps each ray would take
-	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
-		workspace.batch_size,
+	// Count the number of steps each ray would take.  We only need to do this for the new rays.
+	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(n_prev_rays_used), n_threads_linear>>>(
+		n_prev_rays_used,
 		workspace.bounding_box,
 		workspace.occupancy_grid,
 		cone_angle,
@@ -179,17 +193,26 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 
 	CHECK_DATA(nsteps1, uint32_t, workspace.n_steps[0], workspace.batch_size);
 
+	/**
+	 * Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch.
+	 * We need to perform this cumsum over the entire batch of rays, not just the rays that were regenerated over the used ones in the previous batch.
+	 */
+	
 	// Grab some references to the double-buffered n_steps array
 	thrust::device_ptr<uint32_t> n_steps_in_ptr(workspace.n_steps[0]);
 	thrust::device_ptr<uint32_t> n_steps_cum_ptr(workspace.n_steps[1]);
 
-	// Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch
+	// cumsum
 	thrust::inclusive_scan(thrust::cuda::par.on(stream), n_steps_in_ptr, n_steps_in_ptr + workspace.batch_size, n_steps_cum_ptr);
 
 	CHECK_DATA(nsteps2, uint32_t, workspace.n_steps[1], workspace.batch_size);
 
-	// Populate the t0 and t1 buffers with the starts and ends of each ray's samples.
-	// Also copy and compact other output buffers to help with coalesced memory access in future kernels.
+	/**
+	 * Populate the t0 and t1 buffers with the starts and ends of each ray's samples.
+	 * Also copy and compact other output buffers to help with coalesced memory access in future kernels.
+	 * Again, we perform this over the entire batch of samples.
+	 */
+
 	march_and_generate_samples_and_compact_buffers_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
 		workspace.batch_size,
 		workspace.bounding_box,
@@ -237,6 +260,16 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.batch_size,
 		workspace.batch_size
 	);
+
+	if (n_rays_used < 0) {
+		// TODO: better error handling
+		throw std::runtime_error("No rays used to fill sample batch");
+		// regenerate all rays?
+		n_prev_rays_used = workspace.batch_size;
+	}
+
+	n_prev_rays_used = n_rays_used;
+
 }
 
 void NeRFTrainingController::train_step(cudaStream_t stream) {

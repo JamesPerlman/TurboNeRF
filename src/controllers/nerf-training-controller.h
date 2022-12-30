@@ -37,6 +37,7 @@ private:
 	// private properties
 	Dataset dataset;
 	uint32_t training_step;
+	uint32_t n_prev_rays_used;
 
 	// configuration properties
 	uint32_t n_occupancy_grid_levels = 5;
