@@ -13,11 +13,17 @@
 #include "nerf-training-controller.h"
 #include "../models/cascaded-occupancy-grid.cuh"
 #include "../utils/training-batch-kernels.cuh"
+#include "../utils/parallel-utils.cuh"
 
 using namespace nrc;
 using namespace Eigen;
 using namespace tcnn;
 using namespace nlohmann;
+
+#define CHECK_DATA(varname, data_type, data_ptr, data_size) \
+	std::vector<data_type> varname(data_size); \
+	CUDA_CHECK_THROW(cudaMemcpyAsync(varname.data(), data_ptr, data_size * sizeof(data_type), cudaMemcpyDeviceToHost, stream)); \
+	cudaStreamSynchronize(stream);
 
 NeRFTrainingController::NeRFTrainingController(Dataset& dataset) {
 	this->dataset = dataset;
@@ -100,11 +106,6 @@ void NeRFTrainingController::load_images(cudaStream_t stream) {
 
 	printf("All images loaded to GPU.\n");
 }
-
-#define CHECK_DATA(varname, data_type, data_ptr, data_size) \
-	std::vector<data_type> varname(data_size); \
-	CUDA_CHECK_THROW(cudaMemcpyAsync(varname.data(), data_ptr, data_size * sizeof(data_type), cudaMemcpyDeviceToHost, stream)); \
-	cudaStreamSynchronize(stream);
 
 /**
  * Based on my understanding of the instant-ngp paper and some help from NerfAcc,
@@ -203,7 +204,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.idir_xyz,
 		workspace.n_steps[0],
 		workspace.n_steps[1],
-
+		
 		// output buffers
 		workspace.pix_rgba[1],
 		workspace.ori_xyz[1],
@@ -228,7 +229,14 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	CHECK_DATA(posy1, float, workspace.pos_xyz + 1 * workspace.batch_size, workspace.batch_size);
 	CHECK_DATA(posz1, float, workspace.pos_xyz + 2 * workspace.batch_size, workspace.batch_size);
 
-	
+	// Count the number of rays actually used to fill the sample batch
+
+	int n_rays_used = find_last_lt_presorted(
+		stream,
+		n_steps_cum_ptr,
+		workspace.batch_size,
+		workspace.batch_size
+	);
 }
 
 void NeRFTrainingController::train_step(cudaStream_t stream) {
@@ -237,7 +245,7 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 	generate_next_training_batch(stream);
 	
 	network.enlarge_batch_memory_if_needed(workspace.batch_size);
-	
+
 	// generate_training_batch should have populated pos_xyz, dir_xyz[1], and pix_rgba[1] with data correlated by ray
 	network.forward(stream, workspace.batch_size, workspace.pos_xyz, workspace.dir_xyz[1]);
 	
