@@ -71,10 +71,10 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i >= batch_size) return;
 
-	const uint32_t i_offset_0 = i + 0 * batch_size;
-	const uint32_t i_offset_1 = i + 1 * batch_size;
-	const uint32_t i_offset_2 = i + 2 * batch_size;
-	const uint32_t i_offset_3 = i + 3 * batch_size;
+	const uint32_t i_offset_0 = i;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
+	const uint32_t i_offset_3 = i_offset_2 + batch_size;
 	
 	const uint32_t image_idx = img_index[i];
 	const uint32_t pixel_idx = pix_index[i];
@@ -144,21 +144,21 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	// check if thread is out of bounds
 	if (i >= batch_size) return;
 
-	const uint32_t batch_offset_0 = 0;
-	const uint32_t batch_offset_1 = batch_size;
-	const uint32_t batch_offset_2 = batch_offset_1 + batch_size;
+	const uint32_t i_offset_0 = i;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
 	
-	const float o_x = ori_xyz[i + batch_offset_0];
-	const float o_y = ori_xyz[i + batch_offset_1];
-	const float o_z = ori_xyz[i + batch_offset_2];
+	const float o_x = ori_xyz[i_offset_0];
+	const float o_y = ori_xyz[i_offset_1];
+	const float o_z = ori_xyz[i_offset_2];
 	
-	const float d_x = dir_xyz[i + batch_offset_0];
-	const float d_y = dir_xyz[i + batch_offset_1];
-	const float d_z = dir_xyz[i + batch_offset_2];
+	const float d_x = dir_xyz[i_offset_0];
+	const float d_y = dir_xyz[i_offset_1];
+	const float d_z = dir_xyz[i_offset_2];
 	
-	const float id_x = idir_xyz[i + batch_offset_0];
-	const float id_y = idir_xyz[i + batch_offset_1];
-	const float id_z = idir_xyz[i + batch_offset_2];
+	const float id_x = idir_xyz[i_offset_0];
+	const float id_y = idir_xyz[i_offset_1];
+	const float id_z = idir_xyz[i_offset_2];
 
 	uint32_t n_steps_taken = 0;
 	
@@ -239,7 +239,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	// References to input buffers
 	const uint32_t batch_offset_0 = 0;
 	const uint32_t batch_offset_1 = batch_size;
-	const uint32_t batch_offset_2 = batch_offset_1 + batch_size;
+	const uint32_t batch_offset_2 = batch_size << 1; // this is presumably faster than (batch_size * 2) or (batch_offset_1 + batch_size)
 	const uint32_t batch_offset_3 = batch_offset_2 + batch_size;
 
 	const uint32_t i_offset_0 = i + batch_offset_0;
@@ -363,27 +363,31 @@ __global__ void generate_stratified_sample_positions_kernel(
 	}
 
 	// Grab local references to global data
+	const uint32_t i_offset_0 = i;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
 
-	const float t0_i = t0[i];
-	const float t1_i = t1[i];
+	const float t0_i = t0[i_offset_0];
+	const float t1_i = t1[i_offset_0];
 	
 	const float k = random_floats[i];
 	
-	const float o_x = in_ori_xyz[i + 0 * batch_size];
-	const float o_y = in_ori_xyz[i + 1 * batch_size];
-	const float o_z = in_ori_xyz[i + 2 * batch_size];
+	const float o_x = in_ori_xyz[i_offset_0];
+	const float o_y = in_ori_xyz[i_offset_1];
+	const float o_z = in_ori_xyz[i_offset_2];
 	
-	const float d_x = in_dir_xyz[i + 0 * batch_size];
-	const float d_y = in_dir_xyz[i + 1 * batch_size];
-	const float d_z = in_dir_xyz[i + 2 * batch_size];
+	const float d_x = in_dir_xyz[i_offset_0];
+	const float d_y = in_dir_xyz[i_offset_1];
+	const float d_z = in_dir_xyz[i_offset_2];
 
 	// Calculate sample position
 
 	const float t = t0_i + (t1_i - t0_i) * k;
 
-	out_xyz[i + 0 * batch_size] = o_x + t * d_x;
-	out_xyz[i + 1 * batch_size] = o_y + t * d_y;
-	out_xyz[i + 2 * batch_size] = o_z + t * d_z;
+	out_xyz[i_offset_0] = o_x + t * d_x;
+	out_xyz[i_offset_1] = o_y + t * d_y;
+	out_xyz[i_offset_2] = o_z + t * d_z;
+
 }
 
 NRC_NAMESPACE_END
