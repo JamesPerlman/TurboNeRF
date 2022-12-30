@@ -19,7 +19,8 @@ struct NerfNetwork {
 	
 	NerfNetwork();
 	
-	void train(cudaStream_t stream, uint32_t batch_size, float* pos_batch, float* dir_batch, float* rgb_batch);
+	void enlarge_batch_memory_if_needed(uint32_t batch_size);
+	void forward(cudaStream_t stream, uint32_t batch_size, float* pos_batch, float* dir_batch);
 
 private:
 
@@ -38,9 +39,6 @@ private:
 	uint32_t previous_batch_size = 0;
 	
 	void initialize_params_and_gradients();
-	void enlarge_batch_memory_if_needed(uint32_t batch_size);
-
-	void forward(cudaStream_t stream, uint32_t batch_size, float* pos_batch, float* dir_batch);
 };
 
 NRC_NAMESPACE_END
