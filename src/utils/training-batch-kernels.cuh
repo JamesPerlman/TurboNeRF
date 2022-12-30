@@ -87,7 +87,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	
 	const uint32_t img_offset = image_idx * image_data_stride;
 
-	const stbi_uc* __restrict__ pixel = image_data + img_offset + 3 * pixel_idx;
+	const stbi_uc* __restrict__ pixel = image_data + img_offset + 4 * pixel_idx;
 	const stbi_uc r = pixel[0];
 	const stbi_uc g = pixel[1];
 	const stbi_uc b = pixel[2];
