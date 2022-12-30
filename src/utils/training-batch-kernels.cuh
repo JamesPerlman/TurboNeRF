@@ -99,7 +99,10 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	pix_rgba[i_offset_3] = (float)a / 255.0f;
 	
 	// TODO: optimize
-	const Ray ray = cam.get_ray_at_pixel_xy(x, y);
+	Ray ray = cam.get_ray_at_pixel_xy(x, y);
+
+	ray.o = (cam.transform * ray.o.homogeneous()).head<3>();
+	ray.d = (cam.transform * ray.d.homogeneous()).head<3>() - ray.o;
 
 	ori_xyz[i_offset_0] = ray.o.x();
 	ori_xyz[i_offset_1] = ray.o.y();

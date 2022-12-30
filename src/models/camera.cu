@@ -35,12 +35,10 @@ NRC_HOST_DEVICE Ray Camera::get_ray_at_pixel_xy(const uint32_t& x, const uint32_
 	) - Vector2f(0.5f, 0.5f);
 
 	Vector2f uv_scaled = uv.cwiseProduct(sensor_size);
-	Vector3f pix_pos = Vector3f(uv_scaled.x(), uv_scaled.y(), 1.0f);
+	Vector3f pix_pos = Vector3f(uv_scaled.x(), uv_scaled.y(), -1.0f);
 
-	Vector3f cam_origin = transform.block<3, 1>(0, 3);
-
-	Vector3f ray_d = pix_pos - cam_origin;
-	Vector3f ray_o = cam_origin + near * ray_d;
+	Vector3f ray_d = pix_pos;
+	Vector3f ray_o = near * ray_d;
 
 	return Ray{ ray_o, ray_d };
 }
