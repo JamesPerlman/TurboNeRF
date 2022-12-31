@@ -90,7 +90,7 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 
 	// Since there is no previous step here, we set the number of previous rays to the batch size
 	// so that the training batch generator will generate a full batch of rays
-	n_prev_rays_used = workspace.batch_size;
+	n_batch_rays_used = workspace.batch_size;
 	training_step = 0;
 }
 
@@ -145,13 +145,13 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	 * 
 	 * We can take a shortcut here and generate only the data needed to fill the batch back up.
 	 * If not all the previous batch's rays were used, then we can reuse the unused rays.
-	 * AKA, n_prev_rays_used is the number of spent rays that need to be regenerated.
+	 * AKA, n_batch_rays_used is the number of spent rays that need to be regenerated.
 	 * 
 	 * Huzzah, optimization!
 	 * 
 	 */
-	initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(n_prev_rays_used), n_threads_linear>>>(
-		n_prev_rays_used,
+	initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(n_batch_rays_used), n_threads_linear>>>(
+		n_batch_rays_used,
 		dataset.images.size(),
 		dataset.n_pixels_per_image * dataset.n_channels_per_image,
 		dataset.image_dimensions,
@@ -159,7 +159,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.image_data,
 		workspace.img_index,
 		workspace.pix_index,
-		workspace.pix_rgba[0],
+		workspace.pix_rgba,
 		workspace.ori_xyz[0],
 		workspace.dir_xyz[0],
 		workspace.idir_xyz
@@ -178,8 +178,8 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	float cone_angle = 1.0f;
 
 	// Count the number of steps each ray would take.  We only need to do this for the new rays.
-	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(n_prev_rays_used), n_threads_linear>>>(
-		n_prev_rays_used,
+	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(n_batch_rays_used), n_threads_linear>>>(
+		n_batch_rays_used,
 		workspace.bounding_box,
 		workspace.occupancy_grid,
 		cone_angle,
@@ -221,7 +221,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		cone_angle,
 		
 		// input buffers
-		workspace.pix_rgba[0],
+		workspace.pix_rgba,
 		workspace.ori_xyz[0],
 		workspace.dir_xyz[0],
 		workspace.idir_xyz,
@@ -229,10 +229,10 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.n_steps[1],
 		
 		// output buffers
-		workspace.pix_rgba[1],
 		workspace.ori_xyz[1],
 		workspace.dir_xyz[1],
-		workspace.ray_t0, workspace.ray_t1
+		workspace.ray_t0,
+		workspace.ray_t1
 	);
 
 	CHECK_DATA(rayt01, float, workspace.ray_t0, workspace.batch_size);
@@ -261,15 +261,27 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.batch_size
 	);
 
-	if (n_rays_used < 0) {
+	if (n_rays_used <= 0) {
 		// TODO: better error handling
 		throw std::runtime_error("No rays used to fill sample batch");
-		// regenerate all rays?
-		n_prev_rays_used = workspace.batch_size;
 	}
 
-	n_prev_rays_used = n_rays_used;
+	n_batch_rays_used = n_rays_used;
+}
 
+void NeRFTrainingController::calculate_loss(cudaStream_t stream) {
+	// accumulate colors for predicted ray samples
+	accumulate_ray_colors_from_samples_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
+		n_batch_rays_used,
+		workspace.batch_size,
+		workspace.n_steps[0],
+		workspace.n_steps[1],
+		workspace.color_output_rgb,
+		workspace.ray_rgba
+	);
+
+	CHECK_DATA(rayrgba, float, workspace.ray_rgba, workspace.batch_size * 4);
+	printf("ok if this works i win");
 }
 
 void NeRFTrainingController::train_step(cudaStream_t stream) {
@@ -280,6 +292,10 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 	network.enlarge_batch_memory_if_needed(workspace.batch_size);
 
 	// generate_training_batch should have populated pos_xyz, dir_xyz[1], and pix_rgba[1] with data correlated by ray
-	network.forward(stream, workspace.batch_size, workspace.pos_xyz, workspace.dir_xyz[1]);
+	network.forward(stream, workspace.batch_size, workspace.pos_xyz, workspace.dir_xyz[1], workspace.color_output_rgb);
+
+	CHECK_DATA(net_output1, float, workspace.color_output_rgb, workspace.batch_size * 3);
+
+	calculate_loss(stream);
 	
 }

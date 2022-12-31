@@ -37,8 +37,9 @@ public:
 	uint32_t* n_steps[2];
 
 	// ground-truth pixel color components
-	float* pix_rgba[2];
-	// ray estimated color components
+	float* pix_rgba;
+
+	// accumulated ray sample color components
 	float* ray_rgba;
 	
 	// ray origin components

@@ -51,15 +51,15 @@ void TrainingWorkspace::enlarge(
 		1,							// bounding_box
 		n_pixel_elements,			// img_data
 		16 * batch_size,			// density_input
-		3 * batch_size,				// color_output
+		3 * batch_size,				// color_output_rgb
 		batch_size,					// random_floats
 
 		batch_size,					// img_index
-		2 * batch_size,				// pix_index (double buffer)
+		batch_size,					// pix_index
 
 		2 * batch_size,				// n_steps (double buffer)
 		
-		2 * 4 * batch_size,			// pix_rgba (double buffer)
+		4 * batch_size,				// pix_rgba
 		4 * batch_size,				// ray_rgba
 		
 		2 * 3 * batch_size,			// ori_xyz (double buffer)
@@ -90,8 +90,7 @@ void TrainingWorkspace::enlarge(
 	n_steps[1] = n_steps[0] + batch_size;
 	
 	// carefully note how double-buffered pointers are set up
-	pix_rgba[0] = std::get<8>(data);
-	pix_rgba[1] = pix_rgba[0] + 4 * batch_size;
+	pix_rgba = std::get<8>(data);
 
 	ray_rgba = std::get<9>(data);
 	

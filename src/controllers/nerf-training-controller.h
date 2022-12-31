@@ -37,7 +37,7 @@ private:
 	// private properties
 	Dataset dataset;
 	uint32_t training_step;
-	uint32_t n_prev_rays_used;
+	uint32_t n_batch_rays_used;
 
 	// configuration properties
 	uint32_t n_occupancy_grid_levels = 5;
@@ -52,6 +52,7 @@ private:
 	
 	// private methods
 	void generate_next_training_batch(cudaStream_t stream);
+	void calculate_loss(cudaStream_t stream);
 };
 
 NRC_NAMESPACE_END

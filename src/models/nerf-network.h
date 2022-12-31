@@ -20,8 +20,12 @@ struct NerfNetwork {
 	NerfNetwork();
 	
 	void enlarge_batch_memory_if_needed(uint32_t batch_size);
-	void forward(cudaStream_t stream, uint32_t batch_size, float* pos_batch, float* dir_batch);
+	void forward(cudaStream_t stream, uint32_t batch_size, float* pos_batch, float* dir_batch, tcnn::network_precision_t* rgba_output);
 
+	size_t padded_output_width() const {
+		return color_network->padded_output_width();
+	}
+	
 private:
 
 	// full-precision params buffers
@@ -34,9 +38,6 @@ private:
 	tcnn::GPUMemory<tcnn::network_precision_t> color_network_gradients_hp;
 
 	tcnn::GPUMemory<tcnn::network_precision_t> color_network_input;
-	tcnn::GPUMemory<tcnn::network_precision_t> color_network_output;
-
-	uint32_t previous_batch_size = 0;
 	
 	void initialize_params_and_gradients();
 };

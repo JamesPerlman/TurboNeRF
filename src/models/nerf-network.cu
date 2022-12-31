@@ -127,7 +127,8 @@ void NerfNetwork::forward(
 	cudaStream_t stream,
 	uint32_t batch_size,
 	float* pos_batch,
-	float* dir_batch
+	float* dir_batch,
+	network_precision_t* rgba_output
 ) {
 
 	// Forward pass on density network (with multiresolution hash encoding built in!)
@@ -181,7 +182,7 @@ void NerfNetwork::forward(
 	);
 
 	GPUMatrix<network_precision_t> color_network_output_matrix(
-		color_network_output.data(),			// pointer to destination data
+		rgba_output,							// pointer to destination data
 		color_network->padded_output_width(),	// matrix rows
 		batch_size,								// matrix columns
 		0										// memory stride
@@ -200,5 +201,4 @@ void NerfNetwork::enlarge_batch_memory_if_needed(uint32_t batch_size) {
 	uint32_t density_network_output_size = density_network->padded_output_width() * batch_size;
 	uint32_t direction_encoding_output_size = direction_encoding->padded_output_width() * batch_size;
 	color_network_input.enlarge(density_network_output_size + direction_encoding_output_size);
-	color_network_output.enlarge(color_network->padded_output_width() * batch_size);
 }
