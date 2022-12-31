@@ -25,8 +25,6 @@ void TrainingWorkspace::enlarge(
 	auto data = tcnn::allocate_workspace_and_distribute<
 		BoundingBox,				// bounding_box
 		stbi_uc,					// image_data
-		network_precision_t,		// density_input
-		network_precision_t,		// color_output_rgb
 		float,						// random_floats
 		
 		uint32_t,					// img_index
@@ -43,15 +41,16 @@ void TrainingWorkspace::enlarge(
 		
 		float,						// ray_t0
 		float,						// ray_t1
+		float,						// ray_dt
 		float, 						// pos_xyz
 
 		CascadedOccupancyGrid,		// occupancy_grid
-		uint8_t						// occupancy_grid_bitfield
+		uint8_t,					// occupancy_grid_bitfield
+
+		float						// loss
 	>(stream, &arena_allocation,
 		1,							// bounding_box
 		n_pixel_elements,			// img_data
-		16 * batch_size,			// density_input
-		3 * batch_size,				// color_output_rgb
 		batch_size,					// random_floats
 
 		batch_size,					// img_index
@@ -64,48 +63,52 @@ void TrainingWorkspace::enlarge(
 		
 		2 * 3 * batch_size,			// ori_xyz (double buffer)
 		2 * 3 * batch_size,			// dir_xyz (double buffer)
-		2 * 3 * batch_size, 		// idir_xyz
+		3 * batch_size, 			// idir_xyz
 
 		batch_size,					// ray_t0
 		batch_size,					// ray_t1
+		batch_size,					// ray_dt
 		3 * batch_size, 			// pos_xyz
 
 		1,							// occupancy_grid
-		n_grid_bitfield_bytes		// occupancy_grid.bitfield
+		n_grid_bitfield_bytes,		// occupancy_grid.bitfield
+
+		batch_size					// loss
 
 	);
 
 	bounding_box = std::get<0>(data);
 	image_data = std::get<1>(data);
-	density_input = std::get<2>(data);
-	
-	color_output_rgb = std::get<3>(data);
 
-	random_floats = std::get<4>(data);
+	random_floats = std::get<2>(data);
 	
-	img_index = std::get<5>(data);
-	pix_index = std::get<6>(data);
+	img_index = std::get<3>(data);
+	pix_index = std::get<4>(data);
 
-	n_steps[0] = std::get<7>(data);
+	n_steps[0] = std::get<5>(data);
 	n_steps[1] = n_steps[0] + batch_size;
 	
 	// carefully note how double-buffered pointers are set up
-	pix_rgba = std::get<8>(data);
+	pix_rgba = std::get<6>(data);
 
-	ray_rgba = std::get<9>(data);
+	ray_rgba = std::get<7>(data);
 	
-	ori_xyz[0] = std::get<10>(data);
+	ori_xyz[0] = std::get<8>(data);
 	ori_xyz[1] = ori_xyz[0] + 3 * batch_size;
 	
-	dir_xyz[0] = std::get<11>(data);
+	dir_xyz[0] = std::get<9>(data);
 	dir_xyz[1] = dir_xyz[0] + 3 * batch_size;
 	
-	idir_xyz = std::get<12>(data);
+	idir_xyz = std::get<10>(data);
 
-	ray_t0 = std::get<13>(data);
-	ray_t1 = std::get<14>(data);
-	pos_xyz = std::get<15>(data);
+	ray_t0 = std::get<11>(data);
+	ray_t1 = std::get<12>(data);
+	ray_dt = std::get<13>(data);
 
-	occupancy_grid = std::get<16>(data);
-	occupancy_grid_bitfield = std::get<17>(data);
+	pos_xyz = std::get<14>(data);
+
+	occupancy_grid = std::get<15>(data);
+	occupancy_grid_bitfield = std::get<16>(data);
+
+	loss = std::get<17>(data);
 }

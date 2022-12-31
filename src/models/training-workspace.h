@@ -25,10 +25,6 @@ public:
 	BoundingBox* bounding_box;
 
 	stbi_uc* image_data;
-	tcnn::network_precision_t* density_input;
-	tcnn::network_precision_t* density_output;
-
-	tcnn::network_precision_t* color_output_rgb;
 
 	float* random_floats;
 	uint32_t* img_index;
@@ -54,6 +50,7 @@ public:
 	// ray t components
 	float* ray_t0; // t_start
 	float* ray_t1; // t_end
+	float* ray_dt;
 
 	// sample position components
 	float* pos_xyz;
@@ -61,6 +58,9 @@ public:
 	uint32_t n_occupancy_grid_elements;
 	CascadedOccupancyGrid* occupancy_grid;
 	uint8_t* occupancy_grid_bitfield;
+
+	// loss
+	float* loss;
 
 	// GPUMemory managed properties
 

@@ -245,7 +245,8 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.random_floats,
 		workspace.ori_xyz[1],
 		workspace.dir_xyz[1],
-		workspace.pos_xyz
+		workspace.pos_xyz,
+		workspace.ray_dt
 	);
 
 	CHECK_DATA(posx1, float, workspace.pos_xyz + 0 * workspace.batch_size, workspace.batch_size);
@@ -267,34 +268,53 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	}
 
 	n_batch_rays_used = n_rays_used;
+	CHECK_DATA(nsteps__0, uint32_t, workspace.n_steps[0], workspace.batch_size);
+	CHECK_DATA(nsteps__1, uint32_t, workspace.n_steps[1], workspace.batch_size);
 }
 
 void NeRFTrainingController::calculate_loss(cudaStream_t stream) {
+
+	CHECK_DATA(dens1, float, network.get_log_space_density(), workspace.batch_size);
+	CHECK_DATA(nsteps0, uint32_t, workspace.n_steps[0], workspace.batch_size);
+	CHECK_DATA(nsteps1, uint32_t, workspace.n_steps[1], workspace.batch_size);
+	CHECK_DATA(logdens1, float, network.get_log_space_density(), workspace.batch_size);
+	
 	// accumulate colors for predicted ray samples
-	accumulate_ray_colors_from_samples_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear>>>(
+	accumulate_ray_colors_from_samples_kernel<<<n_blocks_linear(n_batch_rays_used), n_threads_linear>>>(
 		n_batch_rays_used,
 		workspace.batch_size,
 		workspace.n_steps[0],
 		workspace.n_steps[1],
-		workspace.color_output_rgb,
+		network.get_color_network_output(),
+		network.get_log_space_density(),
+		workspace.ray_dt,
 		workspace.ray_rgba
 	);
 
 	CHECK_DATA(rayrgba, float, workspace.ray_rgba, workspace.batch_size * 4);
-	printf("ok if this works i win");
+	// calculate loss
+	calculate_loss_kernel<<<n_blocks_linear(n_batch_rays_used), n_threads_linear>>>(
+		n_batch_rays_used,
+		workspace.batch_size,
+		network.get_color_network_output(),
+		workspace.ray_rgba,
+		workspace.loss
+	);
+
+	CHECK_DATA(loss1, float, workspace.loss, n_batch_rays_used);
 }
 
 void NeRFTrainingController::train_step(cudaStream_t stream) {
-	
 	// Generate training batch
 	generate_next_training_batch(stream);
 	
 	network.enlarge_batch_memory_if_needed(workspace.batch_size);
 
-	// generate_training_batch should have populated pos_xyz, dir_xyz[1], and pix_rgba[1] with data correlated by ray
-	network.forward(stream, workspace.batch_size, workspace.pos_xyz, workspace.dir_xyz[1], workspace.color_output_rgb);
+	// generate_training_batch should have populated pos_xyz, dir_xyz[1], and color_output_rgb with data correlated by ray
+	network.forward(stream, workspace.batch_size, workspace.pos_xyz, workspace.dir_xyz[1]);
+	CHECK_DATA(nsteps__0, uint32_t, workspace.n_steps[0], workspace.batch_size);
+	CHECK_DATA(nsteps__1, uint32_t, workspace.n_steps[1], workspace.batch_size);
 
-	CHECK_DATA(net_output1, float, workspace.color_output_rgb, workspace.batch_size * 3);
 
 	calculate_loss(stream);
 	

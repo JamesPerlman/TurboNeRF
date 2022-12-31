@@ -347,11 +347,13 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
  */
 __global__ void generate_stratified_sample_positions_kernel(
 	uint32_t batch_size,
-	const float* __restrict__ t0, const float* __restrict__ t1,
+	const float* __restrict__ t0,
+	const float* __restrict__ t1,
 	const float* __restrict__ random_floats,
 	const float* __restrict__ in_ori_xyz,
 	const float* __restrict__ in_dir_xyz,
-	float* __restrict__ out_xyz
+	float* __restrict__ out_xyz,
+	float* __restrict__ out_dt
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i >= batch_size) {
@@ -366,7 +368,7 @@ __global__ void generate_stratified_sample_positions_kernel(
 	const float t0_i = t0[i_offset_0];
 	const float t1_i = t1[i_offset_0];
 	
-	const float k = random_floats[i];
+	const float k = random_floats[i_offset_0];
 	
 	const float o_x = in_ori_xyz[i_offset_0];
 	const float o_y = in_ori_xyz[i_offset_1];
@@ -377,12 +379,14 @@ __global__ void generate_stratified_sample_positions_kernel(
 	const float d_z = in_dir_xyz[i_offset_2];
 
 	// Calculate sample position
-
-	const float t = t0_i + (t1_i - t0_i) * k;
+	const float dt = t1_i - t0_i;
+	const float t = t0_i + dt * k;
 
 	out_xyz[i_offset_0] = o_x + t * d_x;
 	out_xyz[i_offset_1] = o_y + t * d_y;
 	out_xyz[i_offset_2] = o_z + t * d_z;
+
+	out_dt[i_offset_0] = dt;
 }
 
 /**
@@ -394,7 +398,13 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	uint32_t batch_size,
 	const uint32_t* __restrict__ n_samples_per_ray,
 	const uint32_t* __restrict__ n_samples_cum,
-	const tcnn::network_precision_t* __restrict__ sample_rgba, 	// organized based on the cumulative steps
+
+	// these input buffers organized based on the cumulative steps
+	const tcnn::network_precision_t* __restrict__ network_rgb,
+	const tcnn::network_precision_t* __restrict__ network_sigma,
+	const float* __restrict__ ray_dt,
+
+	// output buffer organized by ray index
 	float* __restrict__ ray_rgba
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -403,41 +413,41 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	}
 
 	// Grab local references to global data
-
 	const uint32_t n_samples = n_samples_per_ray[i];
-	
-	const uint32_t sample_offset_0 = n_samples_cum[i] - n_samples;
-	const uint32_t sample_offset_1 = sample_offset_0 + batch_size;
-	const uint32_t sample_offset_2 = sample_offset_1 + batch_size;
-	const uint32_t sample_offset_3 = sample_offset_2 + batch_size;
+	const uint32_t sample_offset = n_samples_cum[i] - n_samples;
 
-	// Calculate loss
-	float loss = 0.0f;
+	const tcnn::network_precision_t* __restrict__ r = network_rgb + sample_offset;
+	const tcnn::network_precision_t* __restrict__ g = r + batch_size;
+	const tcnn::network_precision_t* __restrict__ b = g + batch_size;
 
+	const tcnn::network_precision_t* __restrict__ sigma = network_sigma + sample_offset;
+
+	const float* __restrict__ dt = ray_dt + sample_offset;
+
+	// Values to accumulate samples into
 	float ray_r = 0.0f;
 	float ray_g = 0.0f;
 	float ray_b = 0.0f;
 	float ray_a = 0.0f;
 
-	for (uint32_t j = 0; j < n_samples; ++j) {
-		const float sample_r = (float)sample_rgba[sample_offset_0 + j];
-		const float sample_g = (float)sample_rgba[sample_offset_1 + j];
-		const float sample_b = (float)sample_rgba[sample_offset_2 + j];
+	float sigma_cumsum = 0.0f;
 
-		// use alpha compositing here.  accumulated ray color is the foreground and the new sample is the background
-		/*
-		ray_a += sample_a * (1.0f - ray_a);
-		
-		ray_r = (ray_r * ray_a + sample_r * sample_a * (1.0f - ray_a)) / ray_a;
-		ray_g = (ray_g * ray_a + sample_g * sample_a * (1.0f - ray_a)) / ray_a;
-		ray_b = (ray_b * ray_a + sample_b * sample_a * (1.0f - ray_a)) / ray_a;
-		*/
-		ray_r = sample_r;
-		ray_g = sample_g;
-		ray_b = sample_b;
-		ray_a = 1.0f;
-		
-		break;
+	// Accumulate samples
+	for (int j = 0; j < n_samples; ++j) {
+		// thank you NerfAcc
+		// TODO: understand what this does
+		const float sigma_j = (float)sigma[j];
+		const float alpha = 1.0f - expf(-sigma_j);
+		const float transmittance = expf(-sigma_cumsum);
+		sigma_cumsum += sigma_j * dt[j];
+
+		const float weight = alpha * transmittance;
+
+		// accumulate the color
+		ray_r += weight * (float)r[j];
+		ray_g += weight * (float)g[j];
+		ray_b += weight * (float)b[j];
+		ray_a += weight;
 	}
 	
 	// write out the accumulated ray color
@@ -445,6 +455,35 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	ray_rgba[i + 1 * batch_size] = ray_g;
 	ray_rgba[i + 2 * batch_size] = ray_b;
 	ray_rgba[i + 3 * batch_size] = ray_a;
+}
+
+// Calculate the loss
+__global__ void calculate_loss_kernel(
+	uint32_t n_rays,
+	uint32_t batch_size,
+	const tcnn::network_precision_t* __restrict__ pred_rgba,
+	const float* __restrict__ gt_rgba,
+	float* __restrict__ loss
+) {
+	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= n_rays) {
+		return;
+	}
+
+	// Grab local references to global data
+	const uint32_t i_offset_0 = i;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
+	const uint32_t i_offset_3 = i_offset_2 + batch_size;
+
+	// Calculate the loss
+	const float r = (float)pred_rgba[i_offset_0] - gt_rgba[i_offset_0];
+	const float g = (float)pred_rgba[i_offset_1] - gt_rgba[i_offset_1];
+	const float b = (float)pred_rgba[i_offset_2] - gt_rgba[i_offset_2];
+	const float a = (float)pred_rgba[i_offset_3] - gt_rgba[i_offset_3];
+
+	// mean squared error
+	loss[i] = (r * r + g * g + b * b + a * a) / 4.0f;
 }
 
 NRC_NAMESPACE_END
