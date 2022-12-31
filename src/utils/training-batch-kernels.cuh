@@ -4,6 +4,7 @@
 #include <device_launch_parameters.h>
 #include <Eigen/Dense>
 #include <stbi/stb_image.h>
+#include <tiny-cuda-nn/common.h>
 
 #include "../common.h"
 #include "../models/bounding-box.cuh"
@@ -200,7 +201,8 @@ __global__ void march_and_count_steps_per_ray_kernel(
  * This kernel has a few purposes:
  * 1. March rays through the occupancy grid and generate start/end intervals for each sample
  * 2. Compact other training buffers to maximize coalesced memory accesses
- */ 
+ */
+
 __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	uint32_t batch_size,
 	const BoundingBox* bounding_box,
@@ -218,7 +220,6 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const uint32_t* __restrict__ n_steps_cum, // one per ray
 
 	// output buffers
-	float* __restrict__ out_pix_rgba,
 	float* __restrict__ out_ori_xyz,
 	float* __restrict__ out_dir_xyz,
 	float* __restrict__ out_t0,
@@ -318,11 +319,6 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			 * After this step we will still need to stratify the t-values and generate the sample positions.
 			 */
 
-			out_pix_rgba[step_offset_0] = in_pix_rgba[i_offset_0];
-			out_pix_rgba[step_offset_1] = in_pix_rgba[i_offset_1];
-			out_pix_rgba[step_offset_2] = in_pix_rgba[i_offset_2];
-			out_pix_rgba[step_offset_3] = in_pix_rgba[i_offset_3];
-
 			out_ori_xyz[step_offset_0] = o_x;
 			out_ori_xyz[step_offset_1] = o_y;
 			out_ori_xyz[step_offset_2] = o_z;
@@ -389,7 +385,6 @@ __global__ void generate_stratified_sample_positions_kernel(
 	out_xyz[i_offset_2] = o_z + t * d_z;
 }
 
-
 /**
  * Accumulate the sample colors by ray.
  */
@@ -399,7 +394,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	uint32_t batch_size,
 	const uint32_t* __restrict__ n_samples_per_ray,
 	const uint32_t* __restrict__ n_samples_cum,
-	const float* __restrict__ sample_rgba, 	// organized based on the cumulative steps
+	const tcnn::network_precision_t* __restrict__ sample_rgba, 	// organized based on the cumulative steps
 	float* __restrict__ ray_rgba
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -425,18 +420,24 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	float ray_a = 0.0f;
 
 	for (uint32_t j = 0; j < n_samples; ++j) {
-		const float sample_r = sample_rgba[sample_offset_0 + j];
-		const float sample_g = sample_rgba[sample_offset_1 + j];
-		const float sample_b = sample_rgba[sample_offset_2 + j];
-		const float sample_a = sample_rgba[sample_offset_3 + j];
+		const float sample_r = (float)sample_rgba[sample_offset_0 + j];
+		const float sample_g = (float)sample_rgba[sample_offset_1 + j];
+		const float sample_b = (float)sample_rgba[sample_offset_2 + j];
 
 		// use alpha compositing here.  accumulated ray color is the foreground and the new sample is the background
-		
+		/*
 		ray_a += sample_a * (1.0f - ray_a);
 		
 		ray_r = (ray_r * ray_a + sample_r * sample_a * (1.0f - ray_a)) / ray_a;
 		ray_g = (ray_g * ray_a + sample_g * sample_a * (1.0f - ray_a)) / ray_a;
 		ray_b = (ray_b * ray_a + sample_b * sample_a * (1.0f - ray_a)) / ray_a;
+		*/
+		ray_r = sample_r;
+		ray_g = sample_g;
+		ray_b = sample_b;
+		ray_a = 1.0f;
+		
+		break;
 	}
 	
 	// write out the accumulated ray color
