@@ -30,19 +30,22 @@ void TrainingWorkspace::enlarge(
 		uint32_t,					// img_index
 		uint32_t,					// pix_index
 
-		uint32_t,					// n_steps
+		uint32_t,					// ray_steps
+		uint32_t,					// ray_steps_cumulative
 		
 		float,						// pix_rgba
 		float,						// ray_rgba
 
-		float,						// ori_xyz
-		float,						// dir_xyz
-		float, 						// idir_xyz
+		float,						// ray_origins
+		float,						// sample_origins
+		float,						// ray_dirs
+		float,						// sample_dirs
+		float, 						// ray_inv_dirs
 		
-		float,						// ray_t0
-		float,						// ray_t1
-		float,						// ray_dt
-		float, 						// pos_xyz
+		float,						// sample_t0
+		float,						// sample_t1
+		float,						// sample_dt
+		float, 						// sample_positions
 
 		CascadedOccupancyGrid,		// occupancy_grid
 		uint8_t,					// occupancy_grid_bitfield
@@ -56,18 +59,21 @@ void TrainingWorkspace::enlarge(
 		batch_size,					// img_index
 		batch_size,					// pix_index
 
-		2 * batch_size,				// n_steps (double buffer)
+		batch_size,					// ray_steps
+		batch_size,					// ray_steps_cumulative
 		
 		4 * batch_size,				// pix_rgba
 		4 * batch_size,				// ray_rgba
 		
-		2 * 3 * batch_size,			// ori_xyz (double buffer)
-		2 * 3 * batch_size,			// dir_xyz (double buffer)
-		3 * batch_size, 			// idir_xyz
+		3 * batch_size,				// ray_origins
+		3 * batch_size,				// sample_origins
+		3 * batch_size,				// ray_dirs
+		3 * batch_size,				// sample_dirs
+		3 * batch_size, 			// ray_inv_dirs
 
-		batch_size,					// ray_t0
-		batch_size,					// ray_t1
-		batch_size,					// ray_dt
+		batch_size,					// sample_t0
+		batch_size,					// sample_t1
+		batch_size,					// sample_dt
 		3 * batch_size, 			// pos_xyz
 
 		1,							// occupancy_grid
@@ -85,30 +91,30 @@ void TrainingWorkspace::enlarge(
 	img_index = std::get<3>(data);
 	pix_index = std::get<4>(data);
 
-	n_steps[0] = std::get<5>(data);
-	n_steps[1] = n_steps[0] + batch_size;
+	ray_steps = std::get<5>(data);
+	ray_steps_cumulative = std::get<6>(data);
 	
 	// carefully note how double-buffered pointers are set up
-	pix_rgba = std::get<6>(data);
+	pix_rgba = std::get<7>(data);
 
-	ray_rgba = std::get<7>(data);
+	ray_rgba = std::get<8>(data);
 	
-	ori_xyz[0] = std::get<8>(data);
-	ori_xyz[1] = ori_xyz[0] + 3 * batch_size;
+	ray_origins = std::get<9>(data);
+	sample_origins = std::get<10>(data);
 	
-	dir_xyz[0] = std::get<9>(data);
-	dir_xyz[1] = dir_xyz[0] + 3 * batch_size;
+	ray_dirs = std::get<11>(data);
+	sample_dirs = std::get<12>(data);
 	
-	idir_xyz = std::get<10>(data);
+	ray_inv_dirs = std::get<13>(data);
 
-	ray_t0 = std::get<11>(data);
-	ray_t1 = std::get<12>(data);
-	ray_dt = std::get<13>(data);
+	sample_t0 = std::get<14>(data);
+	sample_t1 = std::get<15>(data);
+	sample_dt = std::get<16>(data);
 
-	pos_xyz = std::get<14>(data);
+	sample_positions = std::get<17>(data);
 
-	occupancy_grid = std::get<15>(data);
-	occupancy_grid_bitfield = std::get<16>(data);
+	occupancy_grid = std::get<18>(data);
+	occupancy_grid_bitfield = std::get<19>(data);
 
-	loss = std::get<17>(data);
+	loss = std::get<20>(data);
 }

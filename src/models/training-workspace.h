@@ -30,7 +30,8 @@ public:
 	uint32_t* img_index;
 	uint32_t* pix_index; // index of randomly selected pixel in image
 
-	uint32_t* n_steps[2];
+	uint32_t* ray_steps;
+	uint32_t* ray_steps_cumulative;
 
 	// ground-truth pixel color components
 	float* pix_rgba;
@@ -39,21 +40,23 @@ public:
 	float* ray_rgba;
 	
 	// ray origin components
-	float* ori_xyz[2];
+	float* ray_origins;
+	float* sample_origins;
 
 	// ray direction components
-	float* dir_xyz[2];
+	float* ray_dirs;
+	float* sample_dirs;
 
 	// ray inverse direction components
-	float* idir_xyz;
+	float* ray_inv_dirs;
 
 	// ray t components
-	float* ray_t0; // t_start
-	float* ray_t1; // t_end
-	float* ray_dt;
+	float* sample_t0; // t_start
+	float* sample_t1; // t_end
+	float* sample_dt;
 
 	// sample position components
-	float* pos_xyz;
+	float* sample_positions;
 
 	uint32_t n_occupancy_grid_elements;
 	CascadedOccupancyGrid* occupancy_grid;
