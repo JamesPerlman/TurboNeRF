@@ -39,16 +39,16 @@ struct NerfNetwork {
 	 * to 16 output values, the first of which we treat as log-space density
 	 * https://arxiv.org/abs/2201.05989 - page 9
 	 */
-	const tcnn::network_precision_t* get_log_space_density() const {
+	tcnn::network_precision_t* get_log_space_density() const {
 		// The output of the density network is just a pointer to the color network's input buffer.
 		return color_network_input.data();
 	}
 
-	const tcnn::network_precision_t* get_color_network_output() const {
+	tcnn::network_precision_t* get_color_network_output() const {
 		return color_network_output.data();
 	}
 
-	const size_t get_color_network_padded_output_width() const {
+	size_t get_color_network_padded_output_width() const {
 		return color_network->padded_output_width();
 	}
 
@@ -62,13 +62,18 @@ private:
 	tcnn::GPUMemory<tcnn::network_precision_t> color_network_input;
 	tcnn::GPUMemory<tcnn::network_precision_t> color_network_output;
 
-	tcnn::GPUMemory<float> accum_rgba;
-	tcnn::GPUMemory<float> loss_buffer;
+	// gradient calculation buffers
+	tcnn::GPUMemory<float> ray_rgba;
+	tcnn::GPUMemory<float> loss_buf;
+	tcnn::GPUMemory<float> grad_buf;
+	tcnn::GPUMemory<float> trans_buf;
+	tcnn::GPUMemory<float> alpha_buf;
+	tcnn::GPUMemory<float> weight_buf; // alpha * transmittance
+	tcnn::GPUMemory<float> pxdiff_buf; // pixel channel differences
 	
 	void initialize_params_and_gradients();
 
 	// training functions
-
 	
 	// Helper context
 	struct ForwardContext : public tcnn::Context {
@@ -92,6 +97,7 @@ private:
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,
 		const uint32_t& n_rays,
+		const uint32_t& n_samples,
 		const uint32_t* ray_steps,
 		const uint32_t* ray_steps_cumulative,
 		const float* sample_dt,

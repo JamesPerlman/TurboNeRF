@@ -246,7 +246,6 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const uint32_t i_offset_0 = i + batch_offset_0;
 	const uint32_t i_offset_1 = i + batch_offset_1;
 	const uint32_t i_offset_2 = i + batch_offset_2;
-	const uint32_t i_offset_3 = i + batch_offset_3;
 
 	const float o_x = in_ori_xyz[i_offset_0];
 	const float o_y = in_ori_xyz[i_offset_1];

@@ -49,6 +49,7 @@ set(HEADERS
 	src/utils/json-bindings/eigen-json.h
 	src/utils/parallel-utils.cuh
 	src/utils/training-batch-kernels.cuh
+	src/utils/training-network-kernels.cuh
 	src/utils/volumetric-rendering.cuh
 	src/common.h
 	src/main.h

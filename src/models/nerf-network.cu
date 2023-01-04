@@ -237,16 +237,19 @@ float NerfNetwork::calculate_loss(
 	const cudaStream_t& stream,
 	const uint32_t& batch_size,
 	const uint32_t& n_rays,
+	const uint32_t& n_samples,
 	const uint32_t* ray_steps,
 	const uint32_t* ray_steps_cumulative,
 	const float* sample_dt,
 	const float* target_rgba
 ) {
 
+	float n_raysf = n_rays;
+
 	/**
 	 * The density MLP maps the hash encoded position y = enc(x; 𝜃)
 	 * to 16 output values, the first of which we treat as log-space density
-	 * https://arxiv.org/abs/2201.05989 - page 9
+	 * https://arxiv.org/abs/2201.05989 - Muller, et al. page 9
 	 * 
 	 * i.e., the output of the density network is just a pointer to the color network's input buffer.
 	 */
@@ -260,22 +263,42 @@ float NerfNetwork::calculate_loss(
 		color_network_output.data(),
 		log_space_density,
 		sample_dt,
-		accum_rgba.data()
+		ray_rgba.data(),
+		trans_buf.data(),
+		alpha_buf.data(),
+		weight_buf.data()
 	);
 
 	// Calculate mean-squared loss per ray
-	calculate_mse_loss_per_ray_kernel<<<tcnn::n_blocks_linear(n_rays), tcnn::n_threads_linear, 0, stream>>>(
+	calculate_ses_loss_per_ray_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
-		accum_rgba.data(),
+		ray_steps,
+		ray_steps_cumulative,
+		ray_rgba.data(),
 		target_rgba,
-		loss_buffer.data()
+		loss_buf.data(),
+		pxdiff_buf.data()
+	);
+
+	// Calculate gradients
+	calculate_network_output_gradient<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+		n_samples,
+		batch_size,
+		1.0f / (2.0f * n_raysf),
+		color_network_output.data(),
+		pxdiff_buf.data(),
+		sample_dt,
+		trans_buf.data(),
+		alpha_buf.data(),
+		weight_buf.data(),
+		grad_buf.data()
 	);
 
 	// Add all loss values together
-	thrust::device_ptr<float> loss_buffer_ptr(loss_buffer.data());
+	thrust::device_ptr<float> loss_buffer_ptr(loss_buf.data());
 
-	float sum_of_all_errors = thrust::reduce(
+	float sum_of_squared_pixel_errors = thrust::reduce(
 		thrust::cuda::par_nosync.on(stream),
 		loss_buffer_ptr,
 		loss_buffer_ptr + n_rays,
@@ -284,7 +307,7 @@ float NerfNetwork::calculate_loss(
 	);
 
 	// Return mean loss
-	return sum_of_all_errors / (float)n_rays;
+	return sum_of_squared_pixel_errors / (4.0f * n_raysf);
 }
 
 void NerfNetwork::backward(
@@ -297,7 +320,6 @@ void NerfNetwork::backward(
 ) {
 	// ???
 
-	//color_network->backward(forward_ctx->color_ctx,)
 }
 
 void NerfNetwork::train_step(
@@ -322,6 +344,7 @@ void NerfNetwork::train_step(
 		stream,
 		batch_size,
 		n_rays,
+		n_samples,
 		ray_steps,
 		ray_steps_cumulative,
 		dt_batch,
@@ -329,7 +352,7 @@ void NerfNetwork::train_step(
 	);
 
 
-	CHECK_DATA(lossdata_cpu, float, loss_buffer.data(), batch_size);
+	CHECK_DATA(lossdata_cpu, float, loss_buf.data(), batch_size);
 	
 	printf("%f\n", mse_loss);
 
@@ -383,6 +406,11 @@ void NerfNetwork::enlarge_batch_memory_if_needed(const uint32_t& batch_size) {
 	color_network_input.enlarge(density_network_output_size + direction_encoding_output_size);
 	color_network_output.enlarge(color_network->padded_output_width() * batch_size);
 
-	accum_rgba.enlarge(4 * batch_size);
-	loss_buffer.enlarge(batch_size);
+	ray_rgba.enlarge(4 * batch_size);
+	loss_buf.enlarge(batch_size);
+	grad_buf.enlarge(4 * batch_size);
+	trans_buf.enlarge(batch_size);
+	alpha_buf.enlarge(batch_size);
+	weight_buf.enlarge(batch_size);
+	pxdiff_buf.enlarge(4 * batch_size);
 }
