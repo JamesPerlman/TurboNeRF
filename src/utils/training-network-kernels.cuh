@@ -6,6 +6,7 @@
 #include <tiny-cuda-nn/common.h>
 
 #include "../common.h"
+#include "../models/bounding-box.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -91,8 +92,8 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	ray_rgba[i + 3 * batch_size] = ray_a;
 }
 
-// Calculate the loss (squared error sum of all channels per ray)
-__global__ void calculate_ses_loss_per_ray_kernel(
+// Calculate the loss (squared sum of errors per ray)
+__global__ void calculate_sse_loss_per_ray_kernel(
 	uint32_t n_pixels,
 	uint32_t batch_size, // aka data stride
 	const uint32_t* __restrict__ n_samples_per_ray,
@@ -152,14 +153,16 @@ __global__ void calculate_network_output_gradient(
 	const uint32_t batch_size, // aka data stride
 	const float inv_2npix, // 1 / (2.0f * n_pixels)
 	const tcnn::network_precision_t* __restrict__ sample_color,
-	const float* __restrict__ pixel_diffs, // signed difference per color channel, like ray_r - gt_r.  stored for easy access in this kernel
+	const float* __restrict__ pixel_diffs, // signed difference per color channel, like (ray_r - gt_r).  stored for easy access in this kernel
 	const float* __restrict__ sample_dt, // per sample
 	const float* __restrict__ sample_trans,
 	const float* __restrict__ sample_alpha,
 	const float* __restrict__ sample_weight,
 
+	const float loss_scale,
+
 	// output
-	float* __restrict__ grad
+	tcnn::network_precision_t* __restrict__ grad
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i >= n_samples) {
@@ -190,13 +193,47 @@ __global__ void calculate_network_output_gradient(
 	// for gradient formula derivations, look at "/research/NeRF Loss Function Derivation.pdf"
 
 	// rgb gradient
-	grad[i_offset_0] = inv_2npix * dr * weight;
-	grad[i_offset_1] = inv_2npix * dg * weight;
-	grad[i_offset_2] = inv_2npix * db * weight;
+	grad[i_offset_0] = (tcnn::network_precision_t)(loss_scale * inv_2npix * dr * weight);
+	grad[i_offset_1] = (tcnn::network_precision_t)(loss_scale * inv_2npix * dg * weight);
+	grad[i_offset_2] = (tcnn::network_precision_t)(loss_scale * inv_2npix * db * weight);
 
 	// sigma gradient
-	grad[i_offset_3] = inv_2npix * (1.0f - 2.0f * alpha) * (dt * trans) * (dr * sr + dg * sg + db * sb + da);
+	grad[i_offset_3] = (tcnn::network_precision_t)(loss_scale * inv_2npix * (1.0f - 2.0f * alpha) * (dt * trans) * (dr * sr + dg * sg + db * sb + da));
 }
 
+/**
+ * Normalization and inversion kernels
+ * We need to normalize data for the neural network, and then convert the coordinates back to world space after the network has processed the data
+ */
+
+__global__ void normalize_network_input_kernel(
+	const uint32_t batch_size,
+	const float inv_bbox_size, // 1 / (2 * bbox_size)
+	const float* __restrict__ in_sample_pos, // input positions are assumed to be in [-bbox_size, bbox_size]
+	const float* __restrict__ in_sample_dir, // input dirs are assumed to be normalized
+	const float* __restrict__ in_sample_dt,
+	float* __restrict__ out_sample_pos, // output positions are transformed to [0, 1]
+	float* __restrict__ out_sample_dir, // output dirs are transformed to [0, 1]
+	float* __restrict__ out_sample_dt
+) {
+	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= batch_size) {
+		return;
+	}
+
+	const uint32_t i_offset_0 = i;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
+
+	out_sample_pos[i_offset_0] = tcnn::clamp(in_sample_pos[i_offset_0] * inv_bbox_size + 0.5f, 0.0f, 1.0f);
+	out_sample_pos[i_offset_1] = tcnn::clamp(in_sample_pos[i_offset_1] * inv_bbox_size + 0.5f, 0.0f, 1.0f);
+	out_sample_pos[i_offset_2] = tcnn::clamp(in_sample_pos[i_offset_2] * inv_bbox_size + 0.5f, 0.0f, 1.0f);
+
+	out_sample_dir[i_offset_0] = in_sample_dir[i_offset_0] * 0.5f + 0.5f;
+	out_sample_dir[i_offset_1] = in_sample_dir[i_offset_1] * 0.5f + 0.5f;
+	out_sample_dir[i_offset_2] = in_sample_dir[i_offset_2] * 0.5f + 0.5f;
+
+	out_sample_dt[i] = inv_bbox_size * in_sample_dt[i];
+}
 
 NRC_NAMESPACE_END

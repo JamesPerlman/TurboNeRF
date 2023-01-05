@@ -20,11 +20,12 @@ using namespace Eigen;
 using namespace tcnn;
 using namespace nlohmann;
 
-NeRFTrainingController::NeRFTrainingController(Dataset& dataset) {
+NeRFTrainingController::NeRFTrainingController(Dataset& dataset)
+	: network(NerfNetwork(dataset.bounding_box.size_x))
+{
 	this->dataset = dataset;
 	
-	network = NerfNetwork();
-
+	// TODO: refactor size_x to just size?
 	// RNG
 	// todo: CURAND_ASSERT_SUCCESS
 	curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_PHILOX4_32_10);
@@ -125,7 +126,7 @@ void NeRFTrainingController::load_images(cudaStream_t stream) {
 void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	
 	// Generate random floats for use in training
-	
+
 	curandStatus_t status = curandGenerateUniform(rng, workspace.random_floats, workspace.batch_size);
 	if (status != CURAND_STATUS_SUCCESS) {
 		printf("Error generating random floats for training batch.\n");
@@ -188,7 +189,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	 * We need to perform this cumsum over the entire batch of rays, not just the rays that were regenerated over the used ones in the previous batch.
 	 */
 	
-	// Grab some references to the double-buffered n_steps array
+	// Grab some references to the n_steps arrays
 	thrust::device_ptr<uint32_t> n_steps_in_ptr(workspace.ray_steps);
 	thrust::device_ptr<uint32_t> n_steps_cum_ptr(workspace.ray_steps_cumulative);
 
@@ -249,14 +250,20 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		throw std::runtime_error("Sample batch does not contain any rays!\n");
 	}
 
-	n_rays_in_batch = n_ray_max_idx + 1;;
+	n_rays_in_batch = n_ray_max_idx + 1;
 	cudaMemcpyAsync(&n_samples_in_batch, n_steps_cum_ptr.get() + n_ray_max_idx, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream);
 }
 
 void NeRFTrainingController::train_step(cudaStream_t stream) {
+	
+	printf("Training step %d...\n", training_step);
+
 	// Generate training batch
 	generate_next_training_batch(stream);
+
+	printf("Using %d rays and %d samples\n", n_rays_in_batch, n_samples_in_batch);
 	
+	// TODO: NORMALIZE SAMPLE_DIRS AND SAMPLE_POSITIONS (THANK YOU @BURIEDANIMAL)
 	network.train_step(
 		stream,
 		workspace.batch_size,
@@ -264,10 +271,12 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 		n_samples_in_batch,
 		workspace.ray_steps,
 		workspace.ray_steps_cumulative,
-		workspace.sample_origins,
+		workspace.sample_positions,
 		workspace.sample_dirs,
 		workspace.sample_dt,
 		workspace.pix_rgba
 	);
+
+	++training_step;
 
 }

@@ -69,14 +69,13 @@ struct BoundingBox {
    }
 
 
-    inline NRC_HOST_DEVICE float pos_to_unit_x(const float& x) { return (x - min_x) / size_x; }
-    inline NRC_HOST_DEVICE float pos_to_unit_y(const float& y) { return (y - min_y) / size_y; }
-	inline NRC_HOST_DEVICE float pos_to_unit_z(const float& z) { return (z - min_z) / size_z; }
+    inline NRC_HOST_DEVICE float pos_to_unit_x(const float& x) const { return (x - min_x) / size_x; }
+    inline NRC_HOST_DEVICE float pos_to_unit_y(const float& y) const { return (y - min_y) / size_y; }
+	inline NRC_HOST_DEVICE float pos_to_unit_z(const float& z) const { return (z - min_z) / size_z; }
 
-    inline NRC_HOST_DEVICE float unit_to_pos_x(const float& x) { return x * size_x + min_x; }
-    inline NRC_HOST_DEVICE float unit_to_pos_y(const float& y) { return y * size_y + min_y; }
-    inline NRC_HOST_DEVICE float unit_to_pos_z(const float& z) { return z * size_z + min_z; }
-    
+    inline NRC_HOST_DEVICE float unit_to_pos_x(const float& x) const { return x * size_x + min_x; }
+    inline NRC_HOST_DEVICE float unit_to_pos_y(const float& y) const { return y * size_y + min_y; }
+    inline NRC_HOST_DEVICE float unit_to_pos_z(const float& z) const { return z * size_z + min_z; }
 };
 
 NRC_NAMESPACE_END
