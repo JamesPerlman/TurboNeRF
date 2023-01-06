@@ -43,7 +43,7 @@ set(HEADERS
 	src/models/ray.h
 	src/models/training-image.h
 	src/models/training-workspace.h
-	src/utils/gpu_image.h
+	src/utils/gpu-image.cuh
 	src/utils/bit-utils.cuh
 	src/utils/coordinate-transformations.cuh
 	src/utils/json-bindings/eigen-json.h
@@ -62,7 +62,6 @@ set(SOURCES
 	src/models/nerf-network.cu
 	src/models/training-image.cu
 	src/models/training-workspace.cu
-	src/utils/gpu_image.cu
 	src/main.cu	
 )
 
