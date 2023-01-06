@@ -16,10 +16,12 @@ struct NerfNetwork {
 	std::shared_ptr<tcnn::Encoding<tcnn::network_precision_t>> direction_encoding;
 	std::shared_ptr<tcnn::NetworkWithInputEncoding<tcnn::network_precision_t>> density_network;
 	std::shared_ptr<tcnn::Network<tcnn::network_precision_t>> color_network;
-	std::shared_ptr<tcnn::Optimizer<tcnn::network_precision_t>> optimizer;
-	std::shared_ptr<tcnn::Loss<tcnn::network_precision_t>> loss;
+	std::shared_ptr<tcnn::Optimizer<tcnn::network_precision_t>> density_optimizer;
+	std::shared_ptr<tcnn::Optimizer<tcnn::network_precision_t>> color_optimizer;
 	
 	NerfNetwork(const float& aabb_size);
+	
+	void initialize_params(const cudaStream_t& stream);
 
 	void NerfNetwork::train_step(
 		const cudaStream_t& stream,
@@ -95,8 +97,6 @@ private:
 		std::unique_ptr<tcnn::Context> density_ctx;
 		std::unique_ptr<tcnn::Context> color_ctx;
 	};
-	
-	void initialize_params_and_gradients();
 
 	void enlarge_batch_memory_if_needed(const uint32_t& batch_size);
 

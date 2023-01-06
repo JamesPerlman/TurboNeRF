@@ -3,11 +3,13 @@
 // Please see LICENSES/nerfstudio-project_nerfstudio.md for license details.
 
 #include <json/json.hpp>
+#include <math.h>
 #include <tiny-cuda-nn/common.h>
 #include <thrust/device_vector.h>
 #include <thrust/reduce.h>
 
-#include "../utils/gpu_image.h"
+#include "../utils/gpu-image.cuh"
+#include "../utils/parallel-utils.cuh"
 #include "../utils/training-network-kernels.cuh"
 #include "nerf-network.h"
 
@@ -95,22 +97,17 @@ NerfNetwork::NerfNetwork(const float& aabb_size) {
 		{"epsilon", 1e-15},
 	};
 
-	optimizer.reset(
+	density_optimizer.reset(
 		create_optimizer<network_precision_t>(optimizer_config)
 	);
 
-	// Set up Loss
-	json loss_config = {
-		{"otype", "L2"},
-	};
-
-	loss.reset(create_loss<network_precision_t>(loss_config));
-
-	initialize_params_and_gradients();
+	color_optimizer.reset(
+		create_optimizer<network_precision_t>(optimizer_config)
+	);
 }
 
 // initialize params and gradients for the networks (I have no idea if this is correct)
-void NerfNetwork::initialize_params_and_gradients() {
+void NerfNetwork::initialize_params(const cudaStream_t& stream) {
 
 	size_t rng_seed = 72791;
 	pcg32 rng(rng_seed);
@@ -119,43 +116,38 @@ void NerfNetwork::initialize_params_and_gradients() {
 	uint32_t n_total_params = density_network->n_params() + color_network->n_params();
 
 	params_fp.enlarge(n_total_params);
-	params_fp.memset(0);
-
 	params_hp.enlarge(n_total_params);
-	params_hp.memset(0);
 
 	gradients_hp.enlarge(n_total_params);
 	gradients_hp.memset(0);
 
-	// density network params and gradients
+	// initialize params
 
 	density_network->initialize_params(rng, params_fp.data());
+
+	color_network->initialize_params(rng, params_fp.data() + density_network->n_params());
+
+	// initialize_params only initializes full precision params, need to copy to half precision
+
+	copy_and_cast<network_precision_t, float>(stream, n_total_params, params_hp.data(), params_fp.data());
+
+	// assign params pointers
+
 	density_network->set_params(
 		params_hp.data(),
 		params_hp.data(),
 		gradients_hp.data()
 	);
 
-	// color network params and gradients
-
-	color_network->initialize_params(rng, params_fp.data() + density_network->n_params());
 	color_network->set_params(
 		params_hp.data() + density_network->n_params(),
 		params_hp.data() + density_network->n_params(),
 		gradients_hp.data() + density_network->n_params()
 	);
 
-	// initialize optimizer
-	
-	std::vector<std::pair<uint32_t, uint32_t>> density_network_layer_sizes = density_network->layer_sizes();
-	std::vector<std::pair<uint32_t, uint32_t>> color_network_layer_sizes = color_network->layer_sizes();
-
-	std::vector<std::pair<uint32_t, uint32_t>> concatenated_layer_sizes;
-	concatenated_layer_sizes.reserve(density_network_layer_sizes.size() + color_network_layer_sizes.size());
-	concatenated_layer_sizes.insert(concatenated_layer_sizes.end(), density_network_layer_sizes.begin(), density_network_layer_sizes.end());
-	concatenated_layer_sizes.insert(concatenated_layer_sizes.end(), color_network_layer_sizes.begin(), color_network_layer_sizes.end());
-	
-	optimizer->allocate(n_total_params, concatenated_layer_sizes);
+	// initialize optimizers
+	density_optimizer->allocate(density_network);
+	color_optimizer->allocate(color_network);
 }
 
 void NerfNetwork::train_step(
@@ -172,26 +164,11 @@ void NerfNetwork::train_step(
 ) {
 	enlarge_batch_memory_if_needed(batch_size);
 
-	CHECK_DATA(col_params_cpu, network_precision_t, color_network->params(), color_network->n_params());
-	CHECK_DATA(depth_params_cpu, network_precision_t, density_network->params(), density_network->n_params());
-
-	CHECK_DATA(pos_cpu, float, pos_batch, batch_size * 3);
-	CHECK_DATA(dir_cpu, float, dir_batch, batch_size * 3);
-	CHECK_DATA(dt_cpu, float, dt_batch, batch_size);
-	CHECK_DATA(target_cpu, float, target_rgba, batch_size * 4);
-
 	// Normalize input for neural network
 	generate_normalized_network_input(stream, batch_size, pos_batch, dir_batch, dt_batch);
 
-	CHECK_DATA(normal_pos_batch_cpu, float, normal_pos_batch.data(), batch_size * 3);
-	CHECK_DATA(normal_dir_batch_cpu, float, normal_dir_batch.data(), batch_size * 3);
-	CHECK_DATA(normal_dt_batch_cpu, float, normal_dt_batch.data(), batch_size);
-	
 	// Forward
 	auto fwd_ctx = forward(stream, batch_size, normal_pos_batch.data(), normal_dir_batch.data());
-
-	CHECK_DATA(color_network_output_cpu, float, color_network_output.data(), batch_size * 3);
-	CHECK_DATA(density_network_output_cpu, float, color_network_input.data(), batch_size);
 
 	// Loss
 	float mse_loss = calculate_loss(
@@ -205,17 +182,11 @@ void NerfNetwork::train_step(
 		target_rgba
 	);
 
-	CHECK_DATA(ray_steps_cpu, uint32_t, ray_steps, batch_size);
-	CHECK_DATA(ray_steps_cumulative_cpu, uint32_t, ray_steps_cumulative, batch_size);
-	CHECK_DATA(lossdata_cpu, float, loss_buf.data(), batch_size);
-	CHECK_DATA(grad_cpu, network_precision_t, grad_buf.data(), batch_size * 4);
-
 	printf("Loss: %f\n", mse_loss);
 
 	// Backward
 	backward(stream, fwd_ctx, batch_size, normal_pos_batch.data(), normal_dir_batch.data(), target_rgba);
 
-	CHECK_DATA(norm_cpu, float, normal_dir_batch.data(), batch_size);
 	// Optimizer
 	optimizer_step(stream);
 }
@@ -272,8 +243,6 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		true // prepare_input_gradients must be `true` otherwise backwards() fails (forward->dy_dx is not defined)
 	);
 
-	CHECK_DATA(density_network_output_cpu, float, color_network_input.data(), batch_size);
-
 	// Encode directions (dir_batch)
 	// Direction encoding gets concatenated with density_network_output (which will just be the end part of color_network_input)
 	
@@ -316,10 +285,10 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	fwd_ctx->color_ctx = color_network->forward(
 		stream,
 		fwd_ctx->color_network_input_matrix,
-		&fwd_ctx->color_network_output_matrix
+		&fwd_ctx->color_network_output_matrix,
+		false,
+		true // prepare_input_gradients
 	);
-
-	CHECK_DATA(color_network_output_cpu, float, color_network_output.data(), batch_size * 3);
 
 	return fwd_ctx;
 }
@@ -373,6 +342,7 @@ float NerfNetwork::calculate_loss(
 	);
 
 	// Calculate gradients
+	grad_buf.memset(0);
 	calculate_network_output_gradient<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
 		batch_size,
@@ -415,8 +385,7 @@ void NerfNetwork::backward(
 	GPUMatrix<network_precision_t> color_network_dL_doutput_matrix(
 		grad_buf.data(),
 		color_network->padded_output_width(),
-		batch_size,
-		0
+		batch_size
 	);
 
 	GPUMatrix<network_precision_t> color_network_dL_dinput_matrix(color_network->input_width(), batch_size, stream);
@@ -429,28 +398,6 @@ void NerfNetwork::backward(
 		color_network_dL_doutput_matrix,
 		&color_network_dL_dinput_matrix
 	);
-
-	CHECK_DATA(color_network_dL_dinput_cpu, float, color_network_dL_dinput_matrix.data(), batch_size);
-
-/*
-	// I don't think we need to backpropagate through the direction encoding... It has no params and it does not go back through the density network...
-
-	GPUMatrixDynamic<network_precision_t> direction_encoding_dL_dnetwork(
-		direction_encoding->padded_output_width(),
-		batch_size,
-		stream,
-		direction_encoding->preferred_output_layout()
-	);
-
-	direction_encoding->backward(
-		stream,
-		fwd_ctx->dir_network_input_matrix,
-		fwd_ctx->dir_network_output_matrix,
-		color_network_dL_dinput_matrix,
-		&dir_network_dL_dinput_matrix,
-		true
-	);
-*/
 
 	// Backpropagate through the density network
 	GPUMatrix<float> density_network_dL_dinput_matrix(
@@ -467,8 +414,15 @@ void NerfNetwork::backward(
 		density_network->padded_output_width(),
 		batch_size
 	);
-	
-	CHECK_DATA(density_network_dL_doutput_cpu, float, density_network_dL_doutput_matrix.data(), batch_size);
+
+	// manually add calculated sigma loss?
+	// CUDA_CHECK_THROW(cudaMemcpyAsync(
+	// 	density_network_dL_doutput_matrix.data(),
+	// 	grad_buf.data() + batch_size * 3,
+	// 	batch_size * sizeof(network_precision_t),
+	// 	cudaMemcpyDeviceToDevice,
+	// 	stream
+	// ));
 
 	density_network->backward(
 		stream,
@@ -479,46 +433,25 @@ void NerfNetwork::backward(
 		&density_network_dL_dinput_matrix
 	);
 
-	CHECK_DATA(density_network_dL_dinput_cpu, float, density_network_dL_dinput_matrix.data(), batch_size);
-
 }
 
 void NerfNetwork::optimizer_step(const cudaStream_t& stream) {
 
-	optimizer->step(stream, LOSS_SCALE, params_fp.data(), params_hp.data(), gradients_hp.data());
-
-	CHECK_DATA(params_cpu, float, params_fp.data(), params_fp.size());
-/*
-	GPUMatrix<network_precision_t> color_network_output_matrix(
-		color_network_output.data(),
-		color_network->padded_output_width(),
-		batch_size,
-		0
+	density_optimizer->step(
+		stream,
+		LOSS_SCALE,
+		params_fp.data(),
+		params_hp.data(),
+		gradients_hp.data()
 	);
 
-	GPUMatrix<float> ground_truth_data_matrix(
-		target_rgb,
-		color_network->padded_output_width(),
-		batch_size,
-		0
+	color_optimizer->step(
+		stream,
+		LOSS_SCALE,
+		params_fp.data() + density_network->n_params(),
+		params_hp.data() + density_network->n_params(),
+		gradients_hp.data() + density_network->n_params()
 	);
-*/
-/*
-	// allocate matrices for dL_doutput and L
-	GPUMatrix<network_precision_t> dL_doutput(color_network->padded_output_width(), batch_size, stream);
-	GPUMatrix<float> L(color_network->padded_output_width(), batch_size, stream);
-	
-	loss->evaluate(stream,
-		color_network->padded_output_width(),
-		color_network->output_width(),
-		128.0f, // no idea what loss_scale is supposed to be, it is 128.0f in trainer.h
-		color_network_output_matrix,
-		ground_truth_data_matrix,
-		L,
-		dL_doutput
-		// last argument is data_pdf. Not sure if we need to use it. Default is nullptr.
-	);
-*/
 }
 
 void NerfNetwork::enlarge_batch_memory_if_needed(const uint32_t& batch_size) {
@@ -529,7 +462,7 @@ void NerfNetwork::enlarge_batch_memory_if_needed(const uint32_t& batch_size) {
 
 	ray_rgba.enlarge(4 * batch_size);
 	loss_buf.enlarge(batch_size);
-	grad_buf.enlarge(4 * batch_size);
+	grad_buf.enlarge(color_network->padded_output_width() * batch_size);
 	trans_buf.enlarge(batch_size);
 	alpha_buf.enlarge(batch_size);
 	weight_buf.enlarge(batch_size);

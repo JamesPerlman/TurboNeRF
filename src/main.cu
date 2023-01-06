@@ -32,7 +32,7 @@ int main()
     cudaStream_t stream;
 	CUDA_CHECK_THROW(cudaStreamCreate(&stream));
 
-    controller.prepare_for_training(stream, 1024);
+    controller.prepare_for_training(stream, 2<<21);
     
     for (int i = 0; i < 1000; ++i) {
         controller.train_step(stream);

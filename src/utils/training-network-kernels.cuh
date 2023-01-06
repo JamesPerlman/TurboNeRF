@@ -110,15 +110,10 @@ __global__ void calculate_sse_loss_per_ray_kernel(
 	}
 
 	// Grab local references to global data
-	const uint32_t batch_offset_0 = 0;
-	const uint32_t batch_offset_1 = batch_size;
-	const uint32_t batch_offset_2 = batch_size<<2;
-	const uint32_t batch_offset_3 = batch_offset_2 + batch_size;
-
-	const uint32_t i_offset_0 = i + batch_offset_0;
-	const uint32_t i_offset_1 = i + batch_offset_1;
-	const uint32_t i_offset_2 = i + batch_offset_2;
-	const uint32_t i_offset_3 = i + batch_offset_3;
+	const uint32_t i_offset_0 = i;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
+	const uint32_t i_offset_3 = i_offset_2 + batch_size;
 
 	// Calculate the loss
 	const float dr = (float)ray_rgba[i_offset_0] - target_rgba[i_offset_0];
@@ -179,7 +174,7 @@ __global__ void calculate_network_output_gradient(
 	const float dt = sample_dt[i];
 	const float weight = sample_weight[i];
 	const float alpha = sample_alpha[i];
-	const float trans = sample_trans[i];	
+	const float trans = sample_trans[i];
 
 	const float dr = pixel_diffs[i_offset_0];
 	const float dg = pixel_diffs[i_offset_1];
@@ -198,7 +193,7 @@ __global__ void calculate_network_output_gradient(
 	grad[i_offset_2] = (tcnn::network_precision_t)(loss_scale * inv_2npix * db * weight);
 
 	// sigma gradient
-	grad[i_offset_3] = (tcnn::network_precision_t)(loss_scale * inv_2npix * (1.0f - 2.0f * alpha) * (dt * trans) * (dr * sr + dg * sg + db * sb + da));
+	// grad[i_offset_3] = (tcnn::network_precision_t)(loss_scale * inv_2npix * (1.0f - 2.0f * alpha) * (dt * trans) * (dr * sr + dg * sg + db * sb + da));
 }
 
 /**
