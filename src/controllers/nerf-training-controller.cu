@@ -6,9 +6,6 @@
 #include <memory>
 #include <thrust/device_vector.h>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stbi/stb_image.h>
-#include <stbi/stb_image_write.h>
 
 #include "nerf-training-controller.h"
 #include "../models/cascaded-occupancy-grid.cuh"
@@ -88,6 +85,9 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 	// so that the training batch generator will generate a full batch of rays
 	n_rays_in_batch = workspace.batch_size;
 	training_step = 0;
+
+	// Initialize the network
+	network.initialize_params(stream);
 }
 
 void NeRFTrainingController::load_images(cudaStream_t stream) {
@@ -124,7 +124,7 @@ void NeRFTrainingController::load_images(cudaStream_t stream) {
  */
 
 void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
-	
+
 	// Generate random floats for use in training
 
 	curandStatus_t status = curandGenerateUniform(rng, workspace.random_floats, workspace.batch_size);
@@ -149,6 +149,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	 */
 	initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
 		n_rays_in_batch,
+		workspace.batch_size,
 		dataset.images.size(),
 		dataset.n_pixels_per_image * dataset.n_channels_per_image,
 		dataset.image_dimensions,
@@ -173,6 +174,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	// Count the number of steps each ray would take.  We only need to do this for the new rays.
 	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
 		n_rays_in_batch,
+		workspace.batch_size,
 		workspace.bounding_box,
 		workspace.occupancy_grid,
 		cone_angle,
@@ -211,7 +213,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		cone_angle,
 		
 		// input buffers
-		workspace.pix_rgba,
 		workspace.ray_origins,
 		workspace.ray_dirs,
 		workspace.ray_inv_dirs,
@@ -255,7 +256,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 }
 
 void NeRFTrainingController::train_step(cudaStream_t stream) {
-	
 	printf("Training step %d...\n", training_step);
 
 	// Generate training batch

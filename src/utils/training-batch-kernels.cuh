@@ -56,6 +56,7 @@ __global__ void resize_floats_to_uint32_with_max(
 
 // generates rays and RGBs for training, assigns them to an array of contiguous data
 __global__ void initialize_training_rays_and_pixels_kernel(
+	const uint32_t n_rays,
 	const uint32_t batch_size,
 	const uint32_t n_images,
 	const uint32_t image_data_stride,
@@ -70,7 +71,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	float* __restrict__ idir_xyz
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-	if (i >= batch_size) return;
+	if (i >= n_rays) return;
 
 	const uint32_t i_offset_0 = i;
 	const uint32_t i_offset_1 = i_offset_0 + batch_size;
@@ -128,6 +129,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 // CONSIDER: move rays inside bounding box first?
 
 __global__ void march_and_count_steps_per_ray_kernel(
+	uint32_t n_rays,
 	uint32_t batch_size,
 	const BoundingBox* bounding_box,
 	const CascadedOccupancyGrid* occupancy_grid,
@@ -143,7 +145,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
 	// check if thread is out of bounds
-	if (i >= batch_size) return;
+	if (i >= n_rays) return;
 
 	const uint32_t i_offset_0 = i;
 	const uint32_t i_offset_1 = i_offset_0 + batch_size;
@@ -212,7 +214,6 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const float cone_angle,
 	
 	// input buffers
-	const float* __restrict__ in_pix_rgba,
 	const float* __restrict__ in_ori_xyz,
 	const float* __restrict__ in_dir_xyz,
 	const float* __restrict__ in_idir_xyz,
