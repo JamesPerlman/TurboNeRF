@@ -50,4 +50,28 @@ inline NRC_HOST_DEVICE int find_last_lt_presorted(
     return -1;
 }
 
+template <typename DST, typename SRC>
+__global__ void copy_and_cast_kernel(
+    const size_t n_elements,
+    DST* __restrict__ dst,
+    const SRC* __restrict__ src
+) {
+    const size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < n_elements) {
+        dst[idx] = (DST)src[idx];
+    }
+}
+
+template <typename DST, typename SRC>
+inline void copy_and_cast(
+    const cudaStream_t& stream,
+    const size_t n_elements,
+    DST* __restrict__ dst,
+    const SRC* __restrict__ src
+) {
+    const size_t block_size = 256;
+    const size_t n_blocks = (n_elements + block_size - 1) / block_size;
+    copy_and_cast_kernel<<<n_blocks, block_size, 0, stream>>>(n_elements, dst, src);
+}
+
 NRC_NAMESPACE_END
