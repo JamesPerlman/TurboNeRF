@@ -31,3 +31,4 @@ Next-level respect to the researchers much of this codebase is based off.  Thank
 Mildenhall, Ben, et al. "NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis." arXiv, 2020.  doi:10.48550/arxiv.2003.08934 - (https://arxiv.org/abs/2003.08934)  
 M�ller, Thomas, et al. "Instant neural graphics primitives with a multiresolution hash encoding." *ACM Trans. Graph.*, 41(4), 102:1-102:15 - https://doi.org/10.1145/3528223.3530127  
 Max, Nelson. "Optical Models for Direct Volume Rendering." IEEE Transactions on Visualization and Computer Graphics (1995) - https://courses.cs.duke.edu/spring03/cps296.8/papers/max95opticalModelsForDirectVolumeRendering.pdf  
+Müller, T. (2021). tiny-cuda-nn (Version 1.7) [Computer software]. https://github.com/NVlabs/tiny-cuda-nn
