@@ -41,8 +41,8 @@ private:
 	uint32_t n_samples_in_batch;
 
 	// configuration properties
-	uint32_t n_occupancy_grid_levels = 5;
-	uint32_t occupancy_grid_resolution = 128;
+	uint32_t n_occ_grid_levels = 5;
+	uint32_t occ_grid_resolution = 128;
 
 	// network objects
 	NerfNetwork network;

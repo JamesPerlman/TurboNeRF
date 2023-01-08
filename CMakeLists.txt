@@ -71,9 +71,7 @@ set(SOURCES
 	src/controllers/nerf-training-controller.cu
 	src/models/dataset.cu
 	src/models/nerf-network.cu
-	src/models/rendering-workspace.cu
 	src/models/training-image.cu
-	src/models/training-workspace.cu
 	src/main.cu	
 )
 

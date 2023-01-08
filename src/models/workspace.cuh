@@ -16,19 +16,12 @@ private:
 public:
     // allocate memory and save it for freedom later
     template <typename T>
-    T* allocate(const size_t& n_bytes, const cudaStream_t& stream) {
+    T* allocate(const cudaStream_t& stream, const size_t& n_elements) {
         T* ptr;
-        CUDA_CHECK_THROW(cudaMallocAsync(&ptr, n_bytes, stream));
+        CUDA_CHECK_THROW(cudaMallocAsync(&ptr, n_elements * sizeof(T), stream));
         _allocations.emplace_back(ptr);
         return ptr;
     }
-
-    // This function returns a lambda that can be used to allocate memory on the device.
-    // auto make_allocator(const cudaStream_t& stream) const {
-    //     return [this, stream]<typename T>(const size_t& n_bytes) {
-    //         return allocate<T>(n_bytes, stream);
-    //     };
-    // }
 
     // free all allocations
     ~Workspace() {

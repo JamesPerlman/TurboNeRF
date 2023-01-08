@@ -11,13 +11,6 @@
 #include "models/cascaded-occupancy-grid.cuh"
 #include "controllers/nerf-training-controller.h"
 
-// Declare a global device function
-__global__ void helloCuda(void)
-{
-    printf("Hello World from GPU!!\n");
-    int32_t x = blockIdx.x * blockDim.x + threadIdx.x;
-}
-
 int main()
 {
 	nrc::Dataset dataset = nrc::Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json");
@@ -35,9 +28,6 @@ int main()
     for (int i = 0; i < 1000; ++i) {
         controller.train_step(stream);
     }
-    
-    // Launch the "helloCuda" kernel on the device
-    helloCuda<<<1, 1>>> ();
 
     // Wait for the kernel to finish executing
     cudaDeviceSynchronize();

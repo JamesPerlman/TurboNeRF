@@ -22,7 +22,7 @@ struct RenderingWorkspace {
     float* ray_t;
     
     uint32_t* ray_steps;
-    uint32_t* ray_steps_cumulative;
+    uint32_t* ray_steps_cum;
 
     uint32_t* ray_x;
     uint32_t* ray_y;

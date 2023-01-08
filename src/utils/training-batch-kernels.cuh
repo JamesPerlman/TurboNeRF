@@ -132,7 +132,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	uint32_t n_rays,
 	uint32_t batch_size,
 	const BoundingBox* bounding_box,
-	const CascadedOccupancyGrid* occupancy_grid,
+	const CascadedOccupancyGrid* occ_grid,
 	const float cone_angle,
 	const float dt_min,
 	const float dt_max,
@@ -177,17 +177,17 @@ __global__ void march_and_count_steps_per_ray_kernel(
 			break;
 		}
 
-		int grid_level = occupancy_grid->get_grid_level_at(x, y, z, dt_min);
+		int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
 
-		if (occupancy_grid->is_occupied_at(grid_level, x, y, z)) {
+		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			// if grid is occupied here, march forward by a calculated dt
-			float dt = occupancy_grid->get_dt(t, cone_angle, dt_min, dt_max);
+			float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 			t += dt;
 
 			++n_steps_taken;
 		} else {
 			// otherwise we need to find the next occupied cell
-			t = occupancy_grid->get_t_advanced_to_next_voxel(
+			t = occ_grid->get_t_advanced_to_next_voxel(
 				o_x, o_y, o_z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
@@ -208,7 +208,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	uint32_t batch_size,
 	const BoundingBox* bounding_box,
-	const CascadedOccupancyGrid* occupancy_grid,
+	const CascadedOccupancyGrid* occ_grid,
 	const float dt_min,
 	const float dt_max,
 	const float cone_angle,
@@ -285,11 +285,11 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			break;
 		}
 
-		int grid_level = occupancy_grid->get_grid_level_at(x, y, z, dt_min);
+		int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
 
-		if (occupancy_grid->is_occupied_at(grid_level, x, y, z)) {
+		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			// if grid is occupied here, march forward by a calculated dt
-			float dt = occupancy_grid->get_dt(t, cone_angle, dt_min, dt_max);
+			float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 
 			/**
 			 * Here is where we assign training data to our compacted sample buffers.
@@ -331,7 +331,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 
 		} else {
 			// otherwise we need to find the next occupied cell
-			t = occupancy_grid->get_t_advanced_to_next_voxel(
+			t = occ_grid->get_t_advanced_to_next_voxel(
 				o_x, o_y, o_z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,

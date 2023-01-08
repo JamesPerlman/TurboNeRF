@@ -41,24 +41,24 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 		dataset.n_channels_per_image,
 		dataset.images.size(),
 		batch_size,
-		n_occupancy_grid_levels,
-		occupancy_grid_resolution
+		n_occ_grid_levels,
+		occ_grid_resolution
 	);
 
 	// Initialize occupancy grid bitfield (all bits set to 1)
 	CUDA_CHECK_THROW(
 		cudaMemsetAsync(
-			workspace.occupancy_grid_bitfield,
+			workspace.occ_grid_bits,
 			(uint8_t)0b11111111, // set all bits to 1
-			workspace.n_occupancy_grid_elements / 8,
+			workspace.n_occ_grid_elements / 8,
 			stream
 		)
 	);
 
 	// Create a CascadedOccupancyGrid object and copy it to the GPU
-	CascadedOccupancyGrid occupancy_grid_tmp(n_occupancy_grid_levels, workspace.occupancy_grid_bitfield, occupancy_grid_resolution);
+	CascadedOccupancyGrid occ_grid_tmp(n_occ_grid_levels, workspace.occ_grid_bits, occ_grid_resolution);
 	CUDA_CHECK_THROW(
-		cudaMemcpyAsync(workspace.occupancy_grid, &occupancy_grid_tmp, sizeof(CascadedOccupancyGrid), cudaMemcpyHostToDevice, stream)
+		cudaMemcpyAsync(workspace.occ_grid, &occ_grid_tmp, sizeof(CascadedOccupancyGrid), cudaMemcpyHostToDevice, stream)
 	);
 
 	// Copy dataset's BoundingBox to the GPU
@@ -174,7 +174,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		n_rays_in_batch,
 		workspace.batch_size,
 		workspace.bounding_box,
-		workspace.occupancy_grid,
+		workspace.occ_grid,
 		cone_angle,
 		dt_min,
 		dt_max,
@@ -191,7 +191,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	
 	// Grab some references to the n_steps arrays
 	thrust::device_ptr<uint32_t> n_steps_in_ptr(workspace.ray_steps);
-	thrust::device_ptr<uint32_t> n_steps_cum_ptr(workspace.ray_steps_cumulative);
+	thrust::device_ptr<uint32_t> n_steps_cum_ptr(workspace.ray_steps_cum);
 
 	// cumsum
 	thrust::inclusive_scan(thrust::cuda::par.on(stream), n_steps_in_ptr, n_steps_in_ptr + workspace.batch_size, n_steps_cum_ptr);
@@ -206,7 +206,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	march_and_generate_samples_and_compact_buffers_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
 		workspace.batch_size,
 		workspace.bounding_box,
-		workspace.occupancy_grid,
+		workspace.occ_grid,
 		dt_min, dt_max,
 		cone_angle,
 		
@@ -215,7 +215,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_dir,
 		workspace.ray_inv_dir,
 		workspace.ray_steps,
-		workspace.ray_steps_cumulative,
+		workspace.ray_steps_cum,
 		
 		// output buffers
 		workspace.sample_origin,
@@ -268,7 +268,7 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 		n_rays_in_batch,
 		n_samples_in_batch,
 		workspace.ray_steps,
-		workspace.ray_steps_cumulative,
+		workspace.ray_steps_cum,
 		workspace.sample_pos,
 		workspace.sample_dir,
 		workspace.sample_dt,

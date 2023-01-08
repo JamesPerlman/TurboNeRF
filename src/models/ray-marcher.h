@@ -12,7 +12,7 @@ public:
 	// constructor
 	RayMarcher(
 		const BoundingBox* bounding_box,
-		const CascadedOccupancyGrid* occupancy_grid,
+		const CascadedOccupancyGrid* occ_grid,
 		const float& dt_min,
 		const float& dt_max,
 		const float& max_steps,
@@ -31,7 +31,7 @@ public:
 		float* ray_a,
 	)
 		: bounding_box(bounding_box)
-		, occupancy_grid(occupancy_grid)
+		, occ_grid(occ_grid)
 		, dt_min(dt_min)
 		, dt_max(dt_max)
 		, max_steps(max_steps)
@@ -53,7 +53,7 @@ public:
 private:
 	// properties
 	const BoundingBox* bounding_box;
-	const OccupancyGrid* occupancy_grid;
+	const OccupancyGrid* occ_grid;
 	const float& dt_min;
 	const float& dt_max;
 	const float& max_steps;

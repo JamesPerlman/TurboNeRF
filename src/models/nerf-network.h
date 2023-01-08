@@ -29,7 +29,7 @@ struct NerfNetwork {
 		const uint32_t& n_rays,
 		const uint32_t& n_samples,
 		uint32_t* ray_steps,
-		uint32_t* ray_steps_cumulative,
+		uint32_t* ray_steps_cum,
 		float* pos_batch,
 		float* dir_batch,
 		float* dt_batch,

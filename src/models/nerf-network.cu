@@ -156,7 +156,7 @@ void NerfNetwork::train_step(
 	const uint32_t& n_rays,
 	const uint32_t& n_samples,
 	uint32_t* ray_steps,
-	uint32_t* ray_steps_cumulative,
+	uint32_t* ray_steps_cum,
 	float* pos_batch,
 	float* dir_batch,
 	float* dt_batch,
@@ -177,7 +177,7 @@ void NerfNetwork::train_step(
 		n_rays,
 		n_samples,
 		ray_steps,
-		ray_steps_cumulative,
+		ray_steps_cum,
 		normal_dt_batch.data(),
 		target_rgba
 	);
@@ -299,7 +299,7 @@ float NerfNetwork::calculate_loss(
 	const uint32_t& n_rays,
 	const uint32_t& n_samples,
 	const uint32_t* ray_steps,
-	const uint32_t* ray_steps_cumulative,
+	const uint32_t* ray_steps_cum,
 	const float* sample_dt,
 	const float* target_rgba
 ) {
@@ -319,7 +319,7 @@ float NerfNetwork::calculate_loss(
 		n_rays,
 		batch_size,
 		ray_steps,
-		ray_steps_cumulative,
+		ray_steps_cum,
 		color_network_output.data(),
 		log_space_density,
 		sample_dt,
@@ -334,7 +334,7 @@ float NerfNetwork::calculate_loss(
 		n_rays,
 		batch_size,
 		ray_steps,
-		ray_steps_cumulative,
+		ray_steps_cum,
 		ray_rgba.data(),
 		target_rgba,
 		loss_buf.data(),
