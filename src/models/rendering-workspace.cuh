@@ -33,21 +33,29 @@ struct RenderingWorkspace: Workspace {
 	float* sample_dir;
 	float* sample_dt;
 
+	// network buffers
+	tcnn::network_precision_t* network_sigma;
+	tcnn::network_precision_t* network_color;
+
 	// output buffers
-	tcnn::network_precision_t* network_output;
-	float* output_buffer;
+	float* pixel_buffer;
 
 	// samples
 	void enlarge(
 		const cudaStream_t& stream,
 		const uint32_t& output_width,
 		const uint32_t& output_height,
-		const uint32_t& n_rays_per_batch
+		const uint32_t& n_elements_per_batch,
+		const uint32_t& n_network_sigma_elements,
+		const uint32_t& n_network_color_elements
 	) {
 		free_allocations();
-		
-		batch_size = tcnn::next_multiple(batch_size, tcnn::batch_size_granularity);
+
+		batch_size = tcnn::next_multiple(n_elements_per_batch, tcnn::batch_size_granularity);
 		uint32_t n_output_pixel_elements = tcnn::next_multiple(4 * output_width * output_height, tcnn::batch_size_granularity);
+
+		// camera
+		camera			= allocate<Camera>(stream, 1);
 
 		// rays
 		ray_alive		= allocate<bool>(stream, batch_size);
@@ -63,7 +71,12 @@ struct RenderingWorkspace: Workspace {
 		sample_dir		= allocate<float>(stream, 3 * batch_size);
 		sample_dt		= allocate<float>(stream, batch_size);
 
-		output_buffer	= allocate<float>(stream, n_output_pixel_elements);
+		// network
+		network_sigma	= allocate<tcnn::network_precision_t>(stream, n_network_sigma_elements * batch_size);
+		network_color	= allocate<tcnn::network_precision_t>(stream, n_network_color_elements * batch_size);
+
+		// output
+		pixel_buffer	= allocate<float>(stream, n_output_pixel_elements);
 	};
 };
 
