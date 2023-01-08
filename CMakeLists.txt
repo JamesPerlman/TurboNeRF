@@ -37,6 +37,7 @@ add_subdirectory(includes/tiny-cuda-nn)
 
 set(HEADERS
 	# controllers
+	src/controllers/nerf-rendering-controller.h
 	src/controllers/nerf-training-controller.h
 
 	# models
@@ -47,7 +48,7 @@ set(HEADERS
 	src/models/nerf-network.h
 	src/models/ray.h
 	src/models/rays.h
-	src/models/rendering-workspace.h
+	src/models/rendering-workspace.cuh
 	src/models/training-image.cuh
 	src/models/training-workspace.cuh
 	src/models/workspace.cuh
@@ -68,6 +69,7 @@ set(HEADERS
 )
 
 set(SOURCES
+	src/controllers/nerf-rendering-controller.cu
 	src/controllers/nerf-training-controller.cu
 	src/models/dataset.cu
 	src/models/nerf-network.cu
@@ -87,5 +89,6 @@ target_link_libraries(${PROJECT_NAME}
 	PUBLIC
 	${CUDA_LIBRARIES}
 	curand
+	cublas
 	tiny-cuda-nn
 )
