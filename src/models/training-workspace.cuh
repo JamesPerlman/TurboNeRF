@@ -80,6 +80,8 @@ public:
 		const uint32_t& n_occ_grid_levels,
 		const uint32_t& n_occ_grid_cells_per_dimension
 	) {
+		free_allocations();
+		
 		batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
 		uint32_t n_cameras = tcnn::next_multiple(n_images, tcnn::batch_size_granularity);
 		uint32_t n_pixel_elements = tcnn::next_multiple(n_channels_per_image * n_pixels_per_image * n_images, tcnn::batch_size_granularity);

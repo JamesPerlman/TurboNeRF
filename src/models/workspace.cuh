@@ -24,12 +24,18 @@ public:
     }
 
     // free all allocations
-    ~Workspace() {
+    void free_allocations() {
         for (int i = 0; i < _allocations.size(); ++i) {
             if (_allocations[i] != nullptr) {
                 cudaFreeAsync(_allocations[i], _streams[i]);
             }
         }
+        
+        _allocations.clear();
+    }
+
+    ~Workspace() {
+        free_allocations();
     }
 };
 
