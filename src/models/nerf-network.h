@@ -21,9 +21,9 @@ struct NerfNetwork {
 	
 	NerfNetwork(const float& aabb_size);
 
-	void initialize_params(const cudaStream_t& stream);
+	void prepare_for_training(const cudaStream_t& stream);
 
-	void train_step(
+	void train(
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,
 		const uint32_t& n_rays,
@@ -35,24 +35,23 @@ struct NerfNetwork {
 		float* dt_batch,
 		float* target_rgba
 	);
-	
-	/**
-	 * The density MLP maps the hash encoded position y = enc(x; 𝜃)
-	 * to 16 output values, the first of which we treat as log-space density
-	 * https://arxiv.org/abs/2201.05989 - page 9
-	 */
-	tcnn::network_precision_t* get_log_space_density() const {
-		// The output of the density network is just a pointer to the color network's input buffer.
-		return color_network_input.data();
-	}
 
-	tcnn::network_precision_t* get_color_network_output() const {
-		return color_network_output.data();
-	}
+	void NerfNetwork::inference(
+		const cudaStream_t& stream,
+		const uint32_t& batch_size,
+		float* pos_batch,
+		float* dir_batch,
+		tcnn::network_precision_t* sigma, // density network output needs to be sized to get_network_input_width()
+		tcnn::network_precision_t* color // color network output needs to be sized to get_network_output_width()
+	);
 
-	size_t get_color_network_padded_output_width() const {
+	size_t get_network_input_width() const {
+		return color_network->input_width();
+	};
+
+	size_t get_network_output_width() const {
 		return color_network->padded_output_width();
-	}
+	};
 
 private:
 
@@ -98,14 +97,16 @@ private:
 		std::unique_ptr<tcnn::Context> color_ctx;
 	};
 
-	void enlarge_batch_memory_if_needed(const uint32_t& batch_size);
+	void enlarge_training_batch_memory_if_needed(const uint32_t& batch_size);
+
+	void enlarge_inference_batch_memory_if_needed(const uint32_t& batch_size);
 
 	void generate_normalized_network_input(
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,
 		const float* pos_batch,
 		const float* dir_batch,
-		const float* dt_batch
+		const float* dt_batch = nullptr
 	);
 
 	std::unique_ptr<ForwardContext> forward(
