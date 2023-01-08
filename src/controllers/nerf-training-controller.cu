@@ -261,7 +261,6 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 
 	//printf("Using %d rays and %d samples\n", n_rays_in_batch, n_samples_in_batch);
 	
-	// TODO: NORMALIZE SAMPLE_DIRS AND SAMPLE_POSITIONS (THANK YOU @BURIEDANIMAL)
 	network.train(
 		stream,
 		workspace.batch_size,

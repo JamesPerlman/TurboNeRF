@@ -191,7 +191,7 @@ void NerfNetwork::train(
 	optimizer_step(stream);
 }
 
-// Normalizes input and saves it to the correct buffers
+// Normalizes input and saves it to the correct buffers (thank you @buriedanimal)
 void NerfNetwork::generate_normalized_network_input(
 	const cudaStream_t& stream,
 	const uint32_t& batch_size,
