@@ -4,14 +4,12 @@
 #include <device_launch_parameters.h>
 
 #include <json/json.hpp>
-#include <Eigen/Dense>
 
 #include "common.h"
 #include "main.h"
 #include "models/dataset.h"
 #include "models/cascaded-occupancy-grid.cuh"
 #include "controllers/nerf-training-controller.h"
-
 
 // Declare a global device function
 __global__ void helloCuda(void)

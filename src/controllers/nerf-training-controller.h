@@ -13,7 +13,7 @@
 #include "../models/cascaded-occupancy-grid.cuh"
 #include "../models/dataset.h"
 #include "../models/nerf-network.h"
-#include "../models/training-workspace.h"
+#include "../models/training-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 

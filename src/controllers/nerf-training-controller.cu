@@ -2,7 +2,6 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <json/json.hpp>
-#include <Eigen/Dense>
 #include <memory>
 #include <thrust/device_vector.h>
 
@@ -13,7 +12,6 @@
 #include "../utils/parallel-utils.cuh"
 
 using namespace nrc;
-using namespace Eigen;
 using namespace tcnn;
 using namespace nlohmann;
 
@@ -127,14 +125,14 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 
 	// Generate random floats for use in training
 
-	curandStatus_t status = curandGenerateUniform(rng, workspace.random_floats, workspace.batch_size);
+	curandStatus_t status = curandGenerateUniform(rng, workspace.random_float, workspace.batch_size);
 	if (status != CURAND_STATUS_SUCCESS) {
 		printf("Error generating random floats for training batch.\n");
 	}
 	
 	// Convert floats to uint32_t which will be interpreted as pixel indices for any training image
 	resize_floats_to_uint32_with_max<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
-		workspace.batch_size, workspace.random_floats, workspace.pix_index, dataset.n_pixels_per_image
+		workspace.batch_size, workspace.random_float, workspace.pix_index, dataset.n_pixels_per_image
 	);
 
 	/**
@@ -158,9 +156,9 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.img_index,
 		workspace.pix_index,
 		workspace.pix_rgba,
-		workspace.ray_origins,
-		workspace.ray_dirs,
-		workspace.ray_inv_dirs
+		workspace.ray_origin,
+		workspace.ray_dir,
+		workspace.ray_inv_dir
 	);
 
 	/* Begin volumetric sampling of the previous network outputs */
@@ -180,9 +178,9 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		cone_angle,
 		dt_min,
 		dt_max,
-		workspace.ray_origins,
-		workspace.ray_dirs,
-		workspace.ray_inv_dirs,
+		workspace.ray_origin,
+		workspace.ray_dir,
+		workspace.ray_inv_dir,
 		workspace.ray_steps
 	);
 
@@ -213,27 +211,27 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		cone_angle,
 		
 		// input buffers
-		workspace.ray_origins,
-		workspace.ray_dirs,
-		workspace.ray_inv_dirs,
+		workspace.ray_origin,
+		workspace.ray_dir,
+		workspace.ray_inv_dir,
 		workspace.ray_steps,
 		workspace.ray_steps_cumulative,
 		
 		// output buffers
-		workspace.sample_origins,
-		workspace.sample_dirs,
+		workspace.sample_origin,
+		workspace.sample_dir,
 		workspace.sample_t0,
 		workspace.sample_t1
 	);
 
 	// Generate stratified sampling positions
-	generate_stratified_sample_positions_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
+	generate_stratified_sample_pos_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
 		workspace.batch_size,
 		workspace.sample_t0, workspace.sample_t1,
-		workspace.random_floats,
-		workspace.sample_origins,
-		workspace.sample_dirs,
-		workspace.sample_positions,
+		workspace.random_float,
+		workspace.sample_origin,
+		workspace.sample_dir,
+		workspace.sample_pos,
 		workspace.sample_dt
 	);
 
@@ -256,12 +254,12 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 }
 
 void NeRFTrainingController::train_step(cudaStream_t stream) {
-	printf("Training step %d...\n", training_step);
+	//printf("Training step %d...\n", training_step);
 
 	// Generate training batch
 	generate_next_training_batch(stream);
 
-	printf("Using %d rays and %d samples\n", n_rays_in_batch, n_samples_in_batch);
+	//printf("Using %d rays and %d samples\n", n_rays_in_batch, n_samples_in_batch);
 	
 	// TODO: NORMALIZE SAMPLE_DIRS AND SAMPLE_POSITIONS (THANK YOU @BURIEDANIMAL)
 	network.train_step(
@@ -271,8 +269,8 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 		n_samples_in_batch,
 		workspace.ray_steps,
 		workspace.ray_steps_cumulative,
-		workspace.sample_positions,
-		workspace.sample_dirs,
+		workspace.sample_pos,
+		workspace.sample_dir,
 		workspace.sample_dt,
 		workspace.pix_rgba
 	);

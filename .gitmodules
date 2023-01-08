@@ -1,6 +1,3 @@
 [submodule "includes/tiny-cuda-nn"]
 	path = includes/tiny-cuda-nn
 	url = https://github.com/NVLabs/tiny-cuda-nn.git
-[submodule "includes/eigen"]
-	path = includes/eigen
-	url = https://gitlab.com/libeigen/eigen.git

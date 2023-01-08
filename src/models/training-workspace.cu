@@ -1,9 +1,8 @@
 #include "../common.h"
 
-#include "training-workspace.h"
+#include "training-workspace.cuh"
 
 using namespace nrc;
-using namespace Eigen;
 using network_precision_t = tcnn::network_precision_t;
 
 void TrainingWorkspace::enlarge(
@@ -25,7 +24,7 @@ void TrainingWorkspace::enlarge(
 	auto data = tcnn::allocate_workspace_and_distribute<
 		BoundingBox,				// bounding_box
 		stbi_uc,					// image_data
-		float,						// random_floats
+		float,						// random_float
 		
 		uint32_t,					// img_index
 		uint32_t,					// pix_index
@@ -36,16 +35,16 @@ void TrainingWorkspace::enlarge(
 		float,						// pix_rgba
 		float,						// ray_rgba
 
-		float,						// ray_origins
-		float,						// sample_origins
-		float,						// ray_dirs
-		float,						// sample_dirs
-		float, 						// ray_inv_dirs
+		float,						// ray_origin
+		float,						// sample_origin
+		float,						// ray_dir
+		float,						// sample_dir
+		float, 						// ray_inv_dir
 		
 		float,						// sample_t0
 		float,						// sample_t1
 		float,						// sample_dt
-		float, 						// sample_positions
+		float, 						// sample_pos
 
 		CascadedOccupancyGrid,		// occupancy_grid
 		uint8_t,					// occupancy_grid_bitfield
@@ -54,7 +53,7 @@ void TrainingWorkspace::enlarge(
 	>(stream, &arena_allocation,
 		1,							// bounding_box
 		n_pixel_elements,			// img_data
-		batch_size,					// random_floats
+		batch_size,					// random_float
 
 		batch_size,					// img_index
 		batch_size,					// pix_index
@@ -65,11 +64,11 @@ void TrainingWorkspace::enlarge(
 		4 * batch_size,				// pix_rgba
 		4 * batch_size,				// ray_rgba
 		
-		3 * batch_size,				// ray_origins
-		3 * batch_size,				// sample_origins
-		3 * batch_size,				// ray_dirs
-		3 * batch_size,				// sample_dirs
-		3 * batch_size, 			// ray_inv_dirs
+		3 * batch_size,				// ray_origin
+		3 * batch_size,				// sample_origin
+		3 * batch_size,				// ray_dir
+		3 * batch_size,				// sample_dir
+		3 * batch_size, 			// ray_inv_dir
 
 		batch_size,					// sample_t0
 		batch_size,					// sample_t1
@@ -86,7 +85,7 @@ void TrainingWorkspace::enlarge(
 	bounding_box = std::get<0>(data);
 	image_data = std::get<1>(data);
 
-	random_floats = std::get<2>(data);
+	random_float = std::get<2>(data);
 	
 	img_index = std::get<3>(data);
 	pix_index = std::get<4>(data);
@@ -94,24 +93,23 @@ void TrainingWorkspace::enlarge(
 	ray_steps = std::get<5>(data);
 	ray_steps_cumulative = std::get<6>(data);
 	
-	// carefully note how double-buffered pointers are set up
 	pix_rgba = std::get<7>(data);
 
 	ray_rgba = std::get<8>(data);
 	
-	ray_origins = std::get<9>(data);
-	sample_origins = std::get<10>(data);
+	ray_origin = std::get<9>(data);
+	sample_origin = std::get<10>(data);
 	
-	ray_dirs = std::get<11>(data);
-	sample_dirs = std::get<12>(data);
+	ray_dir = std::get<11>(data);
+	sample_dir = std::get<12>(data);
 	
-	ray_inv_dirs = std::get<13>(data);
+	ray_inv_dir = std::get<13>(data);
 
 	sample_t0 = std::get<14>(data);
 	sample_t1 = std::get<15>(data);
 	sample_dt = std::get<16>(data);
 
-	sample_positions = std::get<17>(data);
+	sample_pos = std::get<17>(data);
 
 	occupancy_grid = std::get<18>(data);
 	occupancy_grid_bitfield = std::get<19>(data);

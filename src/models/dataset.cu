@@ -9,9 +9,7 @@
 #include <vector>
 
 #include "dataset.h"
-#include "../utils/json-bindings/eigen-json.h"
 
-using namespace Eigen;
 using namespace std;
 using namespace filesystem;
 using json = nlohmann::json;
@@ -27,16 +25,16 @@ Dataset::Dataset(string file_path) {
     cameras.reserve(n_frames);
     images.reserve(n_frames);
 
-    image_dimensions = Vector2i(json_data["w"], json_data["h"]);
-    n_pixels_per_image = image_dimensions.x() * image_dimensions.y();
+    image_dimensions = make_int2(json_data["w"], json_data["h"]);
+    n_pixels_per_image = image_dimensions.x * image_dimensions.y;
     n_channels_per_image = 4;
     
     // TODO: per-camera focal length
-    Vector2f focal_length(json_data["fl_x"], json_data["fl_y"]);
-    Vector2f view_angle(json_data["camera_angle_x"], json_data["camera_angle_y"]);
-    Vector2f angle_tans(view_angle.array().tan());
+    float2 focal_length{json_data["fl_x"], json_data["fl_y"]};
+    float2 view_angle{json_data["camera_angle_x"], json_data["camera_angle_y"]};
+    float2 angle_tans{tanf(view_angle.x), tanf(view_angle.y)};
     // sensor size is the size of the sensor at distance 1 from the camera's origin
-    Vector2f sensor_size = angle_tans;//2.0f * focal_length.cwiseProduct(0.5f * angle_tans);
+    float2 sensor_size = angle_tans;//2.0f * focal_length.cwiseProduct(0.5f * angle_tans);
 
     uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
     bounding_box = BoundingBox((float)aabb_size);
@@ -48,7 +46,7 @@ Dataset::Dataset(string file_path) {
         float near = frame.value("near", 0.1f);
         float far = frame.value("far", 16.0f);
 
-        Matrix4f camera_matrix = nrc::from_json(frame["transform_matrix"]);
+        Matrix4f camera_matrix(frame["transform_matrix"]);
         
         // TODO: per-camera dimensions
         cameras.emplace_back(near, far, focal_length, image_dimensions, sensor_size, camera_matrix);

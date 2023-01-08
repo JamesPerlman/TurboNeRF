@@ -1,13 +1,12 @@
 #pragma once
 
 #include "../common.h"
-#include <Eigen/Dense>
 
 NRC_NAMESPACE_BEGIN
 
 struct Ray {
-	Eigen::Vector3f o;
-	Eigen::Vector3f d;
+	float3 o;
+	float3 d;
 };
 
 NRC_NAMESPACE_END

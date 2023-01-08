@@ -2,14 +2,14 @@
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include <Eigen/Dense>
 #include <stbi/stb_image.h>
 #include <tiny-cuda-nn/common.h>
 
 #include "../common.h"
 #include "../models/bounding-box.cuh"
 #include "../models/cascaded-occupancy-grid.cuh"
-#include "../models/camera.h"
+#include "../models/camera.cuh"
+#include "../utils/linalg.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -60,7 +60,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t batch_size,
 	const uint32_t n_images,
 	const uint32_t image_data_stride,
-	const Eigen::Vector2i image_dimensions,
+	const int2 image_dimensions,
 	const Camera* __restrict__ cameras,
 	const stbi_uc* __restrict__ image_data,
 	const uint32_t* __restrict__ img_index,
@@ -81,8 +81,8 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t image_idx = img_index[i];
 	const uint32_t pixel_idx = pix_index[i];
 	
-	const uint32_t pixel_x = pixel_idx % image_dimensions.x();
-	const uint32_t pixel_y = pixel_idx / image_dimensions.x();
+	const uint32_t pixel_x = pixel_idx % image_dimensions.x;
+	const uint32_t pixel_y = pixel_idx / image_dimensions.x;
 	const uint32_t x = pixel_x;
 	const uint32_t y = pixel_y;
 	const Camera cam = cameras[image_idx];
@@ -101,21 +101,21 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	pix_rgba[i_offset_3] = (float)a / 255.0f;
 	
 	// TODO: optimize
-	Ray ray = cam.get_ray_at_pixel_xy(x, y);
+	Ray local_ray = cam.local_ray_at_pixel_xy(x, y);
 
-	ray.o = (cam.transform * ray.o.homogeneous()).head<3>();
-	ray.d = (cam.transform * ray.d.homogeneous()).head<3>() - ray.o;
+	float3 global_origin = cam.transform * local_ray.o;
+	float3 global_direction = cam.transform * local_ray.d - cam.transform.get_translation();
 
-	ori_xyz[i_offset_0] = ray.o.x();
-	ori_xyz[i_offset_1] = ray.o.y();
-	ori_xyz[i_offset_2] = ray.o.z();
+	ori_xyz[i_offset_0] = global_origin.x;
+	ori_xyz[i_offset_1] = global_origin.y;
+	ori_xyz[i_offset_2] = global_origin.z;
 
 	// normalize ray directions
-	const float n = rsqrtf(ray.d.x() * ray.d.x() + ray.d.y() * ray.d.y() + ray.d.z() * ray.d.z());
+	const float n = rsqrtf(l2_squared_norm(local_ray.d));
 
-	const float ray_dx = ray.d.x() * n;
-	const float ray_dy = ray.d.y() * n;
-	const float ray_dz = ray.d.z() * n;
+	const float ray_dx = n * global_direction.x;
+	const float ray_dy = n * global_direction.y;
+	const float ray_dz = n * global_direction.z;
 
 	dir_xyz[i_offset_0] = ray_dx;
 	dir_xyz[i_offset_1] = ray_dy;
@@ -345,11 +345,11 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
  * This kernel uses the t0 and t1 values to generate the sample positions.
  * We stratify the sample points using a buffer of random offsets and interpolate between t0 and t1 linearly.
  */
-__global__ void generate_stratified_sample_positions_kernel(
+__global__ void generate_stratified_sample_pos_kernel(
 	uint32_t batch_size,
 	const float* __restrict__ t0,
 	const float* __restrict__ t1,
-	const float* __restrict__ random_floats,
+	const float* __restrict__ random_float,
 	const float* __restrict__ in_ori_xyz,
 	const float* __restrict__ in_dir_xyz,
 	float* __restrict__ out_xyz,
@@ -368,7 +368,7 @@ __global__ void generate_stratified_sample_positions_kernel(
 	const float t0_i = t0[i_offset_0];
 	const float t1_i = t1[i_offset_0];
 	
-	const float k = random_floats[i_offset_0];
+	const float k = random_float[i_offset_0];
 	
 	const float o_x = in_ori_xyz[i_offset_0];
 	const float o_y = in_ori_xyz[i_offset_1];

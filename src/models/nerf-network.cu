@@ -382,6 +382,26 @@ void NerfNetwork::backward(
 ) {
 	// Backpropagate through the color network
 
+	// GPUMatrix<network_precision_t> sigma_grad(
+	// 	1,
+	// 	batch_size
+	// );
+
+	// CUDA_CHECK_THROW(cudaMemcpyAsync(
+	// 	sigma_grad.data(),
+	// 	grad_buf.data() + 3 * batch_size,
+	// 	batch_size * sizeof(network_precision_t),
+	// 	cudaMemcpyDeviceToDevice,
+	// 	stream
+	// ));
+
+	// CUDA_CHECK_THROW(cudaMemsetAsync(
+	// 	grad_buf.data() + 3 * batch_size,
+	// 	0,
+	// 	batch_size * sizeof(network_precision_t),
+	// 	stream
+	// ));
+
 	GPUMatrix<network_precision_t> color_network_dL_doutput_matrix(
 		grad_buf.data(),
 		color_network->padded_output_width(),
@@ -418,7 +438,7 @@ void NerfNetwork::backward(
 	// manually add calculated sigma loss?
 	// CUDA_CHECK_THROW(cudaMemcpyAsync(
 	// 	density_network_dL_doutput_matrix.data(),
-	// 	grad_buf.data() + batch_size * 3,
+	// 	sigma_grad.data(),
 	// 	batch_size * sizeof(network_precision_t),
 	// 	cudaMemcpyDeviceToDevice,
 	// 	stream

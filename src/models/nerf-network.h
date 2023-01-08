@@ -20,10 +20,10 @@ struct NerfNetwork {
 	std::shared_ptr<tcnn::Optimizer<tcnn::network_precision_t>> color_optimizer;
 	
 	NerfNetwork(const float& aabb_size);
-	
+
 	void initialize_params(const cudaStream_t& stream);
 
-	void NerfNetwork::train_step(
+	void train_step(
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,
 		const uint32_t& n_rays,
@@ -128,7 +128,7 @@ private:
 
 	void optimizer_step(const cudaStream_t& stream);
 
-	void NerfNetwork::backward(
+	void backward(
 		cudaStream_t stream,
 		std::unique_ptr<ForwardContext>& forward_ctx,
 		uint32_t batch_size,

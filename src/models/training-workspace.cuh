@@ -7,16 +7,17 @@
 
 #include "../common.h"
 #include "bounding-box.cuh"
-#include "camera.h"
+#include "camera.cuh"
 #include "cascaded-occupancy-grid.cuh"
 #include "ray.h"
+#include "workspace.cuh"
 
 
 NRC_NAMESPACE_BEGIN
 
 // NeRFWorkspace?
 // TODO: Make this a derived struct from RenderingWorkspace
-struct TrainingWorkspace {
+struct TrainingWorkspace: Workspace {
 public:
 
 	uint32_t batch_size;
@@ -26,7 +27,7 @@ public:
 
 	stbi_uc* image_data;
 
-	float* random_floats;
+	float* random_float;
 	uint32_t* img_index;
 	uint32_t* pix_index; // index of randomly selected pixel in image
 
@@ -40,15 +41,15 @@ public:
 	float* ray_rgba;
 	
 	// ray origin components
-	float* ray_origins;
-	float* sample_origins;
+	float* ray_origin;
+	float* sample_origin;
 
 	// ray direction components
-	float* ray_dirs;
-	float* sample_dirs;
+	float* ray_dir;
+	float* sample_dir;
 
 	// ray inverse direction components
-	float* ray_inv_dirs;
+	float* ray_inv_dir;
 
 	// ray t components
 	float* sample_t0; // t_start
@@ -56,7 +57,7 @@ public:
 	float* sample_dt;
 
 	// sample position components
-	float* sample_positions;
+	float* sample_pos;
 
 	uint32_t n_occupancy_grid_elements;
 	CascadedOccupancyGrid* occupancy_grid;
@@ -70,7 +71,7 @@ public:
 	tcnn::GPUMemory<Camera> cameras;
 
 	// constructor
-	TrainingWorkspace() : arena_allocation() {};
+	TrainingWorkspace() {};
 
 	// member functions
 	void enlarge(
