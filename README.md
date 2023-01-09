@@ -23,7 +23,9 @@ madclawgonzo - Requested a haiku written by ChatGPT: "Madclawgonzo / Subscribing
 anonymous  - Requested to remain anonymous  
 gusround - https://github.com/candidogustavo  
 slowcon - (pending message)  
-likid_3 - (pending message)  
+likid_3 - (pending message)    
+cognitrol - Supporting cool work that helps the community explore technology  
+dankmatrix - (pending message)  
 
 ## CITATIONS
 
