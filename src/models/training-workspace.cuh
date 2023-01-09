@@ -59,9 +59,7 @@ public:
 	// sample position components
 	float* sample_pos;
 
-	uint32_t n_occ_grid_elements;
 	CascadedOccupancyGrid* occ_grid;
-	uint8_t* occ_grid_bits;
 
 	// GPUMemory managed properties
 
@@ -85,9 +83,6 @@ public:
 		batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
 		uint32_t n_cameras = tcnn::next_multiple(n_images, tcnn::batch_size_granularity);
 		uint32_t n_pixel_elements = tcnn::next_multiple(n_channels_per_image * n_pixels_per_image * n_images, tcnn::batch_size_granularity);
-
-		n_occ_grid_elements = CascadedOccupancyGrid::get_n_total_elements(n_occ_grid_levels, n_occ_grid_cells_per_dimension);
-		uint32_t n_grid_bitfield_bytes = tcnn::next_multiple(n_occ_grid_elements / 8, tcnn::batch_size_granularity);
 
 		// need to upgrade to C++20 to use typename parameters in lambdas :(
 		// auto alloc = []<typename T>(size_t size) { return allocate<T>(stream, size); };
@@ -118,7 +113,6 @@ public:
 		sample_pos 		= allocate<float>(stream, 3 * batch_size);
 
 		occ_grid 		= allocate<CascadedOccupancyGrid>(stream, 1);
-		occ_grid_bits 	= allocate<uint8_t>(stream, n_grid_bitfield_bytes);
 	}
 
 

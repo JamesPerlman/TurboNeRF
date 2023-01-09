@@ -2,12 +2,10 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <json/json.hpp>
-#include <memory>
 #include <thrust/device_vector.h>
 
 
 #include "nerf-training-controller.h"
-#include "../models/cascaded-occupancy-grid.cuh"
 #include "../utils/training-batch-kernels.cuh"
 #include "../utils/parallel-utils.cuh"
 
@@ -15,11 +13,9 @@ using namespace nrc;
 using namespace tcnn;
 using namespace nlohmann;
 
-NeRFTrainingController::NeRFTrainingController(Dataset& dataset)
-	: network(NerfNetwork(dataset.bounding_box.size_x))
-{
-	this->dataset = dataset;
-	
+NeRFTrainingController::NeRFTrainingController(Dataset& dataset, NeRF& nerf)
+	: dataset(dataset), nerf(nerf)
+{	
 	// TODO: refactor size_x to just size?
 	// RNG
 	// todo: CURAND_ASSERT_SUCCESS
@@ -45,20 +41,9 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 		occ_grid_resolution
 	);
 
-	// Initialize occupancy grid bitfield (all bits set to 1)
-	CUDA_CHECK_THROW(
-		cudaMemsetAsync(
-			workspace.occ_grid_bits,
-			(uint8_t)0b11111111, // set all bits to 1
-			workspace.n_occ_grid_elements / 8,
-			stream
-		)
-	);
-
 	// Create a CascadedOccupancyGrid object and copy it to the GPU
-	CascadedOccupancyGrid occ_grid_tmp(n_occ_grid_levels, workspace.occ_grid_bits, occ_grid_resolution);
 	CUDA_CHECK_THROW(
-		cudaMemcpyAsync(workspace.occ_grid, &occ_grid_tmp, sizeof(CascadedOccupancyGrid), cudaMemcpyHostToDevice, stream)
+		cudaMemcpyAsync(workspace.occ_grid, &nerf.occupancy_grid, sizeof(CascadedOccupancyGrid), cudaMemcpyHostToDevice, stream)
 	);
 
 	// Copy dataset's BoundingBox to the GPU
@@ -85,7 +70,7 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 	training_step = 0;
 
 	// Initialize the network
-	network.prepare_for_training(stream);
+	nerf.network.prepare_for_training(stream);
 }
 
 void NeRFTrainingController::load_images(cudaStream_t stream) {
@@ -261,7 +246,7 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 
 	//printf("Using %d rays and %d samples\n", n_rays_in_batch, n_samples_in_batch);
 	
-	network.train(
+	nerf.network.train(
 		stream,
 		workspace.batch_size,
 		n_rays_in_batch,

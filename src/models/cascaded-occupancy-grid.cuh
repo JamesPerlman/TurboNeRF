@@ -15,23 +15,24 @@
 
 #include "../common.h"
 #include "../utils/bit-utils.cuh"
+#include "cascaded-occupancy-grid-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 
 struct CascadedOccupancyGrid {
 private:
 	uint32_t n_levels;
-	const uint8_t* bitfield;
 	float resolution_f;
 	float inv_resolution_f;
 	uint32_t resolution_i;
 
+	CascadedOccupancyGridWorkspace workspace;
+
 public:
 	// level is the power of two domain size (K from pg. 15 of Müller, et al. 2022)
 	// grid goes from [-2^(level - 1) + 0.5, 2^(level - 1) + 0.5] in each dimension
-	CascadedOccupancyGrid(uint32_t n_levels, const uint8_t* bitfield, uint32_t resolution = 128)
+	CascadedOccupancyGrid(uint32_t n_levels, uint32_t resolution = 128)
 		: n_levels(n_levels)
-		, bitfield(bitfield)
 		, resolution_i(resolution)
 		, resolution_f(resolution)
 		, inv_resolution_f(1.0f / (float)resolution)
@@ -39,18 +40,46 @@ public:
 
 	CascadedOccupancyGrid() = default;
 
-	// calculates number of bytes needed to store the grid
+	// class function to calculate number of bytes needed to store the grid
 	static inline NRC_HOST_DEVICE size_t get_n_total_elements(uint32_t n_levels, uint32_t grid_resolution = 128) {
 		uint32_t side_length = next_power_of_two(grid_resolution);
 		return (size_t)(n_levels * side_length * side_length * side_length);
 	}
+	
+	// allocators/initializers
+	uint8_t* initialize_bitfield(const cudaStream_t& stream) {
+		workspace.enlarge_bitfield(stream, CascadedOccupancyGrid::get_n_total_elements(n_levels, resolution_i));
+		return workspace.bitfield;
+	}
+	
+	float* initialize_values(const cudaStream_t& stream) {
+		workspace.enlarge_values(stream, CascadedOccupancyGrid::get_n_total_elements(n_levels, resolution_i));
+		return workspace.values;
+	}
 
+	// pointer getters
+	inline NRC_HOST_DEVICE uint8_t* get_bitfield() const {
+		return workspace.bitfield;
+	}
+
+	inline NRC_HOST_DEVICE float* get_values() const {
+		return workspace.values;
+	}
+
+	// instance function to return the number of elements in this grid
+	inline uint32_t NRC_HOST_DEVICE get_n_total_elements() const {
+		return workspace.n_total_elements;
+	}
+
+	inline uint32_t NRC_HOST_DEVICE get_n_bitfield_elements() const {
+		return workspace.n_bitfield_elements;
+	}
 
 	// returns the total volume of the grid
 	inline NRC_HOST_DEVICE uint32_t volume() const {
 		return resolution_i * resolution_i * resolution_i;
 	}
-	
+
 	// normalize a coordinate to [0, 1] within a grid at level k
 	inline NRC_HOST_DEVICE float3 get_normalized_coordinates(const uint32_t& k, const float& x, const float& y, const float& z) const {
 		float scale = 1 << k;
@@ -83,7 +112,7 @@ public:
 	) const {
 		uint32_t byte_idx = get_voxel_morton_index(level, x, y, z) / 8;
 		uint8_t bitmask = 1 << ((n_levels * byte_idx + level) % 8);
-		return bitfield[byte_idx] & bitmask;
+		return workspace.bitfield[byte_idx] & bitmask;
 	}
 
 	/* From Müller, et al. 2022

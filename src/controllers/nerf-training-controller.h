@@ -2,6 +2,7 @@
 #include <cuda_runtime.h>
 #include <curand.h>
 #include <curand_kernel.h>
+#include <memory>
 #include <tiny-cuda-nn/common.h>
 #include <tiny-cuda-nn/encoding.h>
 #include <tiny-cuda-nn/optimizer.h>
@@ -13,13 +14,14 @@
 #include "../models/cascaded-occupancy-grid.cuh"
 #include "../models/dataset.h"
 #include "../models/nerf-network.h"
+#include "../models/nerf.cuh"
 #include "../models/training-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 
 struct NeRFTrainingController {
 	// constructor
-	NeRFTrainingController(Dataset& dataset);
+	NeRFTrainingController(Dataset& dataset, NeRF& nerf);
 	~NeRFTrainingController();
 	
 	// public properties
@@ -35,7 +37,9 @@ struct NeRFTrainingController {
 
 private:
 	// private properties
-	Dataset dataset;
+	NeRF& nerf;
+	Dataset& dataset;
+
 	uint32_t training_step;
 	uint32_t n_rays_in_batch;
 	uint32_t n_samples_in_batch;
@@ -43,9 +47,6 @@ private:
 	// configuration properties
 	uint32_t n_occ_grid_levels = 5;
 	uint32_t occ_grid_resolution = 128;
-
-	// network objects
-	NerfNetwork network;
 
 	// workspace
 	TrainingWorkspace workspace;

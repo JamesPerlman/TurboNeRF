@@ -9,7 +9,8 @@ https://gitlab.com/libeigen/eigen [[LICENSE](https://gitlab.com/libeigen/eigen/-
 https://github.com/nothings/stb [[LICENSE](https://github.com/nothings/stb/blob/master/LICENSE)]  
 https://github.com/bmild/nerf [[LICENSE](https://github.com/bmild/nerf/blob/master/LICENSE)]  
 https://github.com/nerfstudio-project/nerfstudio [[LICENSE](https://github.com/nerfstudio-project/nerfstudio/blob/main/LICENSE)]  
-https://github.com/KAIR-BAIR/nerfacc [[LICENSE](https://github.com/KAIR-BAIR/nerfacc/blob/master/LICENSE)]  
+https://github.com/KAIR-BAIR/nerfacc [[LICENSE](https://github.com/KAIR-BAIR/nerfacc/blob/master/LICENSE)]
+https://github.com/knotman90/cuStreamComp [[LICENSE](https://github.com/knotman90/cuStreamComp/blob/master/LICENSE)]
 
 LICENSES TO BE ADDED TO CODEBASE SOON.  CHECK LICENSES/ DIRECTORY
 
@@ -29,6 +30,6 @@ likid_3 - (pending message)
 Next-level respect to the researchers much of this codebase is based off.  Thank you for making your research public.  This would not have been possible without you.  
 
 Mildenhall, Ben, et al. "NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis." arXiv, 2020.  doi:10.48550/arxiv.2003.08934 - (https://arxiv.org/abs/2003.08934)  
-M�ller, Thomas, et al. "Instant neural graphics primitives with a multiresolution hash encoding." *ACM Trans. Graph.*, 41(4), 102:1-102:15 - https://doi.org/10.1145/3528223.3530127  
+Müller, Thomas, et al. "Instant neural graphics primitives with a multiresolution hash encoding." *ACM Trans. Graph.*, 41(4), 102:1-102:15 - https://doi.org/10.1145/3528223.3530127  
 Max, Nelson. "Optical Models for Direct Volume Rendering." IEEE Transactions on Visualization and Computer Graphics (1995) - https://courses.cs.duke.edu/spring03/cps296.8/papers/max95opticalModelsForDirectVolumeRendering.pdf  
 Müller, T. (2021). tiny-cuda-nn (Version 1.7) [Computer software]. https://github.com/NVlabs/tiny-cuda-nn

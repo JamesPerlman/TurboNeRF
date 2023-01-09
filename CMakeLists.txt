@@ -1,4 +1,4 @@
-# CMakeList.txt : Top-level CMake project file, do global configuration
+﻿# CMakeList.txt : Top-level CMake project file, do global configuration
 # and include sub-projects here.
 #
 cmake_minimum_required (VERSION 3.25.1)
@@ -44,11 +44,15 @@ set(HEADERS
 	src/models/bounding-box.cuh
 	src/models/camera.cuh
 	src/models/cascaded-occupancy-grid.cuh
+	src/models/cascaded-occupancy-grid-workspace.cuh
 	src/models/dataset.h
 	src/models/nerf-network-workspace.cuh
 	src/models/nerf-network.h
+	src/models/nerf.cuh
 	src/models/ray.h
 	src/models/rays.h
+	src/models/render-buffer.cuh
+	src/models/render-request.cuh
 	src/models/rendering-workspace.cuh
 	src/models/training-image.cuh
 	src/models/training-workspace.cuh
@@ -63,6 +67,9 @@ set(HEADERS
 	src/utils/training-batch-kernels.cuh
 	src/utils/training-network-kernels.cuh
 	src/utils/volumetric-rendering.cuh
+
+	# services
+	src/services/nerf-manager.cuh
 
 	# common
 	src/common.h
