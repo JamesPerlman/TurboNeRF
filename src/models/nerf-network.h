@@ -124,7 +124,7 @@ private:
 		float* target_rgba
 	);
 
-	void enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size)
+	void enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size);
 };
 
 NRC_NAMESPACE_END
