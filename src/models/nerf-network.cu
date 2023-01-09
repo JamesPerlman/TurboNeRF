@@ -422,7 +422,7 @@ float NerfNetwork::calculate_loss(
 		cudaMemsetAsync(
 			workspace.grad_buf,
 			0,
-			sizeof(network_precision_t) * color_network->input_width() * batch_size,
+			sizeof(network_precision_t) * color_network->padded_output_width() * batch_size,
 			stream
 		)
 	);
