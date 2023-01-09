@@ -1,4 +1,4 @@
-﻿# CMakeList.txt : Top-level CMake project file, do global configuration
+# CMakeList.txt : Top-level CMake project file, do global configuration
 # and include sub-projects here.
 #
 cmake_minimum_required (VERSION 3.25.1)
@@ -45,6 +45,7 @@ set(HEADERS
 	src/models/camera.cuh
 	src/models/cascaded-occupancy-grid.cuh
 	src/models/dataset.h
+	src/models/nerf-network-workspace.cuh
 	src/models/nerf-network.h
 	src/models/ray.h
 	src/models/rays.h

@@ -9,6 +9,7 @@
 #include <tiny-cuda-nn/optimizer.h>
 
 #include "../common.h"
+#include "nerf-network-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -56,28 +57,16 @@ struct NerfNetwork {
 private:
 
 	float aabb_size;
+	uint32_t batch_size;
+	bool can_train;
 
-	// full-precision params buffers for both MLPs
-	tcnn::GPUMemory<float> params_fp;
-	tcnn::GPUMemory<tcnn::network_precision_t> params_hp;
-	tcnn::GPUMemory<tcnn::network_precision_t> gradients_hp;
+    // full-precision params buffers for both MLPs
+    tcnn::GPUMemory<float> params_fp;
+    tcnn::GPUMemory<tcnn::network_precision_t> params_hp;
+    tcnn::GPUMemory<tcnn::network_precision_t> gradients_hp;
 
-	tcnn::GPUMemory<tcnn::network_precision_t> color_network_input;
-	tcnn::GPUMemory<tcnn::network_precision_t> color_network_output;
-
-	// gradient calculation buffers
-	tcnn::GPUMemory<float> ray_rgba;
-	tcnn::GPUMemory<float> loss_buf;
-	tcnn::GPUMemory<tcnn::network_precision_t> grad_buf;
-	tcnn::GPUMemory<float> trans_buf;
-	tcnn::GPUMemory<float> alpha_buf;
-	tcnn::GPUMemory<float> weight_buf; // alpha * transmittance
-	tcnn::GPUMemory<float> pxdiff_buf; // pixel channel differences
-
-	// buffers for normalized data
-	tcnn::GPUMemory<float> normal_pos_batch;
-	tcnn::GPUMemory<float> normal_dir_batch;
-	tcnn::GPUMemory<float> normal_dt_batch;
+	// workspace
+	NeRFNetworkWorkspace workspace;
 
 	// Helper context
 	struct ForwardContext : public tcnn::Context {
@@ -93,13 +82,10 @@ private:
 		tcnn::GPUMatrix<tcnn::network_precision_t> density_dL_doutput;
 		tcnn::GPUMatrix<tcnn::network_precision_t> color_dL_doutput;
 		tcnn::GPUMatrix<float> L;
+
 		std::unique_ptr<tcnn::Context> density_ctx;
 		std::unique_ptr<tcnn::Context> color_ctx;
 	};
-
-	void enlarge_training_batch_memory_if_needed(const uint32_t& batch_size);
-
-	void enlarge_inference_batch_memory_if_needed(const uint32_t& batch_size);
 
 	void generate_normalized_network_input(
 		const cudaStream_t& stream,
@@ -137,6 +123,8 @@ private:
 		float* dir_batch,
 		float* target_rgba
 	);
+
+	void enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size)
 };
 
 NRC_NAMESPACE_END

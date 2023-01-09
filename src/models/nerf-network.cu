@@ -148,6 +148,9 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
 	);
 	
 	color_optimizer->allocate(color_network);
+
+	// flag for training enabled
+	can_train = true;
 }
 
 void NerfNetwork::train(
@@ -162,13 +165,13 @@ void NerfNetwork::train(
 	float* dt_batch,
 	float* target_rgba
 ) {
-	enlarge_training_batch_memory_if_needed(batch_size);
+	enlarge_workspace_if_needed(stream, batch_size);
 
 	// Normalize input for neural network
 	generate_normalized_network_input(stream, batch_size, pos_batch, dir_batch, dt_batch);
 
 	// Forward
-	auto fwd_ctx = forward(stream, batch_size, normal_pos_batch.data(), normal_dir_batch.data());
+	auto fwd_ctx = forward(stream, batch_size, workspace.normal_pos_batch, workspace.normal_dir_batch);
 
 	// Loss
 	float mse_loss = calculate_loss(
@@ -178,14 +181,14 @@ void NerfNetwork::train(
 		n_samples,
 		ray_steps,
 		ray_steps_cum,
-		normal_dt_batch.data(),
+		workspace.normal_dt_batch,
 		target_rgba
 	);
 
 	printf("Loss: %f\n", mse_loss);
 
 	// Backward
-	backward(stream, fwd_ctx, batch_size, normal_pos_batch.data(), normal_dir_batch.data(), target_rgba);
+	backward(stream, fwd_ctx, batch_size, workspace.normal_pos_batch, workspace.normal_dir_batch, target_rgba);
 
 	// Optimizer
 	optimizer_step(stream);
@@ -206,9 +209,9 @@ void NerfNetwork::generate_normalized_network_input(
 		pos_batch,
 		dir_batch,
 		dt_batch,
-		normal_pos_batch.data(),
-		normal_dir_batch.data(),
-		normal_dt_batch.data()
+		workspace.normal_pos_batch,
+		workspace.normal_dir_batch,
+		workspace.normal_dt_batch
 	);
 }
 
@@ -217,19 +220,19 @@ void NerfNetwork::inference(
 	const uint32_t& batch_size,
 	float* pos_batch,
 	float* dir_batch,
-	 // density network output must have space available for (color_network->input_width() * batch_size) elements of type network_precision_t
+	// density network output must have space available for (color_network->input_width() * batch_size) elements of type network_precision_t
 	network_precision_t* sigma,
 	// color network output must have space available for (color_network->padded_output_width() * batch_size) elements of type network_precision_t
 	network_precision_t* color
 ) {
-	enlarge_inference_batch_memory_if_needed(batch_size);
+	enlarge_workspace_if_needed(stream, batch_size);
 
 	// Normalize input
 	generate_normalized_network_input(stream, batch_size, pos_batch, dir_batch);
 
 	// Inference (density network)
 	GPUMatrix density_network_input_matrix(
-		normal_pos_batch.data(),
+		workspace.normal_pos_batch,
 		density_network->input_width(),
 		batch_size
 	);
@@ -250,7 +253,7 @@ void NerfNetwork::inference(
 	network_precision_t* direction_encoding_output = color + density_network->output_width() * batch_size;
 
 	GPUMatrix direction_encoding_input_matrix(
-		normal_dir_batch.data(),
+		workspace.normal_dir_batch,
 		direction_encoding->input_width(),
 		batch_size
 	);
@@ -305,7 +308,7 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 
 	// Here we make the output of the density network a pointer to the first half of the color network's input buffer.
 	fwd_ctx->density_network_output_matrix = GPUMatrix<network_precision_t>(
-		color_network_input.data(), 			// density network output = color network input
+		workspace.color_network_input, 			// density network output = color network input
 		density_network->output_width(), 		// rows
 		batch_size								// cols
 	);
@@ -321,7 +324,7 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	// Encode directions (dir_batch)
 	// Direction encoding gets concatenated with density_network_output (which will just be the second half of color_network_input)
 	
-	network_precision_t* direction_encoding_output = color_network_input.data() + density_network->output_width() * batch_size;
+	network_precision_t* direction_encoding_output = workspace.color_network_input + density_network->output_width() * batch_size;
 
 	fwd_ctx->direction_encoding_input_matrix = GPUMatrix<float>(
 		dir_batch,									// pointer to source data
@@ -344,13 +347,13 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	// Perform the forward pass on the color network
 
 	fwd_ctx->color_network_input_matrix = GPUMatrix<network_precision_t>(
-		color_network_input.data(),				// pointer to source data
+		workspace.color_network_input,				// pointer to source data
 		color_network->input_width(),			// matrix rows
 		batch_size								// matrix columns
 	);
 
 	fwd_ctx->color_network_output_matrix = GPUMatrix<network_precision_t>(
-		color_network_output.data(),			// pointer to destination data
+		workspace.color_network_output,			// pointer to destination data
 		color_network->padded_output_width(),	// matrix rows
 		batch_size								// matrix columns
 	);
@@ -385,20 +388,20 @@ float NerfNetwork::calculate_loss(
 	 * https://arxiv.org/abs/2201.05989 - Muller, et al. page 9
 	 * 
 	 */
-	const tcnn::network_precision_t* log_space_density = color_network_input.data();
+	const tcnn::network_precision_t* log_space_density = workspace.color_network_input;
 
 	accumulate_ray_colors_from_samples_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		ray_steps,
 		ray_steps_cum,
-		color_network_output.data(),
+		workspace.color_network_output,
 		log_space_density,
 		sample_dt,
-		ray_rgba.data(),
-		trans_buf.data(),
-		alpha_buf.data(),
-		weight_buf.data()
+		workspace.ray_rgba,
+		workspace.trans_buf,
+		workspace.alpha_buf,
+		workspace.weight_buf
 	);
 
 	// Calculate mean-squared loss per ray
@@ -407,30 +410,40 @@ float NerfNetwork::calculate_loss(
 		batch_size,
 		ray_steps,
 		ray_steps_cum,
-		ray_rgba.data(),
+		workspace.ray_rgba,
 		target_rgba,
-		loss_buf.data(),
-		pxdiff_buf.data()
+		workspace.loss_buf,
+		workspace.pxdiff_buf
 	);
 
+	
+	// Zero out the gradient buffer
+	CUDA_CHECK_THROW(
+		cudaMemsetAsync(
+			workspace.grad_buf,
+			0,
+			sizeof(network_precision_t) * color_network->input_width() * batch_size,
+			stream
+		)
+	);
+	
 	// Calculate gradients
-	grad_buf.memset(0);
 	calculate_network_output_gradient<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
 		batch_size,
 		1.0f / (2.0f * n_raysf),
-		color_network_output.data(),
-		pxdiff_buf.data(),
+		workspace.color_network_output,
+		workspace.pxdiff_buf,
 		sample_dt,
-		trans_buf.data(),
-		alpha_buf.data(),
-		weight_buf.data(),
+		workspace.trans_buf,
+		workspace.alpha_buf,
+		workspace.weight_buf,
 		LOSS_SCALE,
-		grad_buf.data()
+		workspace.grad_buf
 	);
 
 	// Add all loss values together
-	thrust::device_ptr<float> loss_buffer_ptr(loss_buf.data());
+	thrust::device_ptr<float> loss_buffer_ptr(workspace.loss_buf);
 
 	float sum_of_squared_pixel_errors = thrust::reduce(
 		thrust::cuda::par_nosync.on(stream),
@@ -453,34 +466,17 @@ void NerfNetwork::backward(
 	float* target_rgba
 ) {
 	// Backpropagate through the color network
-
-	// GPUMatrix<network_precision_t> sigma_grad(
-	// 	1,
-	// 	batch_size
-	// );
-
-	// CUDA_CHECK_THROW(cudaMemcpyAsync(
-	// 	sigma_grad.data(),
-	// 	grad_buf.data() + 3 * batch_size,
-	// 	batch_size * sizeof(network_precision_t),
-	// 	cudaMemcpyDeviceToDevice,
-	// 	stream
-	// ));
-
-	// CUDA_CHECK_THROW(cudaMemsetAsync(
-	// 	grad_buf.data() + 3 * batch_size,
-	// 	0,
-	// 	batch_size * sizeof(network_precision_t),
-	// 	stream
-	// ));
-
 	GPUMatrix<network_precision_t> color_network_dL_doutput_matrix(
-		grad_buf.data(),
+		workspace.grad_buf,
 		color_network->padded_output_width(),
 		batch_size
 	);
 
-	GPUMatrix<network_precision_t> color_network_dL_dinput_matrix(color_network->input_width(), batch_size, stream);
+	GPUMatrix<network_precision_t> color_network_dL_dinput_matrix(
+		workspace.color_network_dL_dinput,
+		color_network->input_width(),
+		batch_size
+	);
 
 	color_network->backward(
 		stream,
@@ -493,9 +489,9 @@ void NerfNetwork::backward(
 
 	// Backpropagate through the density network
 	GPUMatrix<float> density_network_dL_dinput_matrix(
+		workspace.density_network_dL_dinput,
 		density_network->input_width(),
-		batch_size,
-		stream
+		batch_size
 	);
 
 	// Construct a dL_dinput matrix of the correct size
@@ -506,15 +502,6 @@ void NerfNetwork::backward(
 		density_network->padded_output_width(),
 		batch_size
 	);
-
-	// manually add calculated sigma loss?
-	// CUDA_CHECK_THROW(cudaMemcpyAsync(
-	// 	density_network_dL_doutput_matrix.data(),
-	// 	sigma_grad.data(),
-	// 	batch_size * sizeof(network_precision_t),
-	// 	cudaMemcpyDeviceToDevice,
-	// 	stream
-	// ));
 
 	density_network->backward(
 		stream,
@@ -546,29 +533,23 @@ void NerfNetwork::optimizer_step(const cudaStream_t& stream) {
 	);
 }
 
-// Only enlarge buffers needed for training
-void NerfNetwork::enlarge_training_batch_memory_if_needed(const uint32_t& batch_size) {
-	uint32_t density_network_output_size = density_network->padded_output_width() * batch_size;
-	uint32_t direction_encoding_output_size = direction_encoding->padded_output_width() * batch_size;
-	color_network_input.enlarge(density_network_output_size + direction_encoding_output_size);
-	color_network_output.enlarge(color_network->padded_output_width() * batch_size);
-
-	ray_rgba.enlarge(4 * batch_size);
-	loss_buf.enlarge(batch_size);
-	grad_buf.enlarge(color_network->padded_output_width() * batch_size);
-	trans_buf.enlarge(batch_size);
-	alpha_buf.enlarge(batch_size);
-	weight_buf.enlarge(batch_size);
-	pxdiff_buf.enlarge(4 * batch_size);
-
-	normal_pos_batch.enlarge(3 * batch_size);
-	normal_dir_batch.enlarge(3 * batch_size);
-	normal_dt_batch.enlarge(batch_size);
-}
-
 // Only enlarge buffers needed for inference
-void NerfNetwork::enlarge_inference_batch_memory_if_needed(const uint32_t& batch_size) {
-	normal_pos_batch.enlarge(3 * batch_size);
-	normal_dir_batch.enlarge(3 * batch_size);
-	normal_dt_batch.enlarge(batch_size);
+void NerfNetwork::enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size) {
+	if (this->batch_size == batch_size) {
+		return;
+	}
+
+	workspace.enlarge(
+		stream,
+		batch_size,
+		density_network->input_width(),
+		density_network->padded_output_width(),
+		direction_encoding->input_width(),
+		direction_encoding->padded_output_width(),
+		color_network->input_width(),
+		color_network->padded_output_width(),
+		can_train
+	);
+
+	this->batch_size = batch_size;
 }
