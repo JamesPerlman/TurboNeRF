@@ -9,9 +9,15 @@
 NRC_NAMESPACE_BEGIN
 
 struct Workspace {
+    struct Allocation {
+        void* ptr;
+        cudaStream_t stream;
+
+        Allocation(const cudaStream_t& stream, void* ptr = nullptr) : ptr(ptr), stream(stream) {};
+    };
+
 private:
-    std::vector<void*> _allocations;
-    std::vector<cudaStream_t> _streams;
+    std::vector<Allocation> _allocations;
 
 public:
     // allocate memory and save it for freedom later
@@ -19,18 +25,18 @@ public:
     T* allocate(const cudaStream_t& stream, const size_t& n_elements) {
         T* ptr;
         CUDA_CHECK_THROW(cudaMallocAsync(&ptr, n_elements * sizeof(T), stream));
-        _allocations.emplace_back(ptr);
+        _allocations.emplace_back(stream, ptr);
         return ptr;
     }
 
     // free all allocations
     void free_allocations() {
-        for (int i = 0; i < _allocations.size(); ++i) {
-            if (_allocations[i] != nullptr) {
-                cudaFreeAsync(_allocations[i], _streams[i]);
+        for (const auto& allocation : _allocations) {
+            if (allocation.ptr != nullptr) {
+                cudaFreeAsync(allocation.ptr, allocation.stream);
             }
         }
-        
+
         _allocations.clear();
     }
 
