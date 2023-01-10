@@ -15,8 +15,7 @@ struct NeRFRenderingController {
     void request_render(
         // TODO: remove stream
         const cudaStream_t& stream,
-        const RenderRequest& request,
-        RenderBuffer& output
+        const RenderRequest& request
     );
 
 };
