@@ -106,6 +106,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	float3 global_origin = cam.transform * local_ray.o;
 	float3 global_direction = cam.transform * local_ray.d - cam.transform.get_translation();
 
+	// todo: move rays to near plane
 	ori_xyz[i_offset_0] = global_origin.x;
 	ori_xyz[i_offset_1] = global_origin.y;
 	ori_xyz[i_offset_2] = global_origin.z;
@@ -188,7 +189,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 		} else {
 			// otherwise we need to find the next occupied cell
 			t = occ_grid->get_t_advanced_to_next_voxel(
-				o_x, o_y, o_z,
+				bounding_box->pos_to_unit_x(x), bounding_box->pos_to_unit_y(y), bounding_box->pos_to_unit_z(z),
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
 				t, dt_min
@@ -221,7 +222,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const uint32_t* __restrict__ n_steps_cum, // one per ray
 
 	// output buffers
-	float* __restrict__ out_ori_xyz,
+	float* __restrict__ out_pos_xyz,
 	float* __restrict__ out_dir_xyz,
 	float* __restrict__ out_t0,
 	float* __restrict__ out_t1
@@ -233,7 +234,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	if (i >= batch_size) return;
 
 
-	// if the total number of cumulative steps is greater than the number of rays, we exit early to avoid overflowing any buffers
+	// if the total number of cumulative steps is greater than the number of rays, we exit early to avoid writing outside of our sample buffers
 	const uint32_t n_total_steps_cum = n_steps_cum[i];
 
 	if (n_total_steps_cum >= batch_size) return;
@@ -268,7 +269,6 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const uint32_t sample_offset_0 = n_total_steps_cum - n_ray_steps[i];
 	const uint32_t sample_offset_1 = sample_offset_0 + batch_offset_1;
 	const uint32_t sample_offset_2 = sample_offset_0 + batch_offset_2;
-	const uint32_t sample_offset_3 = sample_offset_0 + batch_offset_3;
 
 	// Perform raymarching
 
@@ -300,7 +300,6 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			const uint32_t step_offset_0 = sample_offset_0 + n_steps_taken;
 			const uint32_t step_offset_1 = sample_offset_1 + n_steps_taken;
 			const uint32_t step_offset_2 = sample_offset_2 + n_steps_taken;
-			const uint32_t step_offset_3 = sample_offset_3 + n_steps_taken;
 
 			// assign start/end t-values for this sampling interval
 			// t0 (t_start) is our most recent t-value
@@ -319,9 +318,9 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			 * After this step we will still need to stratify the t-values and generate the sample positions.
 			 */
 
-			out_ori_xyz[step_offset_0] = o_x;
-			out_ori_xyz[step_offset_1] = o_y;
-			out_ori_xyz[step_offset_2] = o_z;
+			out_pos_xyz[step_offset_0] = x;
+			out_pos_xyz[step_offset_1] = y;
+			out_pos_xyz[step_offset_2] = z;
 
 			out_dir_xyz[step_offset_0] = d_x;
 			out_dir_xyz[step_offset_1] = d_y;
@@ -332,7 +331,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 		} else {
 			// otherwise we need to find the next occupied cell
 			t = occ_grid->get_t_advanced_to_next_voxel(
-				o_x, o_y, o_z,
+				bounding_box->pos_to_unit_x(x), bounding_box->pos_to_unit_y(y), bounding_box->pos_to_unit_z(z),
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
 				t, dt_min

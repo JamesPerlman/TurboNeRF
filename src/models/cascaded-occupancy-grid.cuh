@@ -147,12 +147,15 @@ public:
 		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
 		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z
 	) const {
+		float x = ray_dir_x * resolution_f;
+		float y = ray_dir_y * resolution_f;
+		float z = ray_dir_z * resolution_f;
 
-		float tx = ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + ray_pos_x + 0.5f) - ray_pos_x) * inv_dir_x) / resolution_f;
-		float ty = ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + ray_pos_y + 0.5f) - ray_pos_y) * inv_dir_y) / resolution_f;
-		float tz = ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + ray_pos_z + 0.5f) - ray_pos_z) * inv_dir_z) / resolution_f;
+		float tx = ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
+		float ty = ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
+		float tz = ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
 
-		return fmaxf(0.0f, fminf(fminf(tx, ty), tz));
+		return fmaxf(0.0f, fminf(fminf(tx, ty), tz)) / resolution_f;
 	}
 
 	// Gets the t-value required to step the ray to the next voxel
