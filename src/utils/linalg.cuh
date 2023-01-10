@@ -11,6 +11,9 @@
 
 #include <cuda_runtime.h>
 #include <json/json.hpp>
+#include "../common.h"
+
+NRC_NAMESPACE_BEGIN
 
 struct Matrix4f
 {
@@ -20,6 +23,27 @@ struct Matrix4f
     float m30, m31, m32, m33;
 
     Matrix4f() = default;
+
+    Matrix4f(
+        float m00, float m01, float m02, float m03,
+        float m10, float m11, float m12, float m13,
+        float m20, float m21, float m22, float m23,
+        float m30, float m31, float m32, float m33
+    ) : m00(m00), m01(m01), m02(m02), m03(m03),
+        m10(m10), m11(m11), m12(m12), m13(m13),
+        m20(m20), m21(m21), m22(m22), m23(m23),
+        m30(m30), m31(m31), m32(m32), m33(m33)
+    {};
+
+    static Matrix4f Identity()
+    {
+        return Matrix4f{
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+    }
 
     // from_json constructor, mij = data[i][j]
     Matrix4f(const nlohmann::json& data)
@@ -64,3 +88,5 @@ inline NRC_HOST_DEVICE float l2_squared_norm(const float3& v)
 {
     return v.x * v.x + v.y * v.y + v.z * v.z;
 }
+
+NRC_NAMESPACE_END
