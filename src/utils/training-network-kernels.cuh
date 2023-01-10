@@ -65,11 +65,15 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	// Accumulate samples
 	for (int j = 0; j < n_samples; ++j) {
 		// thank you NerfAcc (render_transmittance.cu - transmittance_from_sigma_forward_kernel)
-
+		const float dt = s_dt[j];
+		
 		const float sigma_j = (float)s_sigma[j];
-		const float alpha = 1.0f - expf(-sigma_j);
+		const float sigma_j_dt = sigma_j * dt;
+
+		const float alpha = 1.0f - expf(-sigma_j_dt);
 		const float trans = expf(-sigma_cumsum);
-		sigma_cumsum += sigma_j * s_dt[j];
+		
+		sigma_cumsum += sigma_j_dt;
 
 		const float weight = alpha * trans;
 
