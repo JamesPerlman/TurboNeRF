@@ -1,4 +1,4 @@
-﻿# CMakeList.txt : Top-level CMake project file, do global configuration
+# CMakeList.txt : Top-level CMake project file, do global configuration
 # and include sub-projects here.
 #
 cmake_minimum_required (VERSION 3.24)
@@ -59,10 +59,10 @@ set(HEADERS
 	src/models/workspace.cuh
 
 	# utils
-	src/utils/gpu-image.cuh
 	src/utils/bit-utils.cuh
 	src/utils/coordinate-transformations.cuh
 	src/utils/cu-compactor.cuh
+	src/utils/gpu-image.cuh
 	src/utils/linalg.cuh
 	src/utils/parallel-utils.cuh
 	src/utils/rendering-kernels.cuh
@@ -84,6 +84,7 @@ set(SOURCES
 	src/models/nerf-network.cu
 	src/models/training-image.cu
 	src/utils/cu-compactor.cu
+	src/utils/gpu-image.cu
 	src/utils/rendering-kernels.cu
 	src/main.cu	
 )
