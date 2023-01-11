@@ -535,7 +535,7 @@ void NerfNetwork::optimizer_step(const cudaStream_t& stream) {
 
 // Only enlarge buffers needed for inference
 void NerfNetwork::enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size) {
-	if (this->batch_size == batch_size) {
+	if (batch_size <= this->batch_size) {
 		return;
 	}
 
