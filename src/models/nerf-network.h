@@ -46,19 +46,19 @@ struct NerfNetwork {
 		tcnn::network_precision_t* color // color network output needs to be sized to get_network_output_width()
 	);
 
-	size_t get_network_input_width() const {
+	size_t get_color_network_input_width() const {
 		return color_network->input_width();
 	};
 
-	size_t get_network_output_width() const {
+	size_t get_color_network_output_width() const {
 		return color_network->padded_output_width();
 	};
 
 private:
 
 	float aabb_size;
-	uint32_t batch_size;
-	bool can_train;
+	uint32_t batch_size = 0;
+	bool can_train = false;
 
     // full-precision params buffers for both MLPs
     tcnn::GPUMemory<float> params_fp;

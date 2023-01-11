@@ -21,7 +21,7 @@ NRC_NAMESPACE_BEGIN
 
 struct NeRFTrainingController {
 	// constructor
-	NeRFTrainingController(Dataset& dataset, NeRF& nerf);
+	NeRFTrainingController(Dataset& dataset, NeRF* nerf);
 	~NeRFTrainingController();
 	
 	// public properties
@@ -37,7 +37,7 @@ struct NeRFTrainingController {
 
 private:
 	// private properties
-	NeRF& nerf;
+	NeRF* nerf;
 	Dataset& dataset;
 
 	uint32_t training_step;

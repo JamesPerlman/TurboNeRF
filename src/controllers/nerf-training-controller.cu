@@ -13,7 +13,7 @@ using namespace nrc;
 using namespace tcnn;
 using namespace nlohmann;
 
-NeRFTrainingController::NeRFTrainingController(Dataset& dataset, NeRF& nerf)
+NeRFTrainingController::NeRFTrainingController(Dataset& dataset, NeRF* nerf)
 	: dataset(dataset), nerf(nerf)
 {	
 	// TODO: refactor size_x to just size?
@@ -43,7 +43,7 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 
 	// Create a CascadedOccupancyGrid object and copy it to the GPU
 	CUDA_CHECK_THROW(
-		cudaMemcpyAsync(workspace.occ_grid, &nerf.occupancy_grid, sizeof(CascadedOccupancyGrid), cudaMemcpyHostToDevice, stream)
+		cudaMemcpyAsync(workspace.occ_grid, &nerf->occupancy_grid, sizeof(CascadedOccupancyGrid), cudaMemcpyHostToDevice, stream)
 	);
 
 	// Copy dataset's BoundingBox to the GPU
@@ -70,7 +70,7 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 	training_step = 0;
 
 	// Initialize the network
-	nerf.network.prepare_for_training(stream);
+	nerf->network.prepare_for_training(stream);
 }
 
 void NeRFTrainingController::load_images(cudaStream_t stream) {
@@ -246,7 +246,7 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 
 	//printf("Using %d rays and %d samples\n", n_rays_in_batch, n_samples_in_batch);
 	
-	nerf.network.train(
+	nerf->network.train(
 		stream,
 		workspace.batch_size,
 		n_rays_in_batch,

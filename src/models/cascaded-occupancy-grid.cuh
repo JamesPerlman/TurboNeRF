@@ -26,9 +26,9 @@ private:
 	float inv_resolution_f;
 	uint32_t resolution_i;
 
-	CascadedOccupancyGridWorkspace workspace;
 
 public:
+	CascadedOccupancyGridWorkspace workspace;
 	// level is the power of two domain size (K from pg. 15 of Müller, et al. 2022)
 	// grid goes from [-2^(level - 1) + 0.5, 2^(level - 1) + 0.5] in each dimension
 	CascadedOccupancyGrid(uint32_t n_levels, uint32_t resolution = 128)

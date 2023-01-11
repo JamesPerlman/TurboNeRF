@@ -14,40 +14,51 @@ NRC_NAMESPACE_BEGIN
 
 struct NeRFManager {
 private:
-    std::vector<NeRF> nerfs;
-
+	std::vector<NeRF> nerfs;
 public:
-    // get nerfs
-    const std::vector<NeRF>& get_nerfs() const {
-        return nerfs;
-    }
+	// TODO: protect nerfs with const getter?
+	// There are downstream effects which make this impossible for now
+	// like the fact that NeRFNetwork inference has self-mutating side effects
+	// also, pointer/reference sharing between trainer and renderer
+	std::vector<NeRF*> get_nerfs() {
+		std::vector<NeRF*> nerf_ptrs;
+		nerf_ptrs.reserve(nerfs.size());
+		for (auto& nerf : nerfs) {
+			nerf_ptrs.emplace_back(&nerf);
+		}
+		return nerf_ptrs;
+	}
 
-    // create a new nerf
-    NeRF& create_trainable_nerf(const cudaStream_t& stream, const float& aabb_size) {
-        NerfNetwork network(aabb_size);
-        CascadedOccupancyGrid occupancy_grid(5);
+	// create a new nerf
+	NeRF* create_trainable_nerf(const cudaStream_t& stream, const BoundingBox& bbox) {
+		nerfs.emplace_back(
+			NerfNetwork(bbox.size_x),
+			CascadedOccupancyGrid(5),
+			bbox
+		);
 
-        // for now we will initialize the occupancy grid here, but it should probably done somewhere else
-        occupancy_grid.initialize_bitfield(stream);
-        occupancy_grid.initialize_values(stream);
-        
-        // Initialize occupancy grid bitfield (all bits set to 1)
-        CUDA_CHECK_THROW(
-            cudaMemsetAsync(
-                occupancy_grid.get_bitfield(),
-                (uint8_t)0b11111111, // set all bits to 1
-                occupancy_grid.get_n_bitfield_elements(),
-                stream
-            )
-        );
+		NeRF& nerf = nerfs.back();
+		
+		// for now we will initialize the occupancy grid here, but it should probably done somewhere else
+		nerf.occupancy_grid.initialize_bitfield(stream);
+		nerf.occupancy_grid.initialize_values(stream);
+		
+		// Initialize occupancy grid bitfield (all bits set to 1)
+		CUDA_CHECK_THROW(
+			cudaMemsetAsync(
+				nerf.occupancy_grid.get_bitfield(),
+				(uint8_t)0b11111111, // set all bits to 1
+				nerf.occupancy_grid.get_n_bitfield_elements(),
+				stream
+			)
+		);
 
-        nerfs.emplace_back(network, occupancy_grid);
-        return nerfs.back();
-    }
+		return &nerf;
+	}
 
-    // manage nerfs
+	// manage nerfs
 
-    // destroy nerfs    
+	// destroy nerfs	
 };
 
 NRC_NAMESPACE_END

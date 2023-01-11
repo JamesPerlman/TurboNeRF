@@ -10,12 +10,12 @@
 NRC_NAMESPACE_BEGIN
 
 struct RenderRequest {
-    RenderBuffer destination;
+    RenderBuffer output;
     Camera camera;
-    const std::vector<const NeRF*> nerfs;
+    std::vector<NeRF*> nerfs;
 
-    RenderRequest(RenderBuffer destination, Camera camera, const std::vector<const NeRF*> nerfs)
-        : destination(destination), camera(camera), nerfs(nerfs) {};
+    RenderRequest(RenderBuffer output, Camera camera, std::vector<NeRF*> nerfs)
+        : output(output), camera(camera), nerfs(nerfs) {};
 };
 
 NRC_NAMESPACE_END
