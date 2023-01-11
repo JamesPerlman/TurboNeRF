@@ -213,7 +213,7 @@ __global__ void normalize_network_input_kernel(
 	const float* __restrict__ in_sample_dt,
 	float* __restrict__ out_sample_pos, // output positions are transformed to [0, 1]
 	float* __restrict__ out_sample_dir, // output dirs are transformed to [0, 1]
-	float* __restrict__ out_sample_dt = nullptr
+	float* __restrict__ out_sample_dt
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i >= batch_size) {
@@ -232,7 +232,7 @@ __global__ void normalize_network_input_kernel(
 	out_sample_dir[i_offset_1] = in_sample_dir[i_offset_1] * 0.5f + 0.5f;
 	out_sample_dir[i_offset_2] = in_sample_dir[i_offset_2] * 0.5f + 0.5f;
 
-	if (out_sample_dt != nullptr) {
+	if (in_sample_dt != nullptr) {
 		out_sample_dt[i] = inv_bbox_size * in_sample_dt[i];
 	}
 }
