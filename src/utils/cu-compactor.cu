@@ -120,56 +120,59 @@ __global__ void printArray_GPU(T *hd_data, int size, int newline)
     printf("\n");
 }
 
-int generate_compaction_indices(
+int calculate_block_counts_and_offsets(
     const cudaStream_t& stream,
     const int n_elements,
-    const int blockSize,
+    const int block_size,
     const bool* d_predicate,
-    int* d_output
+    int* d_block_counts,
+    int* d_block_offsets
 ) {
-    int numBlocks = divup(n_elements, blockSize);
-    int *d_BlocksCountAndOffset;
+    int n_blocks = divup(n_elements, block_size);
 
-    // TODO: these cudaMallocs can be moved out to avoid unnecessary allocations
-    CUDA_CHECK_THROW(cudaMallocAsync(&d_BlocksCountAndOffset, 2 * numBlocks * sizeof(int), stream));
-
-    thrust::device_ptr<int> bCount_ptr(d_BlocksCountAndOffset + 0 * numBlocks);
-    thrust::device_ptr<int> bOffset_ptr(d_BlocksCountAndOffset + 1 * numBlocks);
+    thrust::device_ptr<int> block_count_ptr(d_block_counts);
+    thrust::device_ptr<int> block_offset_ptr(d_block_offsets);
 
     // phase 1: count number of valid elements in each thread block
-    computeBlockCounts<<<numBlocks, blockSize, 0, stream>>>(
+    computeBlockCounts<<<n_blocks, block_size, 0, stream>>>(
         n_elements,
         d_predicate,
-        bCount_ptr.get()
+        d_block_counts
     );
 
     // phase 2: compute exclusive prefix sum of valid block counts to get output offset for each thread block in grid
     thrust::exclusive_scan(
         thrust::cuda::par_nosync.on(stream),
-        bCount_ptr,
-        bCount_ptr + numBlocks,
-        bOffset_ptr
-    );
-
-    // phase 3: compute output offset for each thread in warp and each warp in thread block, then output valid elements
-    compactK<<<numBlocks, blockSize, sizeof(int) * (blockSize / warpSize), stream>>>(
-        n_elements,
-        d_predicate,
-        bOffset_ptr.get(),
-        d_output
+        block_count_ptr,
+        block_count_ptr + n_blocks,
+        block_offset_ptr
     );
 
     // determine number of elements in the compacted list
-
-    // copy last element of thrustPtr_bOffset to host
-    int bCount, bOffset;
-    CUDA_CHECK_THROW(cudaMemcpyAsync(&bOffset, bOffset_ptr.get() + numBlocks - 1, sizeof(int), cudaMemcpyDeviceToHost, stream));
-    CUDA_CHECK_THROW(cudaMemcpyAsync(&bCount, bCount_ptr.get() + numBlocks - 1, sizeof(int), cudaMemcpyDeviceToHost, stream));
+    int block_count, block_offset;
+    CUDA_CHECK_THROW(cudaMemcpyAsync(&block_count, d_block_counts + n_blocks - 1, sizeof(int), cudaMemcpyDeviceToHost, stream));
+    CUDA_CHECK_THROW(cudaMemcpyAsync(&block_offset, d_block_offsets + n_blocks - 1, sizeof(int), cudaMemcpyDeviceToHost, stream));
     CUDA_CHECK_THROW(cudaStreamSynchronize(stream))
-    // compact_length = thrustPrt_bOffset[numBlocks - 1] + thrustPrt_bCount[numBlocks - 1];
-    cudaFree(d_BlocksCountAndOffset);
 
-    return bOffset + bCount;
+    return block_offset + block_count;
+}
+
+void generate_compaction_indices(
+    const cudaStream_t& stream,
+    const int n_elements,
+    const int block_size,
+    const bool* d_predicate,
+    const int* d_block_offsets,
+    int* d_output
+) {
+    int n_blocks = divup(n_elements, block_size);
+    // phase 3: compute output offset for each thread in warp and each warp in thread block, then output valid elements
+    compactK<<<n_blocks, block_size, sizeof(int) * (block_size / warpSize), stream>>>(
+        n_elements,
+        d_predicate,
+        d_block_offsets,
+        d_output
+    );
 }
 
 NRC_NAMESPACE_END

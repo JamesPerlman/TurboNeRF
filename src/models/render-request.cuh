@@ -14,7 +14,7 @@ struct RenderRequest {
     Camera camera;
     std::vector<NeRF*> nerfs;
 
-    RenderRequest(RenderBuffer output, Camera camera, std::vector<NeRF*> nerfs)
+    RenderRequest(RenderBuffer& output, Camera& camera, std::vector<NeRF*>& nerfs)
         : output(output), camera(camera), nerfs(nerfs) {};
 };
 

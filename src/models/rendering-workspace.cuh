@@ -19,29 +19,25 @@ struct RenderingWorkspace: Workspace {
 	BoundingBox* bounding_box;
 	CascadedOccupancyGrid* occupancy_grid;
 
+	// compaction
+	int c_block_size;
+	int* c_block_counts;
+	int* c_block_offsets;
 	int* compact_idx;
 
 	// rays
 	bool* ray_alive;
-	bool* ray_active;
+	bool* ray_active[2];
+	float* ray_origin[2];
+	float* ray_dir[2];
+	float* ray_idir[2];
+	float* ray_t[2];
 
-	float* ray_origin;
-	float* ray_dir;
-	float* ray_idir;
-	float* ray_t;
-
-	// 2D ray index (x, y)
-	uint32_t* ray_idx; 
-	
-	uint32_t* ray_steps;
-	uint32_t* ray_steps_cum;
-
-	uint32_t* ray_x;
-	uint32_t* ray_y;
+	// 2D ray index (x + y * width)
+	uint32_t* ray_idx[2]; 
 	
 	// samples
 	float* sample_pos;
-	float* sample_dir;
 	float* sample_dt;
 
 	// network buffers
@@ -58,7 +54,8 @@ struct RenderingWorkspace: Workspace {
 		const uint32_t& output_height,
 		const uint32_t& n_elements_per_batch,
 		const uint32_t& n_network_sigma_elements,
-		const uint32_t& n_network_color_elements
+		const uint32_t& n_network_color_elements,
+		const uint32_t& compaction_block_size
 	) {
 		free_allocations();
 
@@ -70,22 +67,36 @@ struct RenderingWorkspace: Workspace {
 		bounding_box	= allocate<BoundingBox>(stream, 1);
 		occupancy_grid	= allocate<CascadedOccupancyGrid>(stream, 1);
 
+		// compaction
+		c_block_size	= compaction_block_size;
+		c_block_counts	= allocate<int>(stream, c_block_size);
+		c_block_offsets	= allocate<int>(stream, c_block_size);
 		compact_idx		= allocate<int>(stream, batch_size);
 
 		// rays
-		ray_alive		= allocate<bool>(stream, batch_size);
-		ray_active		= allocate<bool>(stream, batch_size);
-		ray_origin		= allocate<float>(stream, 3 * batch_size);
-		ray_dir			= allocate<float>(stream, 3 * batch_size);
-		ray_idir 		= allocate<float>(stream, 3 * batch_size);
-		ray_t			= allocate<float>(stream, batch_size);
-		ray_steps		= allocate<uint32_t>(stream, batch_size);
-		ray_steps_cum	= allocate<uint32_t>(stream, batch_size);
-		ray_idx			= allocate<uint32_t>(stream, batch_size);
+		ray_alive		= allocate<bool>(stream, batch_size); // no need to double buffer
+
+		// double buffers
+		ray_active[0]	= allocate<bool>(stream, 2 * batch_size);
+		ray_active[1]	= ray_active[0] + batch_size;
+
+		ray_origin[0]	= allocate<float>(stream, 2 * 3 * batch_size);
+		ray_origin[1]	= ray_origin[0] + 3 * batch_size;
+		
+		ray_dir[0]		= allocate<float>(stream, 2 * 3 * batch_size);
+		ray_dir[1]		= ray_dir[0] + 3 * batch_size;
+
+		ray_idir[0]		= allocate<float>(stream, 2 * 3 * batch_size);
+		ray_idir[1]		= ray_idir[0] + 3 * batch_size;
+
+		ray_t[0]		= allocate<float>(stream, 2 * batch_size);
+		ray_t[1]		= ray_t[0] + batch_size;
+
+		ray_idx[0]		= allocate<uint32_t>(stream, 2 * batch_size);
+		ray_idx[1]		= ray_idx[0] + batch_size;
 
 		// samples
 		sample_pos		= allocate<float>(stream, 3 * batch_size);
-		sample_dir		= allocate<float>(stream, 3 * batch_size);
 		sample_dt		= allocate<float>(stream, batch_size);
 
 		// network

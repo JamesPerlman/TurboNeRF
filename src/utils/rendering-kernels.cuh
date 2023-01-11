@@ -19,8 +19,7 @@ __global__ void generate_rays_pinhole_kernel(
 	float* __restrict__ ray_dir,
 	float* __restrict__ ray_idir,
     uint32_t* __restrict__ ray_idx,
-	const uint32_t start_idx = 0,
-	const uint32_t end_idx = UINT32_MAX
+	const uint32_t start_idx = 0
 );
 
 __global__ void march_rays_and_generate_samples_kernel(
@@ -47,19 +46,42 @@ __global__ void march_rays_and_generate_samples_kernel(
 	float* __restrict__ sample_dt
 );
 
+__global__ void compact_rays_kernel(
+    const int n_compacted_elements,
+	const int batch_size,
+    const int* __restrict__ indices,
+
+	// input buffers (read-only)
+	const uint32_t* __restrict__ in_idx, // this is the ray-pixel index
+	const bool* __restrict__ in_active,
+	const float* __restrict__ in_t,
+	const float* __restrict__ in_origin,
+	const float* __restrict__ in_dir,
+	const float* __restrict__ in_idir,
+
+	// compacted output buffers (write-only)
+	uint32_t* __restrict__ out_idx,
+	bool* __restrict__ out_active,
+	float* __restrict__ out_t,
+	float* __restrict__ out_origin,
+	float* __restrict__ out_dir,
+	float* __restrict__ out_idir
+);
+
 __global__ void composite_samples_kernel(
     const uint32_t n_samples,
     const uint32_t batch_size,
+	const uint32_t output_stride,
     
     // read-only
     const tcnn::network_precision_t* __restrict__ network_sigma,
     const tcnn::network_precision_t* __restrict__ network_rgb,
     const float* __restrict__ sample_dt,
     const uint32_t* __restrict__ sample_idx,
+	const bool* __restrict__ ray_active,
 
     // read/write
     bool* __restrict__ ray_alive,
-    bool* __restrict__ ray_active,
     float* __restrict__ output_rgba
 );
 

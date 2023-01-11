@@ -20,16 +20,16 @@ __global__ void generate_rays_pinhole_kernel(
 	float* __restrict__ ray_dir,
 	float* __restrict__ ray_idir,
     uint32_t* __restrict__ ray_idx,
-	const uint32_t start_idx,
-	const uint32_t end_idx
+	const uint32_t start_idx
 ) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-	uint32_t idx = start_idx + i;
 
-	if (idx >= min(n_rays, end_idx)) {
+	if (i >= n_rays) {
 		return;
 	}
 
+	uint32_t idx = start_idx + i;
+	
 	uint32_t x = idx % cam->pixel_dims.x;
 	uint32_t y = idx / cam->pixel_dims.x;
 
@@ -161,20 +161,80 @@ __global__ void march_rays_and_generate_samples_kernel(
 	}
 }
 
+// ray compaction
+__global__ void compact_rays_kernel(
+    const int n_compacted_elements,
+	const int batch_size,
+    const int* __restrict__ indices,
+
+	// input buffers (read-only)
+	const uint32_t* __restrict__ in_idx, // this is the ray-pixel index
+	const bool* __restrict__ in_active,
+	const float* __restrict__ in_t,
+	const float* __restrict__ in_origin,
+	const float* __restrict__ in_dir,
+	const float* __restrict__ in_idir,
+
+	// compacted output buffers (write-only)
+	uint32_t* __restrict__ out_idx,
+	bool* __restrict__ out_active,
+	float* __restrict__ out_t,
+	float* __restrict__ out_origin,
+	float* __restrict__ out_dir,
+	float* __restrict__ out_idir
+) {
+    // compacted index is the index to write to
+    const int c_idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (c_idx >= n_compacted_elements) return;
+
+	// expanded index is the index to read from
+	const int e_idx = indices[c_idx];
+	
+	// 1-component buffers
+	out_idx[c_idx] = in_idx[e_idx];
+	out_active[c_idx] = in_active[e_idx];
+	out_t[c_idx] = in_t[e_idx];
+
+	// local references to pointer offsets
+	const int c_offset_0 = c_idx;
+	const int c_offset_1 = c_offset_0 + batch_size;
+	const int c_offset_2 = c_offset_1 + batch_size;
+
+	const int e_offset_0 = e_idx;
+	const int e_offset_1 = e_offset_0 + batch_size;
+	const int e_offset_2 = e_offset_1 + batch_size;
+
+	// 3-component buffers
+	out_origin[c_offset_0] = in_origin[e_offset_0];
+	out_origin[c_offset_1] = in_origin[e_offset_1];
+	out_origin[c_offset_2] = in_origin[e_offset_2];
+	
+	out_dir[c_offset_0] = in_dir[e_offset_0];
+	out_dir[c_offset_1] = in_dir[e_offset_1];
+	out_dir[c_offset_2] = in_dir[e_offset_2];
+
+	out_idir[c_offset_0] = in_idir[e_offset_0];
+	out_idir[c_offset_1] = in_idir[e_offset_1];
+	out_idir[c_offset_2] = in_idir[e_offset_2];
+
+}
+
 // alpha compositing kernel, composites the latest samples into the output image
 __global__ void composite_samples_kernel(
     const uint32_t n_samples,
-    const uint32_t batch_size,
+	const uint32_t batch_size,
+	const uint32_t output_stride,
     
     // read-only
     const network_precision_t* __restrict__ network_sigma,
     const network_precision_t* __restrict__ network_rgb,
     const float* __restrict__ sample_dt,
     const uint32_t* __restrict__ sample_idx,
+	const bool* __restrict__ ray_active,
 
     // read/write
     bool* __restrict__ ray_alive,
-    bool* __restrict__ ray_active,
     float* __restrict__ output_rgba
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -191,9 +251,9 @@ __global__ void composite_samples_kernel(
     const uint32_t i_offset_3 = i_offset_2 + batch_size;
     
     const uint32_t idx_offset_0 = sample_idx[i];
-    const uint32_t idx_offset_1 = idx_offset_0 + batch_size;
-    const uint32_t idx_offset_2 = idx_offset_1 + batch_size;
-    const uint32_t idx_offset_3 = idx_offset_2 + batch_size;
+    const uint32_t idx_offset_1 = idx_offset_0 + output_stride;
+    const uint32_t idx_offset_2 = idx_offset_1 + output_stride;
+    const uint32_t idx_offset_3 = idx_offset_2 + output_stride;
 
     // sample colors
     const float s_r = network_rgb[i_offset_0];

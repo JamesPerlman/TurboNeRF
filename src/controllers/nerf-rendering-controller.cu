@@ -32,7 +32,8 @@ void NeRFRenderingController::request_render(
         request.output.height,
         batch_size,
         nerf->network.get_color_network_input_width(),
-        nerf->network.get_color_network_output_width()
+        nerf->network.get_color_network_output_width(),
+        n_threads_linear
     );
 
     printf("Rendering...\n");
@@ -75,6 +76,10 @@ void NeRFRenderingController::request_render(
     uint32_t n_pixels = request.output.width * request.output.height;
     uint32_t n_rays_total = n_pixels;
 
+    // double buffer indices
+    int active_buf_idx = 0;
+    int compact_buf_idx = 1;
+
     // loop over all pixels, chunked by batch size
     uint32_t n_pixels_filled = 0;
     while (n_pixels_filled < n_pixels) {
@@ -90,37 +95,28 @@ void NeRFRenderingController::request_render(
 
         // calculate the pixel indices to fill in this batch
         uint32_t pixel_start = n_pixels_filled;
-        uint32_t pixel_end = pixel_start + n_pixels_to_fill;
 
         // generate rays for the pixels in this batch
-        generate_rays_pinhole_kernel<<<n_blocks_linear(n_pixels_to_fill), n_threads_linear, 0, stream>>>(
+        generate_rays_pinhole_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
             n_rays,
             batch_size,
             workspace.camera,
-            workspace.ray_origin,
-            workspace.ray_dir,
-            workspace.ray_idir,
-            workspace.ray_idx,
-            pixel_start,
-            pixel_end
+            workspace.ray_origin[active_buf_idx],
+            workspace.ray_dir[active_buf_idx],
+            workspace.ray_idir[active_buf_idx],
+            workspace.ray_idx[active_buf_idx],
+            pixel_start
         );
-
-        CHECK_DATA(ray_idx_cpu, uint32_t, workspace.ray_idx, batch_size);
-
-        CHECK_DATA(ray_origin_cpu, float, workspace.ray_origin, batch_size * 3);
-        CHECK_DATA(ray_dir_cpu, float, workspace.ray_dir, batch_size * 3);
-        CHECK_DATA(ray_idir_cpu, float, workspace.ray_idir, batch_size * 3);
-
 
         // initialize other ray properties
         // ray_t = 0
-        CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_t, 0, batch_size * sizeof(float), stream));
+        CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_t[active_buf_idx], 0, batch_size * sizeof(float), stream));
 
         // ray_alive = true
         CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, batch_size * sizeof(bool), stream));
 
         // ray_active = true
-        CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_active, true, batch_size * sizeof(bool), stream));
+        CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_active[active_buf_idx], true, batch_size * sizeof(bool), stream));
 
         // TODO: figure out correct values for these
         const float dt_min = 0.01f;
@@ -134,20 +130,20 @@ void NeRFRenderingController::request_render(
         while (n_rays_alive > 0) {
             // march each ray one step
             // TODO: should we march potentially multiple steps to maximize occupancy?
-            march_rays_and_generate_samples_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
-                n_rays,
+            march_rays_and_generate_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+                n_rays_alive,
                 batch_size,
                 workspace.bounding_box,
                 workspace.occupancy_grid,
                 dt_min,
                 dt_max,
                 cone_angle,
-                workspace.ray_origin,
-                workspace.ray_dir,
-                workspace.ray_idir,
+                workspace.ray_origin[active_buf_idx],
+                workspace.ray_dir[active_buf_idx],
+                workspace.ray_idir[active_buf_idx],
                 workspace.ray_alive,
-                workspace.ray_active,
-                workspace.ray_t,
+                workspace.ray_active[active_buf_idx],
+                workspace.ray_t[active_buf_idx],
                 workspace.sample_pos,
                 workspace.sample_dt
             );
@@ -157,36 +153,86 @@ void NeRFRenderingController::request_render(
                 stream,
                 batch_size,
                 workspace.sample_pos,
-                workspace.ray_dir,
+                workspace.ray_dir[active_buf_idx],
                 workspace.network_sigma,
                 workspace.network_color
             );
 
             // accumulate these samples into the pixel colors
             composite_samples_kernel<<<n_blocks_linear(n_pixels_to_fill), n_threads_linear, 0, stream>>>(
-                n_rays,
+                n_rays_alive,
                 batch_size,
+                request.output.stride,
                 workspace.network_sigma,
                 workspace.network_color,
                 workspace.sample_dt,
-                workspace.ray_idx,
+                workspace.ray_idx[active_buf_idx],
+                workspace.ray_active[active_buf_idx],
                 workspace.ray_alive,
-                workspace.ray_active,
                 request.output.rgba
             );
 
-            n_rays_alive = generate_compaction_indices(
+            // update how many rays are still alive
+            const int n_rays_to_compact = calculate_block_counts_and_offsets(
                 stream,
-                batch_size,
-                n_threads_linear,
+                n_rays_alive,
+                workspace.c_block_size,
                 workspace.ray_alive,
-                workspace.compact_idx
+                workspace.c_block_counts,
+                workspace.c_block_offsets
             );
 
-            CHECK_DATA(compact_idx, int, workspace.compact_idx, batch_size);
+            // if no rays are alive, we can skip compositing
+            if (n_rays_to_compact == 0) {
+                break;
+            }
+            
+            // check if compaction is required
+            if (n_rays_to_compact < n_rays_alive) {
+                // get compacted ray indices
+                CHECK_DATA(ray_active_cpu111, char, workspace.ray_active[active_buf_idx], batch_size);
+                CHECK_DATA(ray_active_cpu222, char, workspace.ray_active[compact_buf_idx], batch_size);
+                generate_compaction_indices(
+                    stream,
+                    n_rays_alive,
+                    workspace.c_block_size,
+                    workspace.ray_alive,
+                    workspace.c_block_offsets,
+                    workspace.compact_idx
+                );
 
-            printf("n_rays_alive: %d\n", n_rays_alive);
+                // compact ray properties via the indices
+                compact_rays_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+                    n_rays_to_compact,
+                    batch_size,
+                    workspace.compact_idx,
 
+                    // input
+                    workspace.ray_idx[active_buf_idx],
+                    workspace.ray_active[active_buf_idx],
+                    workspace.ray_t[active_buf_idx],
+                    workspace.ray_origin[active_buf_idx],
+                    workspace.ray_dir[active_buf_idx],
+                    workspace.ray_idir[active_buf_idx],
+
+                    // output
+                    workspace.ray_idx[compact_buf_idx],
+                    workspace.ray_active[compact_buf_idx],
+                    workspace.ray_t[compact_buf_idx],
+                    workspace.ray_origin[compact_buf_idx],
+                    workspace.ray_dir[compact_buf_idx],
+                    workspace.ray_idir[compact_buf_idx]
+                );
+
+                // all compacted rays are alive
+                CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_compact * sizeof(bool), stream));
+
+                // swap the active and compact buffer indices
+                std::swap(active_buf_idx, compact_buf_idx);
+
+                // update n_rays_alive
+                n_rays_alive = n_rays_to_compact;
+            }
         }
         // increment the number of pixels filled
         n_pixels_filled += n_pixels_to_fill;

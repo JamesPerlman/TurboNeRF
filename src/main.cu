@@ -58,8 +58,10 @@ int main()
 	for (int i = 0; i < 1000; ++i) {
 		trainer.train_step(stream);
 
-		if (i % 100 == 0) {
+		if (i % 100 == 0 && i > 0) {
+			render_request.output.clear(stream);
 			renderer.request_render(stream, render_request);
+			render_request.output.save_image(stream, fmt::format("H:\\test-render-{}.png", i));
 		}
 	}
 

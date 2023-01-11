@@ -1,4 +1,4 @@
-# CMakeList.txt : Top-level CMake project file, do global configuration
+﻿# CMakeList.txt : Top-level CMake project file, do global configuration
 # and include sub-projects here.
 #
 cmake_minimum_required (VERSION 3.24)
@@ -78,14 +78,22 @@ set(HEADERS
 )
 
 set(SOURCES
+	# controllers
 	src/controllers/nerf-rendering-controller.cu
 	src/controllers/nerf-training-controller.cu
+
+	# models
 	src/models/dataset.cu
 	src/models/nerf-network.cu
+	src/models/render-buffer.cu
 	src/models/training-image.cu
+
+	# utils
 	src/utils/cu-compactor.cu
 	src/utils/gpu-image.cu
 	src/utils/rendering-kernels.cu
+
+	# common
 	src/main.cu	
 )
 
