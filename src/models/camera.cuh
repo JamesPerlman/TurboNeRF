@@ -49,25 +49,6 @@ struct Camera {
 		return Ray{ ray_o, ray_d };
 	}
 };
-/*
-// init_rays CUDA kernel
-__global__ void init_rays_pinhole(
-	uint32_t n_rays,
-	Camera cam,
-	Ray* rays_out
-) {
-	int32_t x = blockIdx.x * blockDim.x + threadIdx.x;
-	int32_t y = blockIdx.y * blockDim.y + threadIdx.y;
 
-	int32_t idx = x * gridDim.x + y;
 
-	if (idx >= n_rays) {
-		return;
-	}
-	
-	Ray ray = cam.local_ray_at_pixel_xy(x, y);
-	
-	rays_out[idx] = ray;
-}
-*/
 NRC_NAMESPACE_END
