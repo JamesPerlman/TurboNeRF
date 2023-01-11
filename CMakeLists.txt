@@ -68,7 +68,6 @@ set(HEADERS
 	src/utils/rendering-kernels.cuh
 	src/utils/training-batch-kernels.cuh
 	src/utils/training-network-kernels.cuh
-	src/utils/volumetric-rendering.cuh
 
 	# services
 	src/services/nerf-manager.cuh
