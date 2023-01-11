@@ -105,8 +105,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 
 	float3 global_origin = cam.transform * local_ray.o;
 	float3 global_direction = cam.transform * local_ray.d - cam.transform.get_translation();
-
-	// todo: move rays to near plane
+	
 	ori_xyz[i_offset_0] = global_origin.x;
 	ori_xyz[i_offset_1] = global_origin.y;
 	ori_xyz[i_offset_2] = global_origin.z;
@@ -132,7 +131,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 __global__ void march_and_count_steps_per_ray_kernel(
 	uint32_t n_rays,
 	uint32_t batch_size,
-	const BoundingBox* bounding_box,
+	const BoundingBox* bbox,
 	const CascadedOccupancyGrid* occ_grid,
 	const float cone_angle,
 	const float dt_min,
@@ -174,7 +173,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 		const float y = o_y + t * d_y;
 		const float z = o_z + t * d_z;
 
-		if (!bounding_box->contains(x, y, z)) {
+		if (!bbox->contains(x, y, z)) {
 			break;
 		}
 
@@ -189,7 +188,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 		} else {
 			// otherwise we need to find the next occupied cell
 			t = occ_grid->get_t_advanced_to_next_voxel(
-				bounding_box->pos_to_unit_x(x), bounding_box->pos_to_unit_y(y), bounding_box->pos_to_unit_z(z),
+				bbox->pos_to_unit_x(x), bbox->pos_to_unit_y(y), bbox->pos_to_unit_z(z),
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
 				t, dt_min
@@ -208,7 +207,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 
 __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	uint32_t batch_size,
-	const BoundingBox* bounding_box,
+	const BoundingBox* bbox,
 	const CascadedOccupancyGrid* occ_grid,
 	const float dt_min,
 	const float dt_max,
@@ -281,7 +280,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 		const float y = o_y + t * d_y;
 		const float z = o_z + t * d_z;
 
-		if (!bounding_box->contains(x, y, z)) {
+		if (!bbox->contains(x, y, z)) {
 			break;
 		}
 
@@ -331,7 +330,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 		} else {
 			// otherwise we need to find the next occupied cell
 			t = occ_grid->get_t_advanced_to_next_voxel(
-				bounding_box->pos_to_unit_x(x), bounding_box->pos_to_unit_y(y), bounding_box->pos_to_unit_z(z),
+				bbox->pos_to_unit_x(x), bbox->pos_to_unit_y(y), bbox->pos_to_unit_z(z),
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
 				t, dt_min
