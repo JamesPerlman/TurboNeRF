@@ -46,6 +46,7 @@ set(HEADERS
 	src/models/cascaded-occupancy-grid.cuh
 	src/models/cascaded-occupancy-grid-workspace.cuh
 	src/models/dataset.h
+	src/models/nerf-network-params-workspace.cuh
 	src/models/nerf-network-workspace.cuh
 	src/models/nerf-network.h
 	src/models/nerf.cuh

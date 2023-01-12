@@ -96,37 +96,44 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
 	size_t rng_seed = 72791;
 	pcg32 rng(rng_seed);
 
-	// concatenated network params and gradients
-	uint32_t n_total_params = density_network->n_params() + color_network->n_params();
-
-	params_fp.enlarge(n_total_params);
-	params_hp.enlarge(n_total_params);
-
-	gradients_hp.enlarge(n_total_params);
-	gradients_hp.memset(0);
-
 	// initialize params
-
-	density_network->initialize_params(rng, params_fp.data());
-
-	color_network->initialize_params(rng, params_fp.data() + density_network->n_params());
+	params_workspace.enlarge(
+		stream,
+		density_network->n_params(),
+		color_network->n_params()
+	);
+	
+	density_network->initialize_params(rng, params_workspace.density_network_params_fp);
+	color_network->initialize_params(rng, params_workspace.color_network_params_fp);
 
 	// initialize_params only initializes full precision params, need to copy to half precision
 
-	copy_and_cast<network_precision_t, float>(stream, n_total_params, params_hp.data(), params_fp.data());
+	copy_and_cast<network_precision_t, float>(
+		stream,
+		density_network->n_params(),
+		params_workspace.density_network_params_hp,
+		params_workspace.density_network_params_fp
+	);
+
+	copy_and_cast<network_precision_t, float>(
+		stream,
+		color_network->n_params(),
+		params_workspace.color_network_params_hp,
+		params_workspace.color_network_params_fp
+	);
 
 	// assign params pointers
 
 	density_network->set_params(
-		params_hp.data(),
-		params_hp.data(),
-		gradients_hp.data()
+		params_workspace.density_network_params_hp,
+		params_workspace.density_network_params_hp,
+		params_workspace.density_network_gradients_hp
 	);
 
 	color_network->set_params(
-		params_hp.data() + density_network->n_params(),
-		params_hp.data() + density_network->n_params(),
-		gradients_hp.data() + density_network->n_params()
+		params_workspace.color_network_params_hp,
+		params_workspace.color_network_params_hp,
+		params_workspace.color_network_gradients_hp
 	);
 
 	// initialize optimizers
@@ -519,17 +526,17 @@ void NerfNetwork::optimizer_step(const cudaStream_t& stream) {
 	density_optimizer->step(
 		stream,
 		LOSS_SCALE,
-		params_fp.data(),
-		params_hp.data(),
-		gradients_hp.data()
+		params_workspace.density_network_params_fp,
+		params_workspace.density_network_params_hp,
+		params_workspace.density_network_gradients_hp
 	);
 
 	color_optimizer->step(
 		stream,
 		LOSS_SCALE,
-		params_fp.data() + density_network->n_params(),
-		params_hp.data() + density_network->n_params(),
-		gradients_hp.data() + density_network->n_params()
+		params_workspace.color_network_params_fp,
+		params_workspace.color_network_params_hp,
+		params_workspace.color_network_gradients_hp
 	);
 }
 

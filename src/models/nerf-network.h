@@ -9,6 +9,7 @@
 #include <tiny-cuda-nn/optimizer.h>
 
 #include "../common.h"
+#include "nerf-network-params-workspace.cuh"
 #include "nerf-network-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
@@ -60,13 +61,9 @@ private:
 	uint32_t batch_size = 0;
 	bool can_train = false;
 
-    // full-precision params buffers for both MLPs
-    tcnn::GPUMemory<float> params_fp;
-    tcnn::GPUMemory<tcnn::network_precision_t> params_hp;
-    tcnn::GPUMemory<tcnn::network_precision_t> gradients_hp;
-
 	// workspace
 	NeRFNetworkWorkspace workspace;
+	NeRFNetworkParamsWorkspace params_workspace;
 
 	// Helper context
 	struct ForwardContext : public tcnn::Context {

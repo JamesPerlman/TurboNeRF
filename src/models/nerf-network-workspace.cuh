@@ -40,6 +40,7 @@ struct NeRFNetworkWorkspace : Workspace {
         const uint32_t& direction_encoding_output_width,
         const uint32_t& color_network_input_width,
         const uint32_t& color_network_output_width,
+        
         const bool& for_training
     ) {
         free_allocations();
