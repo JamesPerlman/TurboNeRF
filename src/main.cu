@@ -34,7 +34,7 @@ int main()
 
 	// set up training controller
 	auto trainer = nrc::NeRFTrainingController(dataset, nerf);
-	trainer.prepare_for_training(stream, 2<<19);
+	trainer.prepare_for_training(stream, 1<<20);
 
 	// set up rendering controller
 	auto renderer = nrc::NeRFRenderingController();
@@ -44,9 +44,15 @@ int main()
 	auto render_buffer = nrc::RenderBuffer(1024, 1024, rgba);
 
 	auto camera_transform = nrc::Matrix4f::Identity();
-
-	auto render_cam = nrc::Camera(0.0f, 8.0f, make_float2(100.0f, 100.0f), make_int2(1024, 1024), make_float2(1.0f, 1.0f), camera_transform);
-
+	auto train_cam = dataset.cameras[6];
+	auto render_cam = nrc::Camera(
+		train_cam.near,
+		train_cam.far,
+		train_cam.focal_length,
+		make_int2(1024, 1024),
+		train_cam.sensor_size,
+		train_cam.transform
+	);
 	// fetch nerfs as pointers
 	std::vector<nrc::NeRF*> nerf_ptrs;
 	for (auto& nerf : nerf_manager.get_nerfs()) {
@@ -55,10 +61,10 @@ int main()
 
 	auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);
 
-	for (int i = 0; i < 1000; ++i) {
+	for (int i = 0; i < 300; ++i) {
 		trainer.train_step(stream);
 
-		if (i % 100 == 0 && i > 0) {
+		if (i % 1 == 0 && i > 0) {
 			render_request.output.clear(stream);
 			renderer.request_render(stream, render_request);
 			render_request.output.save_image(stream, fmt::format("H:\\test-render-{}.png", i));
