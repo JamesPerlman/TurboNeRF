@@ -3,6 +3,8 @@
 #include "../models/camera.cuh"
 #include "../utils/cu-compactor.cuh"
 #include "../utils/rendering-kernels.cuh"
+#include "../utils/parallel-utils.cuh"
+#include "../utils/gpu-image.cuh"
 
 using namespace nrc;
 using namespace tcnn;
@@ -12,7 +14,7 @@ NeRFRenderingController::NeRFRenderingController(
 ) {
     if (batch_size == 0) {
         // TODO: determine batch size from GPU specs
-        this->batch_size = 1024;
+        this->batch_size = 1<<20;
     } else {
         this->batch_size = batch_size;
     }
@@ -120,8 +122,8 @@ void NeRFRenderingController::request_render(
 
         // TODO: figure out correct values for these
         const float dt_min = 0.01f;
-        const float dt_max = 1.0f;
-        const float cone_angle = 1.0f;
+        const float dt_max = 1e10f;
+        const float cone_angle = 0.004f;
 
         // ray marching loop
         uint32_t n_rays_alive = n_rays;
@@ -159,7 +161,7 @@ void NeRFRenderingController::request_render(
             );
 
             // accumulate these samples into the pixel colors
-            composite_samples_kernel<<<n_blocks_linear(n_pixels_to_fill), n_threads_linear, 0, stream>>>(
+            composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
                 batch_size,
                 request.output.stride,
@@ -190,8 +192,6 @@ void NeRFRenderingController::request_render(
             // check if compaction is required
             if (n_rays_to_compact < n_rays_alive) {
                 // get compacted ray indices
-                CHECK_DATA(ray_active_cpu111, char, workspace.ray_active[active_buf_idx], batch_size);
-                CHECK_DATA(ray_active_cpu222, char, workspace.ray_active[compact_buf_idx], batch_size);
                 generate_compaction_indices(
                     stream,
                     n_rays_alive,
@@ -202,7 +202,7 @@ void NeRFRenderingController::request_render(
                 );
 
                 // compact ray properties via the indices
-                compact_rays_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+                compact_rays_kernel<<<n_blocks_linear(n_rays_to_compact), n_threads_linear, 0, stream>>>(
                     n_rays_to_compact,
                     batch_size,
                     workspace.compact_idx,
