@@ -245,31 +245,28 @@ __global__ void composite_samples_kernel(
     if (!ray_alive[i] || !ray_active[i]) return;
 
     // grab local references to global memory
+
+    // sample colors
     const uint32_t i_offset_0 = i;
     const uint32_t i_offset_1 = i_offset_0 + batch_size;
     const uint32_t i_offset_2 = i_offset_1 + batch_size;
-    const uint32_t i_offset_3 = i_offset_2 + batch_size;
-    
-    const uint32_t idx_offset_0 = sample_idx[i];
-    const uint32_t idx_offset_1 = idx_offset_0 + output_stride;
-    const uint32_t idx_offset_2 = idx_offset_1 + output_stride;
-    const uint32_t idx_offset_3 = idx_offset_2 + output_stride;
 
-    // sample colors
     const float s_r = network_rgb[i_offset_0];
     const float s_g = network_rgb[i_offset_1];
     const float s_b = network_rgb[i_offset_2];
 
     // alpha
     const float s_a = 1.0f - exp(-(float)network_sigma[i_offset_0] * sample_dt[i]);
-    
 
     // pixel colors
+    const uint32_t idx_offset_0 = sample_idx[i];
+    const uint32_t idx_offset_1 = idx_offset_0 + output_stride;
+    const uint32_t idx_offset_2 = idx_offset_1 + output_stride;
+    const uint32_t idx_offset_3 = idx_offset_2 + output_stride;
+
     const float p_r = output_rgba[idx_offset_0];
     const float p_g = output_rgba[idx_offset_1];
     const float p_b = output_rgba[idx_offset_2];
-
-    // alpha
     const float p_a = output_rgba[idx_offset_3];
 
     // transmittance
@@ -279,17 +276,17 @@ __global__ void composite_samples_kernel(
     // new samples are composited behind current pixels
     // aka new sample is the background, current pixel is the foreground
 
-    const float output_a = p_a + s_a * p_t;
+	const float output_a = p_a + s_a * p_t;
 
-    output_rgba[idx_offset_0] = p_r * p_a + s_r * s_a * p_t;
-    output_rgba[idx_offset_1] = p_g * p_a + s_g * s_a * p_t;
-    output_rgba[idx_offset_2] = p_b * p_a + s_b * s_a * p_t;
-    output_rgba[idx_offset_3] = output_a;
+	output_rgba[idx_offset_0] = p_r * p_a + s_r * s_a * p_t;
+	output_rgba[idx_offset_1] = p_g * p_a + s_g * s_a * p_t;
+	output_rgba[idx_offset_2] = p_b * p_a + s_b * s_a * p_t;
+	output_rgba[idx_offset_3] = output_a;
 
-    // terminate ray if alpha >= 1.0
-    if (output_a >= 1.0f) {
-        ray_alive[i] = false;
-    }
+	// terminate ray if alpha >= 1.0
+	if (output_a >= 1.0f) {
+		ray_alive[i] = false;
+	}
 }
 
 NRC_NAMESPACE_END
