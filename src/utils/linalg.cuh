@@ -54,7 +54,17 @@ struct Matrix4f
         m30 = data[3][0]; m31 = data[3][1]; m32 = data[3][2]; m33 = data[3][3];
     }
 
-    // multiplication operator with float3 - simply assume the float3 makes a homegenous float4
+    // multiplication operator with float3 - multiply by upper left 3x3, no translation
+    inline NRC_HOST_DEVICE float3 mmul_ul3x3(const float3& v) const
+    {
+        return make_float3(
+            m00 * v.x + m01 * v.y + m02 * v.z,
+            m10 * v.x + m11 * v.y + m12 * v.z,
+            m20 * v.x + m21 * v.y + m22 * v.z
+        );
+    }
+
+    // multiplication operator with float3 - assume we want v to be inferred as homogeneous
     inline NRC_HOST_DEVICE float3 operator*(const float3& v) const
     {
         return make_float3(
