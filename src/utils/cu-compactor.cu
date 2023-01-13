@@ -152,7 +152,7 @@ int calculate_block_counts_and_offsets(
     int block_count, block_offset;
     CUDA_CHECK_THROW(cudaMemcpyAsync(&block_count, d_block_counts + n_blocks - 1, sizeof(int), cudaMemcpyDeviceToHost, stream));
     CUDA_CHECK_THROW(cudaMemcpyAsync(&block_offset, d_block_offsets + n_blocks - 1, sizeof(int), cudaMemcpyDeviceToHost, stream));
-    CUDA_CHECK_THROW(cudaStreamSynchronize(stream))
+    CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
 
     return block_offset + block_count;
 }
