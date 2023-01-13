@@ -41,7 +41,7 @@ struct Camera {
 		float sx = sensor_size.x * (float(x) / (pixel_dims_f.x + 0.5f) - 0.5f);
 		float sy = sensor_size.y * (float(y) / (pixel_dims_f.y + 0.5f) - 0.5f);
 
-		float3 pix_pos = make_float3(sx, sx, -1.0f);
+		float3 pix_pos = make_float3(sx, sy, -1.0f);
 
 		float3 ray_d = pix_pos;
 		float3 ray_o = near * ray_d;
