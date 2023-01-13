@@ -120,10 +120,10 @@ __global__ void calculate_sse_loss_per_ray_kernel(
 	const uint32_t i_offset_3 = i_offset_2 + batch_size;
 
 	// Calculate the loss
-	const float dr = (float)ray_rgba[i_offset_0] - target_rgba[i_offset_0];
-	const float dg = (float)ray_rgba[i_offset_1] - target_rgba[i_offset_1];
-	const float db = (float)ray_rgba[i_offset_2] - target_rgba[i_offset_2];
-	const float da = (float)ray_rgba[i_offset_3] - target_rgba[i_offset_3];
+	const float dr = ray_rgba[i_offset_0] - target_rgba[i_offset_0];
+	const float dg = ray_rgba[i_offset_1] - target_rgba[i_offset_1];
+	const float db = ray_rgba[i_offset_2] - target_rgba[i_offset_2];
+	const float da = ray_rgba[i_offset_3] - target_rgba[i_offset_3];
 
 	// squared error sum per ray color component
 	out_loss[i] = dr * dr + dg * dg + db * db + da * da;
@@ -163,17 +163,23 @@ __global__ void calculate_network_output_gradient(
 	// output
 	tcnn::network_precision_t* __restrict__ grad
 ) {
-	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-	if (i >= n_samples) {
-		return;
-	}
-
-	// local references to data
+	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
 	const uint32_t i_offset_0 = i;
 	const uint32_t i_offset_1 = i_offset_0 + batch_size;
 	const uint32_t i_offset_2 = i_offset_1 + batch_size;
 	const uint32_t i_offset_3 = i_offset_2 + batch_size;
+
+	if (i >= n_samples) {
+		grad[i_offset_0] = 0.0f;
+		grad[i_offset_1] = 0.0f;
+		grad[i_offset_2] = 0.0f;
+		grad[i_offset_3] = 0.0f;
+
+		return;
+	}
+
+	// local references to data
 
 	const float dt = sample_dt[i];
 	const float weight = sample_weight[i];
@@ -197,7 +203,7 @@ __global__ void calculate_network_output_gradient(
 	grad[i_offset_2] = (tcnn::network_precision_t)(loss_scale * inv_2npix * db * weight);
 
 	// sigma gradient
-	// grad[i_offset_3] = (tcnn::network_precision_t)(loss_scale * inv_2npix * (1.0f - 2.0f * alpha) * (dt * trans) * (dr * sr + dg * sg + db * sb + da));
+	grad[i_offset_3] = (tcnn::network_precision_t)(loss_scale * inv_2npix * (1.0f - 2.0f * alpha) * (dt * trans) * (dr * sr + dg * sg + db * sb + da));
 }
 
 /**
