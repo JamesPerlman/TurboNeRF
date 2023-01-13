@@ -21,6 +21,7 @@ struct RenderingWorkspace: Workspace {
 
 	// compaction
 	int c_block_size;
+	int c_n_blocks;
 	int* c_block_counts;
 	int* c_block_offsets;
 	int* compact_idx;
@@ -69,8 +70,10 @@ struct RenderingWorkspace: Workspace {
 
 		// compaction
 		c_block_size	= compaction_block_size;
-		c_block_counts	= allocate<int>(stream, c_block_size);
-		c_block_offsets	= allocate<int>(stream, c_block_size);
+		c_n_blocks		= tcnn::div_round_up((int)batch_size, c_block_size);
+
+		c_block_counts	= allocate<int>(stream, c_n_blocks);
+		c_block_offsets	= allocate<int>(stream, c_n_blocks);
 		compact_idx		= allocate<int>(stream, batch_size);
 
 		// rays
