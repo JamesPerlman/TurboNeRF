@@ -104,14 +104,14 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	Ray local_ray = cam.local_ray_at_pixel_xy(x, y);
 
 	float3 global_origin = cam.transform * local_ray.o;
-	float3 global_direction = cam.transform * local_ray.d - cam.transform.get_translation();
+	float3 global_direction = cam.transform.mmul_ul3x3(local_ray.d);
 	
 	ori_xyz[i_offset_0] = global_origin.x;
 	ori_xyz[i_offset_1] = global_origin.y;
 	ori_xyz[i_offset_2] = global_origin.z;
 
 	// normalize ray directions
-	const float n = rsqrtf(l2_squared_norm(local_ray.d));
+	const float n = rsqrtf(l2_squared_norm(global_direction));
 
 	const float ray_dx = n * global_direction.x;
 	const float ray_dy = n * global_direction.y;
