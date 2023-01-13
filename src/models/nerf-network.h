@@ -67,18 +67,18 @@ private:
 
 	// Helper context
 	struct ForwardContext : public tcnn::Context {
-		tcnn::GPUMatrix<float> density_network_input_matrix;
-		tcnn::GPUMatrix<tcnn::network_precision_t> density_network_output_matrix;
+		tcnn::GPUMatrix<float, tcnn::MatrixLayout::RowMajor> density_network_input_matrix;
+		tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> density_network_output_matrix;
 
-		tcnn::GPUMatrix<float> direction_encoding_input_matrix;
-		tcnn::GPUMatrix<tcnn::network_precision_t> direction_encoding_output_matrix;
+		tcnn::GPUMatrix<float, tcnn::MatrixLayout::RowMajor> direction_encoding_input_matrix;
+		tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> direction_encoding_output_matrix;
 		
-		tcnn::GPUMatrix<tcnn::network_precision_t> color_network_input_matrix;
-		tcnn::GPUMatrix<tcnn::network_precision_t> color_network_output_matrix;
+		tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> color_network_input_matrix;
+		tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> color_network_output_matrix;
 		
-		tcnn::GPUMatrix<tcnn::network_precision_t> density_dL_doutput;
-		tcnn::GPUMatrix<tcnn::network_precision_t> color_dL_doutput;
-		tcnn::GPUMatrix<float> L;
+		tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> density_dL_doutput;
+		tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> color_dL_doutput;
+		tcnn::GPUMatrix<float, tcnn::MatrixLayout::RowMajor> L;
 
 		std::unique_ptr<tcnn::Context> density_ctx;
 		std::unique_ptr<tcnn::Context> color_ctx;
