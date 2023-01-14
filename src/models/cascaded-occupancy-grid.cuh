@@ -31,7 +31,7 @@ public:
 	CascadedOccupancyGridWorkspace workspace;
 	// level is the power of two domain size (K from pg. 15 of Müller, et al. 2022)
 	// grid goes from [-2^(level - 1) + 0.5, 2^(level - 1) + 0.5] in each dimension
-	CascadedOccupancyGrid(uint32_t n_levels, uint32_t resolution = 128)
+	CascadedOccupancyGrid(const uint32_t& n_levels, const uint32_t& resolution = 128)
 		: n_levels(n_levels)
 		, resolution_i(resolution)
 		, resolution_f(resolution)
@@ -41,8 +41,11 @@ public:
 	CascadedOccupancyGrid() = default;
 
 	// class function to calculate number of bytes needed to store the grid
-	static inline NRC_HOST_DEVICE size_t get_n_total_elements(uint32_t n_levels, uint32_t grid_resolution = 128) {
-		uint32_t side_length = next_power_of_two(grid_resolution);
+	static inline NRC_HOST_DEVICE size_t get_n_total_elements(
+		const uint32_t& n_levels,
+		const uint32_t& grid_resolution = 128
+	) {
+		const uint32_t side_length = next_power_of_two(grid_resolution);
 		return (size_t)(n_levels * side_length * side_length * side_length);
 	}
 	
@@ -66,6 +69,18 @@ public:
 		return workspace.values;
 	}
 
+	// memory setters
+	inline __host__ void set_bitfield(const cudaStream_t& stream, const uint8_t& value) {
+		CUDA_CHECK_THROW(
+			cudaMemsetAsync(
+				workspace.bitfield,
+				value,
+				workspace.n_bitfield_elements * sizeof(uint8_t),
+				stream
+			)
+		);
+	}
+
 	// instance function to return the number of elements in this grid
 	inline uint32_t NRC_HOST_DEVICE get_n_total_elements() const {
 		return workspace.n_total_elements;
@@ -82,7 +97,7 @@ public:
 
 	// normalize a coordinate to [0, 1] within a grid at level k
 	inline NRC_HOST_DEVICE float3 get_normalized_coordinates(const uint32_t& k, const float& x, const float& y, const float& z) const {
-		float scale = 1 << k;
+		const float scale = 1 << k;
 		return {
 			x / scale + 0.5f,
 			y / scale + 0.5f,
@@ -97,9 +112,9 @@ public:
 	) const {
 		float scale = 1 << level;
 		
-		uint32_t x_i = (uint32_t)((x / scale + 0.5f) * resolution_f);
-		uint32_t y_i = (uint32_t)((y / scale + 0.5f) * resolution_f);
-		uint32_t z_i = (uint32_t)((z / scale + 0.5f) * resolution_f);
+		const uint32_t x_i = (x / scale + 0.5f) * resolution_f;
+		const uint32_t y_i = (y / scale + 0.5f) * resolution_f;
+		const uint32_t z_i = (z / scale + 0.5f) * resolution_f;
 		
 		// using morton code (Z-order curve), from Müller, et al. 2022 (page 15, "Occupancy Grids")
 		return tcnn::morton3D(x_i, y_i, z_i);
@@ -110,8 +125,8 @@ public:
 		const uint8_t& level,
 		const float& x, const float& y, const float& z
 	) const {
-		uint32_t byte_idx = get_voxel_morton_index(level, x, y, z) / 8;
-		uint8_t bitmask = 1 << ((n_levels * byte_idx + level) % 8);
+		const uint32_t byte_idx = get_voxel_morton_index(level, x, y, z) / 8;
+		const uint8_t bitmask = 1 << ((n_levels * byte_idx + level) % 8);
 		return workspace.bitfield[byte_idx] & bitmask;
 	}
 
@@ -125,18 +140,19 @@ public:
 		const float& x, const float& y, const float& z,
 		const float& dt_min
 	) const {
-		
 		for (int k = 0; k < n_levels; ++k) {
-			float level_size = 1 << k;
-			float level_extent = 0.5f * level_size;
-			float cell_size = level_size * inv_resolution_f;
+			const float level_size = 1 << k;
+			const float level_extent = 0.5f * level_size;
+			const float cell_size = level_size * inv_resolution_f;
 			
 			// might be able to eliminate the = in <= here
-			bool grid_k_covers_xyz = fabsf(x) <= level_extent && fabsf(y) <= level_extent && fabsf(z) <= level_extent;
+			const bool grid_k_covers_xyz = fabsf(x) <= level_extent && fabsf(y) <= level_extent && fabsf(z) <= level_extent;
 			if (grid_k_covers_xyz && cell_size > dt_min) {
 				return k;
 			}
 		}
+		// fallthrough - return largest grid
+		return n_levels - 1;
 	}
 
 	// Stepping along a ray as in a Digital Differential Analyzer (DDA), get the distance to the next voxel
@@ -147,9 +163,9 @@ public:
 		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
 		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z
 	) const {
-		float x = ray_dir_x * resolution_f;
-		float y = ray_dir_y * resolution_f;
-		float z = ray_dir_z * resolution_f;
+		const float x = ray_dir_x * resolution_f;
+		const float y = ray_dir_y * resolution_f;
+		const float z = ray_dir_z * resolution_f;
 
 		float tx = ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
 		float ty = ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
@@ -167,7 +183,7 @@ public:
 		const float& t,
 		const float& dt_min
 	) const {
-		float t_target = get_t_to_next_voxel(
+		const float t_target = get_t_to_next_voxel(
 			ray_pos_x, ray_pos_y, ray_pos_z,
 			ray_dir_x, ray_dir_y, ray_dir_z,
 			inv_dir_x, inv_dir_y, inv_dir_z

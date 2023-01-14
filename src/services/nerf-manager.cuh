@@ -44,14 +44,7 @@ public:
 		nerf.occupancy_grid.initialize_values(stream);
 		
 		// Initialize occupancy grid bitfield (all bits set to 1)
-		CUDA_CHECK_THROW(
-			cudaMemsetAsync(
-				nerf.occupancy_grid.get_bitfield(),
-				(uint8_t)0b11111111, // set all bits to 1
-				nerf.occupancy_grid.get_n_bitfield_elements(),
-				stream
-			)
-		);
+		nerf.occupancy_grid.set_bitfield(stream, 0b11111111);
 
 		return &nerf;
 	}
