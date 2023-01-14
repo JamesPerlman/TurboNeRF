@@ -3,44 +3,37 @@
 #include <device_launch_parameters.h>
 #include <iostream>
 #include <iomanip>
-#include <Eigen/Dense>
 
 #include "../common.h"
-
+#include "linalg.cuh"
 
 NRC_NAMESPACE_BEGIN
 
-void print_matrix(const Eigen::Matrix4f& mat) {
-    // Set floating point output precision to 2 decimal places
-    std::cout << std::fixed << std::setprecision(2);
-    for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < 4; j++) {
-            std::cout << std::setw(5) << mat(i, j) << " ";
-        }
-        std::cout << std::endl;
-    }
-}
-
-inline NRC_HOST_DEVICE Eigen::Matrix4f nerf_to_nrc(Eigen::Matrix4f nerf_matrix)
+inline NRC_HOST_DEVICE Matrix4f nerf_to_nrc(Matrix4f nerf_matrix)
 {
-    Eigen::Matrix4f result(nerf_matrix);
-    result.col(1).array() *= -1;
-    result.col(2).array() *= -1;
-    // cycle axes xyz->zxy
-    const Eigen::Matrix4f tmp = result.eval();
-    result.row(2) = tmp.row(0);
-    result.row(0) = tmp.row(1);
-    result.row(1) = tmp.row(2);
+    Matrix4f result = nerf_matrix;
+    // invert column 1
+    result.m01 = -nerf_matrix.m01;
+    result.m11 = -nerf_matrix.m11;
+    result.m21 = -nerf_matrix.m21;
+    result.m31 = -nerf_matrix.m31;
+
+    // invert column 2
+    result.m02 = -nerf_matrix.m02;
+    result.m12 = -nerf_matrix.m12;
+    result.m22 = -nerf_matrix.m22;
+    result.m32 = -nerf_matrix.m32;
+
+    // roll axes xyz -> yzx
+    const Matrix4f tmp = result;
+    // x -> y
+    result.m00 = tmp.m10; result.m01 = tmp.m11; result.m02 = tmp.m12; result.m03 = tmp.m13;
+    // y -> z
+    result.m10 = tmp.m20; result.m11 = tmp.m21; result.m12 = tmp.m22; result.m13 = tmp.m23;
+    // z -> x
+    result.m20 = tmp.m00; result.m21 = tmp.m01; result.m22 = tmp.m02; result.m23 = tmp.m03;
     
-    printf("INPUT: \n");
-    print_matrix(nerf_matrix);
-
-    printf("RESULT: \n");
-    print_matrix(result);
-
     return result;
 }
-
-#include "../common.h"
 
 NRC_NAMESPACE_END
