@@ -39,7 +39,7 @@ __global__ void generate_rays_pinhole_kernel(
 	float3 global_direction = cam->transform * local_ray.d - cam->transform.get_translation();
 
 	// normalize ray directions
-	const float n = rsqrtf(l2_squared_norm(global_direction));
+	const float n = rnorm3df(global_direction.x, global_direction.y, global_direction.z);
 
 	const float ray_dx = n * global_direction.x;
 	const float ray_dy = n * global_direction.y;
@@ -174,6 +174,7 @@ __global__ void compact_rays_kernel(
 	const float* __restrict__ in_origin,
 	const float* __restrict__ in_dir,
 	const float* __restrict__ in_idir,
+	const float* __restrict__ in_sigma,
 
 	// compacted output buffers (write-only)
 	uint32_t* __restrict__ out_idx,
@@ -181,7 +182,8 @@ __global__ void compact_rays_kernel(
 	float* __restrict__ out_t,
 	float* __restrict__ out_origin,
 	float* __restrict__ out_dir,
-	float* __restrict__ out_idir
+	float* __restrict__ out_idir,
+	float* __restrict__ out_sigma
 ) {
     // compacted index is the index to write to
     const int c_idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -192,9 +194,10 @@ __global__ void compact_rays_kernel(
 	const int e_idx = indices[c_idx];
 	
 	// 1-component buffers
-	out_idx[c_idx] = in_idx[e_idx];
-	out_active[c_idx] = in_active[e_idx];
-	out_t[c_idx] = in_t[e_idx];
+	out_idx[c_idx]		= in_idx[e_idx];
+	out_active[c_idx]	= in_active[e_idx];
+	out_t[c_idx]		= in_t[e_idx];
+	out_sigma[c_idx]	= in_sigma[e_idx];
 
 	// local references to pointer offsets
 	const int c_offset_0 = c_idx;
@@ -235,6 +238,7 @@ __global__ void composite_samples_kernel(
 
     // read/write
     bool* __restrict__ ray_alive,
+	float* __restrict__ ray_sigma,
     float* __restrict__ output_rgba
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -255,8 +259,20 @@ __global__ void composite_samples_kernel(
     const float s_g = network_rgb[i_offset_1];
     const float s_b = network_rgb[i_offset_2];
 
-    // alpha
-    const float s_a = 1.0f - exp(-(float)network_sigma[i_offset_0] * sample_dt[i]);
+	// sample sigma
+	const float sigma_dt = (float)network_sigma[i] * sample_dt[i] / 16.0f;
+
+    // sample alpha
+    const float s_a = 1.0f - __expf(-sigma_dt);
+
+	// ray transmittance
+	const float r_t = __expf(-ray_sigma[i]);
+
+	// sample weight
+	const float s_w = s_a * r_t;
+
+	// sigma cumulative sum
+	ray_sigma[i] += sigma_dt;
 
     // pixel colors
     const uint32_t idx_offset_0 = sample_idx[i];
@@ -264,28 +280,32 @@ __global__ void composite_samples_kernel(
     const uint32_t idx_offset_2 = idx_offset_1 + output_stride;
     const uint32_t idx_offset_3 = idx_offset_2 + output_stride;
 
-    const float p_r = output_rgba[idx_offset_0];
-    const float p_g = output_rgba[idx_offset_1];
-    const float p_b = output_rgba[idx_offset_2];
-    const float p_a = output_rgba[idx_offset_3];
+    // const float p_r = output_rgba[idx_offset_0];
+    // const float p_g = output_rgba[idx_offset_1];
+    // const float p_b = output_rgba[idx_offset_2];
+    // const float p_a = output_rgba[idx_offset_3];
 
     // transmittance
-    const float p_t = 1.0f - p_a;
+    // const float p_t = 1.0f - p_a;
 
     // alpha compositing
     // new samples are composited behind current pixels
     // aka new sample is the background, current pixel is the foreground
 
-	const float output_a = p_a + s_a * p_t;
-
-	output_rgba[idx_offset_0] = p_r * p_a + s_r * s_a * p_t;
-	output_rgba[idx_offset_1] = p_g * p_a + s_g * s_a * p_t;
-	output_rgba[idx_offset_2] = p_b * p_a + s_b * s_a * p_t;
-	output_rgba[idx_offset_3] = output_a;
+	output_rgba[idx_offset_0] += s_w * s_r;
+	output_rgba[idx_offset_1] += s_w * s_g;
+	output_rgba[idx_offset_2] += s_w * s_b;
+	output_rgba[idx_offset_3] += s_w;
 
 	// terminate ray if alpha >= 1.0
-	if (output_a >= 1.0f) {
+	const float out_a = output_rgba[idx_offset_3];
+	if (out_a >= 1.0f) {
 		ray_alive[i] = false;
+		
+		output_rgba[idx_offset_0] /= out_a;
+		output_rgba[idx_offset_1] /= out_a;
+		output_rgba[idx_offset_2] /= out_a;
+		output_rgba[idx_offset_3] = 1.0f;
 	}
 }
 

@@ -4,6 +4,7 @@
 #include <device_launch_parameters.h>
 #include <stbi/stb_image.h>
 #include <tiny-cuda-nn/common.h>
+#include <crt/math_functions.h>
 
 #include "../common.h"
 #include "../models/bounding-box.cuh"
@@ -111,7 +112,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	ori_xyz[i_offset_2] = global_origin.z;
 
 	// normalize ray directions
-	const float n = rsqrtf(l2_squared_norm(global_direction));
+	const float n = rnorm3df(global_direction.x, global_direction.y, global_direction.z);
 
 	const float ray_dx = n * global_direction.x;
 	const float ray_dy = n * global_direction.y;
@@ -187,6 +188,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 			++n_steps_taken;
 		} else {
 			// otherwise we need to find the next occupied cell
+			// TODO: feed in normalized positions so we don't have to calculate them here!
 			t = occ_grid->get_t_advanced_to_next_voxel(
 				bbox->pos_to_unit_x(x), bbox->pos_to_unit_y(y), bbox->pos_to_unit_z(z),
 				d_x, d_y, d_z,
@@ -231,7 +233,6 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 
 	// check if thread is out of bounds
 	if (i >= batch_size) return;
-
 
 	// if the total number of cumulative steps is greater than the number of rays, we exit early to avoid writing outside of our sample buffers
 	const uint32_t n_total_steps_cum = n_steps_cum[i];

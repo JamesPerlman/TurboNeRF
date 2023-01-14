@@ -60,7 +60,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	float ray_b = 0.0f;
 	float ray_a = 0.0f;
 
-	float sigma_cumsum = 0.0f;
+	float sigma_dt_sum = 0.0f;
 
 	// Accumulate samples
 	for (int j = 0; j < n_samples; ++j) {
@@ -70,10 +70,10 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 		const float sigma_j = (float)s_sigma[j];
 		const float sigma_j_dt = sigma_j * dt;
 
-		const float alpha = 1.0f - expf(-sigma_j_dt);
-		const float trans = expf(-sigma_cumsum);
+		const float alpha = 1.0f - __expf(-sigma_j_dt);
+		const float trans = __expf(-sigma_dt_sum);
 		
-		sigma_cumsum += sigma_j_dt;
+		sigma_dt_sum += sigma_j_dt;
 
 		const float weight = alpha * trans;
 

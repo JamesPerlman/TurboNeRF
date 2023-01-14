@@ -14,7 +14,7 @@ NeRFRenderingController::NeRFRenderingController(
 ) {
     if (batch_size == 0) {
         // TODO: determine batch size from GPU specs
-        this->batch_size = 1<<20;
+        this->batch_size = 1<<21;
     } else {
         this->batch_size = batch_size;
     }
@@ -114,16 +114,19 @@ void NeRFRenderingController::request_render(
         // ray_t = 0
         CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_t[active_buf_idx], 0, batch_size * sizeof(float), stream));
 
+        // ray_sigma = 0
+        CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_sigma[active_buf_idx], 0, batch_size * sizeof(float), stream));
+
         // ray_alive = true
         CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, batch_size * sizeof(bool), stream));
 
         // ray_active = true
         CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_active[active_buf_idx], true, batch_size * sizeof(bool), stream));
 
-        // TODO: figure out correct values for these
-        const float dt_min = 0.01f;
-        const float dt_max = 1e10f;
-        const float cone_angle = 0.004f;
+        
+        float dt_min = sqrtf(3.0f) / 1024.0f;
+        float dt_max = nerf->bounding_box.size_x * sqrtf(3.0f) / 1024.0f;
+        const float cone_angle = 1.0f / 256.0f;
 
         // ray marching loop
         uint32_t n_rays_alive = n_rays;
@@ -171,6 +174,7 @@ void NeRFRenderingController::request_render(
                 workspace.ray_idx[active_buf_idx],
                 workspace.ray_active[active_buf_idx],
                 workspace.ray_alive,
+                workspace.ray_sigma[active_buf_idx],
                 request.output.rgba
             );
 
@@ -214,6 +218,7 @@ void NeRFRenderingController::request_render(
                     workspace.ray_origin[active_buf_idx],
                     workspace.ray_dir[active_buf_idx],
                     workspace.ray_idir[active_buf_idx],
+                    workspace.ray_sigma[active_buf_idx],
 
                     // output
                     workspace.ray_idx[compact_buf_idx],
@@ -221,7 +226,8 @@ void NeRFRenderingController::request_render(
                     workspace.ray_t[compact_buf_idx],
                     workspace.ray_origin[compact_buf_idx],
                     workspace.ray_dir[compact_buf_idx],
-                    workspace.ray_idir[compact_buf_idx]
+                    workspace.ray_idir[compact_buf_idx],
+                    workspace.ray_sigma[compact_buf_idx]
                 );
 
                 // all compacted rays are alive

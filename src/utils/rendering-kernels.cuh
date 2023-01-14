@@ -58,6 +58,7 @@ __global__ void compact_rays_kernel(
 	const float* __restrict__ in_origin,
 	const float* __restrict__ in_dir,
 	const float* __restrict__ in_idir,
+	const float* __restrict__ in_sigma,
 
 	// compacted output buffers (write-only)
 	uint32_t* __restrict__ out_idx,
@@ -65,7 +66,8 @@ __global__ void compact_rays_kernel(
 	float* __restrict__ out_t,
 	float* __restrict__ out_origin,
 	float* __restrict__ out_dir,
-	float* __restrict__ out_idir
+	float* __restrict__ out_idir,
+	float* __restrict__ out_sigma
 );
 
 __global__ void composite_samples_kernel(
@@ -82,6 +84,7 @@ __global__ void composite_samples_kernel(
 
     // read/write
     bool* __restrict__ ray_alive,
+	float* __restrict__ ray_sigma,
     float* __restrict__ output_rgba
 );
 

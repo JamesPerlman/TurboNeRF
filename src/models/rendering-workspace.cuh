@@ -33,6 +33,7 @@ struct RenderingWorkspace: Workspace {
 	float* ray_dir[2];
 	float* ray_idir[2];
 	float* ray_t[2];
+	float* ray_sigma[2]; // accumulated sigma
 
 	// 2D ray index (x + y * width)
 	uint32_t* ray_idx[2]; 
@@ -97,6 +98,9 @@ struct RenderingWorkspace: Workspace {
 
 		ray_idx[0]		= allocate<uint32_t>(stream, 2 * batch_size);
 		ray_idx[1]		= ray_idx[0] + batch_size;
+
+		ray_sigma[0]	= allocate<float>(stream, 2 * batch_size);
+		ray_sigma[1]	= ray_sigma[0] + batch_size;
 
 		// samples
 		sample_pos		= allocate<float>(stream, 3 * batch_size);

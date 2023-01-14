@@ -148,11 +148,9 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 
 	/* Begin volumetric sampling of the previous network outputs */
 	
-	// TODO: calculate these accurately.  These are from NerfAcc.
-
-	float dt_min = 0.01f;
-	float dt_max = 1e10f;
-	float cone_angle = 0.004f;
+	float dt_min = sqrtf(3.0f) / 1024.0f;
+	float dt_max = dataset.bounding_box.size_x * sqrtf(3.0f) / 1024.0f;
+	float cone_angle = 1.0f / 256.0f;
 
 	// Count the number of steps each ray would take.  We only need to do this for the new rays.
 	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
@@ -233,6 +231,9 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		// TODO: better error handling
 		throw std::runtime_error("Sample batch does not contain any rays!\n");
 	}
+
+	CHECK_DATA(n_steps_cpu, uint32_t, workspace.ray_steps, workspace.batch_size);
+	CHECK_DATA(n_steps_cum_cpu, uint32_t, workspace.ray_steps_cum, workspace.batch_size);
 
 	n_rays_in_batch = n_ray_max_idx + 1;
 	cudaMemcpyAsync(&n_samples_in_batch, n_steps_cum_ptr.get() + n_ray_max_idx, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream);
