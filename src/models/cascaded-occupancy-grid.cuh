@@ -176,11 +176,10 @@ public:
 
 	// Gets the t-value required to step the ray to the next voxel
 	// rewritten from NerfAcc without the while loop (see `advance_to_next_voxel`)
-	inline NRC_HOST_DEVICE float get_t_advanced_to_next_voxel(
+	inline NRC_HOST_DEVICE float get_dt_to_next_voxel(
 		const float& ray_pos_x, const float& ray_pos_y, const float& ray_pos_z,
 		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
 		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z,
-		const float& t,
 		const float& dt_min
 	) const {
 		const float t_target = get_t_to_next_voxel(
@@ -188,7 +187,7 @@ public:
 			ray_dir_x, ray_dir_y, ray_dir_z,
 			inv_dir_x, inv_dir_y, inv_dir_z
 		);
-		return t + ceilf(t_target / dt_min) * dt_min;
+		return ceilf(t_target / dt_min) * dt_min;
 	}
 
 	// gets dt

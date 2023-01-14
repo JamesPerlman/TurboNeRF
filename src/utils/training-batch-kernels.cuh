@@ -189,12 +189,12 @@ __global__ void march_and_count_steps_per_ray_kernel(
 		} else {
 			// otherwise we need to find the next occupied cell
 			// TODO: feed in normalized positions so we don't have to calculate them here!
-			t = occ_grid->get_t_advanced_to_next_voxel(
+			t = occ_grid->get_dt_to_next_voxel(
 				bbox->pos_to_unit_x(x), bbox->pos_to_unit_y(y), bbox->pos_to_unit_z(z),
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
-				t, dt_min
-			);
+				dt_min
+			) * bbox->size_x;
 		}
 	}
 
@@ -330,12 +330,12 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 
 		} else {
 			// otherwise we need to find the next occupied cell
-			t = occ_grid->get_t_advanced_to_next_voxel(
+			t = occ_grid->get_dt_to_next_voxel(
 				bbox->pos_to_unit_x(x), bbox->pos_to_unit_y(y), bbox->pos_to_unit_z(z),
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
-				t, dt_min
-			);
+				dt_min
+			) * bbox->size_x;
 		}
 	}
 }

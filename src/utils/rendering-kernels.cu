@@ -151,12 +151,12 @@ __global__ void march_rays_and_generate_samples_kernel(
             break;
 		} else {
 			// otherwise we need to find the next occupied cell
-			t = occ_grid->get_t_advanced_to_next_voxel(
+			t += occ_grid->get_dt_to_next_voxel(
 				bbox->pos_to_unit_x(x), bbox->pos_to_unit_y(y), bbox->pos_to_unit_z(z),
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
-				t, dt_min
-			);
+				dt_min
+			) * bbox->size_x;
 		}
 	}
 }
