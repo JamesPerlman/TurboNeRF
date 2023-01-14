@@ -33,9 +33,9 @@ NeRFTrainingController::~NeRFTrainingController() {
 void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t batch_size) {
 	// This allocates memory for all the elements we need during training
 	workspace.enlarge(stream,
+		dataset.images.size(),
 		dataset.n_pixels_per_image,
 		dataset.n_channels_per_image,
-		dataset.images.size(),
 		batch_size,
 		n_occ_grid_levels,
 		occ_grid_resolution

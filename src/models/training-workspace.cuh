@@ -71,9 +71,9 @@ public:
 	// member functions
 	void TrainingWorkspace::enlarge(
 		const cudaStream_t& stream,
-		const uint32_t& n_images,
-		const uint32_t& n_pixels_per_image,
-		const uint32_t& n_channels_per_image,
+		const size_t& n_images,
+		const size_t& n_pixels_per_image,
+		const size_t& n_channels_per_image,
 		const uint32_t& n_samples_per_batch,
 		const uint32_t& n_occ_grid_levels,
 		const uint32_t& n_occ_grid_cells_per_dimension
@@ -81,8 +81,8 @@ public:
 		free_allocations();
 		
 		batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
-		uint32_t n_cameras = tcnn::next_multiple(n_images, tcnn::batch_size_granularity);
-		uint32_t n_pixel_elements = tcnn::next_multiple(n_channels_per_image * n_pixels_per_image * n_images, tcnn::batch_size_granularity);
+		uint32_t n_cameras = n_images;
+		size_t n_pixel_elements = n_channels_per_image * n_pixels_per_image * n_images;
 
 		// need to upgrade to C++20 to use typename parameters in lambdas :(
 		// auto alloc = []<typename T>(size_t size) { return allocate<T>(stream, size); };

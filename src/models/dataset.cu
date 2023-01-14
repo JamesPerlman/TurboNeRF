@@ -27,7 +27,7 @@ Dataset::Dataset(string file_path) {
     images.reserve(n_frames);
 
     image_dimensions = make_int2(json_data["w"], json_data["h"]);
-    n_pixels_per_image = image_dimensions.x * image_dimensions.y;
+    n_pixels_per_image = (uint32_t)image_dimensions.x * (uint32_t)image_dimensions.y;
     n_channels_per_image = 4;
     
     // TODO: per-camera focal length
