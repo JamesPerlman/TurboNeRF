@@ -142,6 +142,7 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
 		{"otype", "Adam"},
 		{"learning_rate", 1e-2},
 		{"epsilon", 1e-15},
+		{"l2_reg", 1e-6},
 	};
 
 	density_optimizer.reset(
@@ -193,7 +194,7 @@ void NerfNetwork::train(
 		target_rgba
 	);
 
-	printf("Loss: %f\n", mse_loss);
+	printf("Loss: %f / # Rays: %lu\n", mse_loss, n_rays);
 
 	// Backward
 	backward(stream, fwd_ctx, batch_size, workspace.normal_pos_batch, workspace.normal_dir_batch, target_rgba);
@@ -435,16 +436,6 @@ float NerfNetwork::calculate_loss(
 		target_rgba,
 		workspace.loss_buf,
 		workspace.pxdiff_buf
-	);
-
-	// Zero out the gradient buffer
-	CUDA_CHECK_THROW(
-		cudaMemsetAsync(
-			workspace.grad_buf,
-			0,
-			sizeof(network_precision_t) * color_network->padded_output_width() * batch_size,
-			stream
-		)
 	);
 	
 	// Calculate gradients
