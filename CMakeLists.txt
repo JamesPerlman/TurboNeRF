@@ -64,6 +64,7 @@ set(HEADERS
 	src/utils/coordinate-transformations.cuh
 	src/utils/cu-compactor.cuh
 	src/utils/gpu-image.cuh
+	src/utils/linalg/transform4f.cuh
 	src/utils/linalg.cuh
 	src/utils/parallel-utils.cuh
 	src/utils/rendering-kernels.cuh
