@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "dataset.h"
+#include "../utils/coordinate-transformations.cuh"
 
 using namespace std;
 using namespace filesystem;
@@ -46,7 +47,9 @@ Dataset::Dataset(string file_path) {
         float near = frame.value("near", 0.1f);
         float far = frame.value("far", 16.0f);
 
-        Matrix4f camera_matrix(frame["transform_matrix"]);
+        Matrix4f transform_matrix(frame["transform_matrix"]);
+
+        Matrix4f camera_matrix = nerf_to_nrc(transform_matrix);
         
         // TODO: per-camera dimensions
         cameras.emplace_back(near, far, focal_length, image_dimensions, sensor_size, camera_matrix);
