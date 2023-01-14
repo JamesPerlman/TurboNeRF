@@ -63,18 +63,18 @@ struct Transform4f
         const float m10_x_m23_m_m13_x_m20 = m10 * m23 - m13 * m20;
 
         return Transform4f{
-            +(m11_x_m22_m_m12_x_m21) * i_det,
-            -(m01 * m22 - m02 * m21) * i_det,
-            +(m01 * m12 - m02 * m11) * i_det,
-            -(m01 * (m12_x_m23_m_m13_x_m22) - m02 * (m11_x_m23_m_m13_x_m21) + m03 * (m11_x_m22_m_m12_x_m21)) * i_det,
-            -(m10_x_m22_m_m12_x_m20) * i_det,
-            +(m00 * m22 - m02 * m20) * i_det,
-            -(m00 * m12 - m02 * m10) * i_det,
-            +(m00 * (m12_x_m23_m_m13_x_m22) - m02 * (m10_x_m23_m_m13_x_m20) + m03 * (m10_x_m22_m_m12_x_m20)) * i_det,
-            +(m10_x_m21_m_m11_x_m20) * i_det,
-            -(m00 * m21 - m01 * m20) * i_det,
-            +(m00 * m11 - m01 * m10) * i_det,
-            -(m00 * (m11_x_m23_m_m13_x_m21) - m01 * (m10_x_m23_m_m13_x_m20) + m03 * (m10_x_m21_m_m11_x_m20)) * i_det,
+            + (m11_x_m22_m_m12_x_m21) * i_det,
+            - (m01 * m22 - m02 * m21) * i_det,
+            + (m01 * m12 - m02 * m11) * i_det,
+            - (m01 * (m12_x_m23_m_m13_x_m22) - m02 * (m11_x_m23_m_m13_x_m21) + m03 * (m11_x_m22_m_m12_x_m21)) * i_det,
+            - (m10_x_m22_m_m12_x_m20) * i_det,
+            + (m00 * m22 - m02 * m20) * i_det,
+            - (m00 * m12 - m02 * m10) * i_det,
+            + (m00 * (m12_x_m23_m_m13_x_m22) - m02 * (m10_x_m23_m_m13_x_m20) + m03 * (m10_x_m22_m_m12_x_m20)) * i_det,
+            + (m10_x_m21_m_m11_x_m20) * i_det,
+            - (m00 * m21 - m01 * m20) * i_det,
+            + (m00 * m11 - m01 * m10) * i_det,
+            - (m00 * (m11_x_m23_m_m13_x_m21) - m01 * (m10_x_m23_m_m13_x_m20) + m03 * (m10_x_m21_m_m11_x_m20)) * i_det,
         };
     }
 };
