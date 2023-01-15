@@ -39,33 +39,25 @@ struct NeRFNetworkWorkspace : Workspace {
         const uint32_t& direction_encoding_input_width,
         const uint32_t& direction_encoding_output_width,
         const uint32_t& color_network_input_width,
-        const uint32_t& color_network_output_width,
-        
-        const bool& for_training
+        const uint32_t& color_network_output_width
     ) {
         free_allocations();
 
         batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
-	
-        if (for_training) {
-            color_network_input = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);
-            color_network_output = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
 
-            density_network_dL_dinput = allocate<float>(stream, density_network_input_width * batch_size);
-            color_network_dL_dinput = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);
+        color_network_input = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);
+        color_network_output = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
 
-            trans_buf = allocate<float>(stream, batch_size);
-            alpha_buf = allocate<float>(stream, batch_size);
-            weight_buf = allocate<float>(stream, batch_size);
-            pxdiff_buf = allocate<float>(stream, 4 * batch_size);
-            ray_rgba = allocate<float>(stream, 4 * batch_size);
-            loss_buf = allocate<float>(stream, batch_size);
-            grad_buf = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
-        }
+        density_network_dL_dinput = allocate<float>(stream, density_network_input_width * batch_size);
+        color_network_dL_dinput = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);
 
-        normal_pos_batch = allocate<float>(stream, 3 * batch_size);
-        normal_dir_batch = allocate<float>(stream, 3 * batch_size);
-        normal_dt_batch = allocate<float>(stream, batch_size);
+        trans_buf = allocate<float>(stream, batch_size);
+        alpha_buf = allocate<float>(stream, batch_size);
+        weight_buf = allocate<float>(stream, batch_size);
+        pxdiff_buf = allocate<float>(stream, 4 * batch_size);
+        ray_rgba = allocate<float>(stream, 4 * batch_size);
+        loss_buf = allocate<float>(stream, batch_size);
+        grad_buf = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
     }
 };
 

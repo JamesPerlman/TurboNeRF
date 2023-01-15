@@ -176,11 +176,8 @@ void NerfNetwork::train(
 	
 	enlarge_workspace_if_needed(stream, batch_size);
 
-	// Normalize input for neural network
-	generate_normalized_network_input(stream, batch_size, pos_batch, dir_batch, dt_batch);
-
 	// Forward
-	auto fwd_ctx = forward(stream, batch_size, workspace.normal_pos_batch, workspace.normal_dir_batch);
+	auto fwd_ctx = forward(stream, batch_size, pos_batch, dir_batch);
 
 	// Loss
 	float mse_loss = calculate_loss(
@@ -190,39 +187,17 @@ void NerfNetwork::train(
 		n_samples,
 		ray_steps,
 		ray_steps_cum,
-		workspace.normal_dt_batch,
+		dt_batch,
 		target_rgba
 	);
 
 	printf("Loss: %f / # Rays: %lu\n", mse_loss, n_rays);
 
 	// Backward
-	backward(stream, fwd_ctx, batch_size, workspace.normal_pos_batch, workspace.normal_dir_batch, target_rgba);
+	backward(stream, fwd_ctx, batch_size, pos_batch, dir_batch, target_rgba);
 
 	// Optimizer
 	optimizer_step(stream);
-}
-
-// Normalizes input and saves it to the correct buffers (thank you @buriedanimal)
-// TODO: pass in n_samples
-void NerfNetwork::generate_normalized_network_input(
-	const cudaStream_t& stream,
-	const uint32_t& batch_size,
-	const float* pos_batch,
-	const float* dir_batch,
-	const float* dt_batch
-) {
-	// Normalize input for neural network
-	normalize_network_input_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
-		batch_size,
-		1.0f / aabb_size,
-		pos_batch,
-		dir_batch,
-		dt_batch,
-		workspace.normal_pos_batch,
-		workspace.normal_dir_batch,
-		workspace.normal_dt_batch
-	);
 }
 
 void NerfNetwork::inference(
@@ -235,14 +210,9 @@ void NerfNetwork::inference(
 	// color network output must have space available for (color_network->padded_output_width() * batch_size) elements of type network_precision_t
 	network_precision_t* color
 ) {
-	enlarge_workspace_if_needed(stream, batch_size);
-
-	// Normalize input
-	generate_normalized_network_input(stream, batch_size, pos_batch, dir_batch);
-
 	// Inference (density network)
 	GPUMatrixDynamic density_network_input_matrix(
-		workspace.normal_pos_batch,
+		pos_batch,
 		density_network->input_width(),
 		batch_size,
 		MatrixLayout::RowMajor
@@ -265,7 +235,7 @@ void NerfNetwork::inference(
 	network_precision_t* direction_encoding_output = sigma + density_network->padded_output_width() * batch_size;
 
 	GPUMatrixDynamic direction_encoding_input_matrix(
-		workspace.normal_dir_batch,
+		dir_batch,
 		direction_encoding->input_width(),
 		batch_size,
 		MatrixLayout::RowMajor
@@ -573,8 +543,7 @@ void NerfNetwork::enlarge_workspace_if_needed(const cudaStream_t& stream, const 
 		direction_encoding->input_width(),
 		direction_encoding->padded_output_width(),
 		color_network->input_width(),
-		color_network->padded_output_width(),
-		can_train
+		color_network->padded_output_width()
 	);
 
 	this->batch_size = batch_size;

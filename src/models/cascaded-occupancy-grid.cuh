@@ -21,31 +21,34 @@ NRC_NAMESPACE_BEGIN
 
 struct CascadedOccupancyGrid {
 private:
-	uint32_t n_levels;
+	int n_levels;
 	float resolution_f;
 	float inv_resolution_f;
+	float max_size;
+	float inv_size;
 	uint32_t resolution_i;
-
 
 public:
 	CascadedOccupancyGridWorkspace workspace;
 	// level is the power of two domain size (K from pg. 15 of Müller, et al. 2022)
 	// grid goes from [-2^(level - 1) + 0.5, 2^(level - 1) + 0.5] in each dimension
-	CascadedOccupancyGrid(const uint32_t& n_levels, const uint32_t& resolution = 128)
+	CascadedOccupancyGrid(const int& n_levels, const int& resolution = 128)
 		: n_levels(n_levels)
 		, resolution_i(resolution)
 		, resolution_f(resolution)
-		, inv_resolution_f(1.0f / (float)resolution)
+		, max_size(1 << (n_levels - 1))
+		, inv_size(1.0f / max_size)
+		, inv_resolution_f(resolution_f)
 	{};
 
 	CascadedOccupancyGrid() = default;
 
 	// class function to calculate number of bytes needed to store the grid
 	static inline NRC_HOST_DEVICE size_t get_n_total_elements(
-		const uint32_t& n_levels,
-		const uint32_t& grid_resolution = 128
+		const int& n_levels,
+		const int& grid_resolution = 128
 	) {
-		const uint32_t side_length = next_power_of_two(grid_resolution);
+		const int side_length = next_power_of_two(grid_resolution);
 		return (size_t)(n_levels * side_length * side_length * side_length);
 	}
 	
@@ -90,31 +93,30 @@ public:
 		return workspace.n_bitfield_elements;
 	}
 
-	// returns the total volume of the grid
+	// returns the total volume of a grid
 	inline NRC_HOST_DEVICE uint32_t volume() const {
 		return resolution_i * resolution_i * resolution_i;
 	}
 
-	// normalize a coordinate to [0, 1] within a grid at level k
-	inline NRC_HOST_DEVICE float3 get_normalized_coordinates(const uint32_t& k, const float& x, const float& y, const float& z) const {
-		const float scale = 1 << k;
-		return {
-			x / scale + 0.5f,
-			y / scale + 0.5f,
-			z / scale + 0.5f
-		};
+	
+	// get the size of the grid at a given level
+	inline NRC_HOST_DEVICE float get_level_size(const int& level) const {
+		return 1.0f / (float)(1 << level);
 	}
 	
 	// returns the index of the voxel containing the point
+	// assumes that xyz is in [0, 1]
 	inline NRC_HOST_DEVICE uint32_t get_voxel_morton_index(
-		const uint32_t& level,
+		const int& level,
 		const float& x, const float& y, const float& z
 	) const {
-		float scale = 1 << level;
+		// scale factor for each coordinate, based on the level
+		// converts [0, 1] -> [0, resolution] for the current level
+		const float s = 1.0f / (float)(1 << level);
 		
-		const uint32_t x_i = (x / scale + 0.5f) * resolution_f;
-		const uint32_t y_i = (y / scale + 0.5f) * resolution_f;
-		const uint32_t z_i = (z / scale + 0.5f) * resolution_f;
+		const uint32_t x_i = (x * s + 0.5f) * resolution_f;
+		const uint32_t y_i = (y * s + 0.5f) * resolution_f;
+		const uint32_t z_i = (z * s + 0.5f) * resolution_f;
 		
 		// using morton code (Z-order curve), from Müller, et al. 2022 (page 15, "Occupancy Grids")
 		return tcnn::morton3D(x_i, y_i, z_i);
@@ -122,11 +124,11 @@ public:
 	
 	// checks if the grid is occupied or not*
 	inline NRC_HOST_DEVICE bool is_occupied_at(
-		const uint8_t& level,
+		const int& level,
 		const float& x, const float& y, const float& z
 	) const {
 		const uint32_t byte_idx = get_voxel_morton_index(level, x, y, z) / 8;
-		const uint8_t bitmask = 1 << ((n_levels * byte_idx + level) % 8);
+		const uint8_t bitmask = 1 << ((n_levels * byte_idx + (uint32_t)level) % 8);
 		return workspace.bitfield[byte_idx] & bitmask;
 	}
 
@@ -142,11 +144,11 @@ public:
 	) const {
 		for (int k = 0; k < n_levels; ++k) {
 			const float level_size = 1 << k;
-			const float level_extent = 0.5f * level_size;
+			const float level_half_size = 0.5f * level_size;
 			const float cell_size = level_size * inv_resolution_f;
 			
 			// might be able to eliminate the = in <= here
-			const bool grid_k_covers_xyz = fabsf(x) <= level_extent && fabsf(y) <= level_extent && fabsf(z) <= level_extent;
+			const bool grid_k_covers_xyz = fabsf(x) <= level_half_size && fabsf(y) <= level_half_size && fabsf(z) <= level_half_size;
 			if (grid_k_covers_xyz && cell_size > dt_min) {
 				return k;
 			}
@@ -161,15 +163,17 @@ public:
 	inline NRC_HOST_DEVICE float get_t_to_next_voxel(
 		const float& ray_pos_x, const float& ray_pos_y, const float& ray_pos_z,
 		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
-		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z
+		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z,
+		const int& grid_level
 	) const {
-		const float x = ray_dir_x * resolution_f;
-		const float y = ray_dir_y * resolution_f;
-		const float z = ray_dir_z * resolution_f;
-
-		float tx = ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
-		float ty = ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
-		float tz = ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
+		const float i_level_size = 1.0f / get_level_size(grid_level);
+		const float x = (ray_pos_x * i_level_size + 0.5f) * resolution_f;
+		const float y = (ray_pos_y * i_level_size + 0.5f) * resolution_f;
+		const float z = (ray_pos_z * i_level_size + 0.5f) * resolution_f;
+		
+		const float tx = ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
+		const float ty = ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
+		const float tz = ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
 
 		return fmaxf(0.0f, fminf(fminf(tx, ty), tz)) / resolution_f;
 	}
@@ -180,13 +184,16 @@ public:
 		const float& ray_pos_x, const float& ray_pos_y, const float& ray_pos_z,
 		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
 		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z,
-		const float& dt_min
+		const float& dt_min,
+		const int& grid_level
 	) const {
 		const float t_target = get_t_to_next_voxel(
 			ray_pos_x, ray_pos_y, ray_pos_z,
 			ray_dir_x, ray_dir_y, ray_dir_z,
-			inv_dir_x, inv_dir_y, inv_dir_z
+			inv_dir_x, inv_dir_y, inv_dir_z,
+			grid_level
 		);
+
 		return ceilf(t_target / dt_min) * dt_min;
 	}
 

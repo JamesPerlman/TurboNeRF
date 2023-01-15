@@ -65,11 +65,12 @@ __global__ void generate_rays_pinhole_kernel(
     ray_idx[i] = idx;
 }
 
-__global__ void march_rays_and_generate_samples_kernel(
+__global__ void march_rays_and_generate_network_inputs_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
-	const BoundingBox* bbox,
 	const CascadedOccupancyGrid* occ_grid,
+	const BoundingBox* bbox,
+	const float inv_aabb_size,
 	const float dt_min,
 	const float dt_max,
 	const float cone_angle,
@@ -85,8 +86,9 @@ __global__ void march_rays_and_generate_samples_kernel(
     float* __restrict__ ray_t,
 
 	// output buffers (write-only)
-	float* __restrict__ sample_pos,
-	float* __restrict__ sample_dt
+	float* __restrict__ network_pos,
+	float* __restrict__ network_dir,
+	float* __restrict__ network_dt
 ) {
 	// get thread index
 	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -117,48 +119,54 @@ __global__ void march_rays_and_generate_samples_kernel(
 	// Perform raymarching
 
 	float t = ray_t[i];
-	uint32_t n_steps_taken = 0;
+	float dt = 0.0f;
+	float x, y, z;
 
 	while (true) {
 
-		const float x = o_x + t * d_x;
-		const float y = o_y + t * d_y;
-		const float z = o_z + t * d_z;
+		t += dt;
+
+		x = o_x + t * d_x;
+		y = o_y + t * d_y;
+		z = o_z + t * d_z;
 
 		if (!bbox->contains(x, y, z)) {
-            ray_alive[i] = false;
-			sample_pos[i_offset_0] = x;
-			sample_pos[i_offset_1] = y;
-			sample_pos[i_offset_2] = z;
+			ray_alive[i] = false;
 			break;
 		}
 
-		int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
+		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			// if grid is occupied here, march forward by a calculated dt
-			float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-
-			sample_pos[i_offset_0] = x;
-			sample_pos[i_offset_1] = y;
-			sample_pos[i_offset_2] = z;
+			dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 
 			// march t forward
 			ray_t[i] = t + dt;
-            sample_dt[i] = dt;
 
+			network_pos[i_offset_0] = x * inv_aabb_size + 0.5f;
+			network_pos[i_offset_1] = y * inv_aabb_size + 0.5f;
+			network_pos[i_offset_2] = z * inv_aabb_size + 0.5f;
+			
+			network_dir[i_offset_0] = d_x * 0.5f + 0.5f;
+			network_dir[i_offset_1] = d_x * 0.5f + 0.5f;
+			network_dir[i_offset_2] = d_x * 0.5f + 0.5f;
+
+			network_dt[i] = dt * inv_aabb_size;
             // for now, we only march samples once.
             break;
 		} else {
 			// otherwise we need to find the next occupied cell
-			t += occ_grid->get_dt_to_next_voxel(
-				bbox->pos_to_unit_x(x), bbox->pos_to_unit_y(y), bbox->pos_to_unit_z(z),
+			dt = occ_grid->get_dt_to_next_voxel(
+				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
-				dt_min
-			) * bbox->size_x;
+				dt_min,
+				grid_level
+			);
 		}
 	}
+
 }
 
 // ray compaction
@@ -260,7 +268,7 @@ __global__ void composite_samples_kernel(
     const float s_b = network_rgb[i_offset_2];
 
 	// sample sigma
-	const float sigma_dt = (float)network_sigma[i] * sample_dt[i] / 16.0f;
+	const float sigma_dt = (float)network_sigma[i] * sample_dt[i];
 
     // sample alpha
     const float s_a = 1.0f - __expf(-sigma_dt);

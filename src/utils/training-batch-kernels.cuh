@@ -178,23 +178,24 @@ __global__ void march_and_count_steps_per_ray_kernel(
 			break;
 		}
 
-		int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
+		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			// if grid is occupied here, march forward by a calculated dt
-			float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+			const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 			t += dt;
 
 			++n_steps_taken;
 		} else {
 			// otherwise we need to find the next occupied cell
 			// TODO: feed in normalized positions so we don't have to calculate them here!
-			t = occ_grid->get_dt_to_next_voxel(
-				bbox->pos_to_unit_x(x), bbox->pos_to_unit_y(y), bbox->pos_to_unit_z(z),
+			t += occ_grid->get_dt_to_next_voxel(
+				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
-				dt_min
-			) * bbox->size_x;
+				dt_min,
+				grid_level
+			);
 		}
 	}
 
@@ -285,11 +286,11 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			break;
 		}
 
-		int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
+		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			// if grid is occupied here, march forward by a calculated dt
-			float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+			const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 
 			/**
 			 * Here is where we assign training data to our compacted sample buffers.
@@ -330,12 +331,13 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 
 		} else {
 			// otherwise we need to find the next occupied cell
-			t = occ_grid->get_dt_to_next_voxel(
-				bbox->pos_to_unit_x(x), bbox->pos_to_unit_y(y), bbox->pos_to_unit_z(z),
+			t += occ_grid->get_dt_to_next_voxel(
+				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
-				dt_min
-			) * bbox->size_x;
+				dt_min,
+				grid_level
+			);
 		}
 	}
 }
@@ -343,15 +345,18 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 /**
  * This kernel uses the t0 and t1 values to generate the sample positions.
  * We stratify the sample points using a buffer of random offsets and interpolate between t0 and t1 linearly.
+ * We also convert unit directions in [-1, 1] to normalized directions in [0, 1]
  */
-__global__ void generate_stratified_sample_pos_kernel(
+__global__ void generate_network_inputs_kernel(
 	uint32_t batch_size,
+	float inv_aabb_size,
 	const float* __restrict__ t0,
 	const float* __restrict__ t1,
 	const float* __restrict__ random_float,
-	const float* __restrict__ in_ori_xyz,
-	const float* __restrict__ in_dir_xyz,
+	const float* __restrict__ in_xyz,
+	const float* __restrict__ in_dir,
 	float* __restrict__ out_xyz,
+	float* __restrict__ out_dir,
 	float* __restrict__ out_dt
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -369,23 +374,28 @@ __global__ void generate_stratified_sample_pos_kernel(
 	
 	const float k = random_float[i_offset_0];
 	
-	const float o_x = in_ori_xyz[i_offset_0];
-	const float o_y = in_ori_xyz[i_offset_1];
-	const float o_z = in_ori_xyz[i_offset_2];
+	const float o_x = in_xyz[i_offset_0];
+	const float o_y = in_xyz[i_offset_1];
+	const float o_z = in_xyz[i_offset_2];
 	
-	const float d_x = in_dir_xyz[i_offset_0];
-	const float d_y = in_dir_xyz[i_offset_1];
-	const float d_z = in_dir_xyz[i_offset_2];
+	const float d_x = in_dir[i_offset_0];
+	const float d_y = in_dir[i_offset_1];
+	const float d_z = in_dir[i_offset_2];
 
 	// Calculate sample position
 	const float dt = t1_i - t0_i;
 	const float t = t0_i + dt * k;
 
-	out_xyz[i_offset_0] = o_x + t * d_x;
-	out_xyz[i_offset_1] = o_y + t * d_y;
-	out_xyz[i_offset_2] = o_z + t * d_z;
+	out_dt[i_offset_0] = dt * inv_aabb_size;
 
-	out_dt[i_offset_0] = dt;
+	out_xyz[i_offset_0] = (o_x + t * d_x) * inv_aabb_size + 0.5f;
+	out_xyz[i_offset_1] = (o_y + t * d_y) * inv_aabb_size + 0.5f;
+	out_xyz[i_offset_2] = (o_z + t * d_z) * inv_aabb_size + 0.5f;
+
+	out_dir[i_offset_0] = (d_x + 1.0f) * 0.5f;
+	out_dir[i_offset_1] = (d_y + 1.0f) * 0.5f;
+	out_dir[i_offset_2] = (d_z + 1.0f) * 0.5f;
 }
+
 
 NRC_NAMESPACE_END

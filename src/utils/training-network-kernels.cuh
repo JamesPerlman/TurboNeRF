@@ -206,41 +206,4 @@ __global__ void calculate_network_output_gradient(
 	grad[i_offset_3] = (tcnn::network_precision_t)(loss_scale * inv_2npix * (1.0f - 2.0f * alpha) * (dt * trans) * (dr * sr + dg * sg + db * sb + da));
 }
 
-/**
- * Normalization and inversion kernels
- * We need to normalize data for the neural network, and then convert the coordinates back to world space after the network has processed the data
- */
-
-__global__ void normalize_network_input_kernel(
-	const uint32_t batch_size,
-	const float inv_bbox_size, // 1 / (2 * bbox_size)
-	const float* __restrict__ in_sample_pos, // input positions are assumed to be in [-bbox_size, bbox_size]
-	const float* __restrict__ in_sample_dir, // input dirs are assumed to be normalized
-	const float* __restrict__ in_sample_dt,
-	float* __restrict__ out_sample_pos, // output positions are transformed to [0, 1]
-	float* __restrict__ out_sample_dir, // output dirs are transformed to [0, 1]
-	float* __restrict__ out_sample_dt
-) {
-	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-	if (i >= batch_size) {
-		return;
-	}
-
-	const uint32_t i_offset_0 = i;
-	const uint32_t i_offset_1 = i_offset_0 + batch_size;
-	const uint32_t i_offset_2 = i_offset_1 + batch_size;
-
-	out_sample_pos[i_offset_0] = tcnn::clamp(in_sample_pos[i_offset_0] * inv_bbox_size + 0.5f, 0.0f, 1.0f);
-	out_sample_pos[i_offset_1] = tcnn::clamp(in_sample_pos[i_offset_1] * inv_bbox_size + 0.5f, 0.0f, 1.0f);
-	out_sample_pos[i_offset_2] = tcnn::clamp(in_sample_pos[i_offset_2] * inv_bbox_size + 0.5f, 0.0f, 1.0f);
-
-	out_sample_dir[i_offset_0] = in_sample_dir[i_offset_0] * 0.5f + 0.5f;
-	out_sample_dir[i_offset_1] = in_sample_dir[i_offset_1] * 0.5f + 0.5f;
-	out_sample_dir[i_offset_2] = in_sample_dir[i_offset_2] * 0.5f + 0.5f;
-
-	if (in_sample_dt != nullptr) {
-		out_sample_dt[i] = inv_bbox_size * in_sample_dt[i];
-	}
-}
-
 NRC_NAMESPACE_END

@@ -83,15 +83,7 @@ private:
 		std::unique_ptr<tcnn::Context> density_ctx;
 		std::unique_ptr<tcnn::Context> color_ctx;
 	};
-
-	void generate_normalized_network_input(
-		const cudaStream_t& stream,
-		const uint32_t& batch_size,
-		const float* pos_batch,
-		const float* dir_batch,
-		const float* dt_batch = nullptr
-	);
-
+	
 	std::unique_ptr<ForwardContext> forward(
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,

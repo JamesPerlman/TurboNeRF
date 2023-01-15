@@ -135,11 +135,12 @@ void NeRFRenderingController::request_render(
         while (n_rays_alive > 0) {
             // march each ray one step
             // TODO: should we march potentially multiple steps to maximize occupancy?
-            march_rays_and_generate_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+            march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
                 batch_size,
-                workspace.bounding_box,
                 workspace.occupancy_grid,
+                workspace.bounding_box,
+                1.0f / nerf->bounding_box.size_x,
                 dt_min,
                 dt_max,
                 cone_angle,
@@ -149,16 +150,17 @@ void NeRFRenderingController::request_render(
                 workspace.ray_alive,
                 workspace.ray_active[active_buf_idx],
                 workspace.ray_t[active_buf_idx],
-                workspace.sample_pos,
-                workspace.sample_dt
+                workspace.network_pos,
+                workspace.network_dir,
+                workspace.network_dt
             );
 
             // query the NeRF network for the samples
             nerf->network.inference(
                 stream,
                 batch_size,
-                workspace.sample_pos,
-                workspace.ray_dir[active_buf_idx],
+                workspace.network_pos,
+                workspace.network_dir,
                 workspace.network_sigma,
                 workspace.network_color
             );
@@ -170,7 +172,7 @@ void NeRFRenderingController::request_render(
                 request.output.stride,
                 workspace.network_sigma,
                 workspace.network_color,
-                workspace.sample_dt,
+                workspace.network_dt,
                 workspace.ray_idx[active_buf_idx],
                 workspace.ray_active[active_buf_idx],
                 workspace.ray_alive,

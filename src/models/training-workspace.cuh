@@ -54,10 +54,11 @@ public:
 	// ray t components
 	float* sample_t0; // t_start
 	float* sample_t1; // t_end
-	float* sample_dt;
 
-	// sample position components
-	float* sample_pos;
+	// normalized network input
+    float* network_pos;
+	float* network_dir;
+    float* network_dt;
 
 	CascadedOccupancyGrid* occ_grid;
 
@@ -87,6 +88,7 @@ public:
 		// need to upgrade to C++20 to use typename parameters in lambdas :(
 		// auto alloc = []<typename T>(size_t size) { return allocate<T>(stream, size); };
 
+		occ_grid 		= allocate<CascadedOccupancyGrid>(stream, 1);
 		bounding_box 	= allocate<BoundingBox>(stream, 1);
 		image_data 		= allocate<stbi_uc>(stream, n_pixel_elements);
 
@@ -109,12 +111,11 @@ public:
 
 		sample_t0 		= allocate<float>(stream, batch_size);
 		sample_t1 		= allocate<float>(stream, batch_size);
-		sample_dt 		= allocate<float>(stream, batch_size);
-		sample_pos 		= allocate<float>(stream, 3 * batch_size);
-
-		occ_grid 		= allocate<CascadedOccupancyGrid>(stream, 1);
+		
+		network_pos		= allocate<float>(stream, 3 * batch_size);
+		network_dir		= allocate<float>(stream, 3 * batch_size);
+		network_dt		= allocate<float>(stream, batch_size);
 	}
-
 
 private:
 	tcnn::GPUMemoryArena::Allocation arena_allocation;

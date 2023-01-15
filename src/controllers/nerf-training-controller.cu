@@ -208,15 +208,17 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	);
 
 	// Generate stratified sampling positions
-	generate_stratified_sample_pos_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
+	generate_network_inputs_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
 		workspace.batch_size,
+		1.0f / dataset.bounding_box.size_x,
 		workspace.sample_t0,
 		workspace.sample_t1,
 		workspace.random_float,
 		workspace.sample_origin,
 		workspace.sample_dir,
-		workspace.sample_pos,
-		workspace.sample_dt
+		workspace.network_pos,
+		workspace.network_dir,
+		workspace.network_dt
 	);
 
 	// Count the number of rays actually used to fill the sample batch
@@ -252,9 +254,9 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 		n_samples_in_batch,
 		workspace.ray_steps,
 		workspace.ray_steps_cum,
-		workspace.sample_pos,
-		workspace.sample_dir,
-		workspace.sample_dt,
+		workspace.network_pos,
+		workspace.network_dir,
+		workspace.network_dt,
 		workspace.pix_rgba
 	);
 

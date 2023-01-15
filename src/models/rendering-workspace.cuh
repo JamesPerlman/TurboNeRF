@@ -39,8 +39,9 @@ struct RenderingWorkspace: Workspace {
 	uint32_t* ray_idx[2]; 
 	
 	// samples
-	float* sample_pos;
-	float* sample_dt;
+	float* network_pos;
+	float* network_dir;
+	float* network_dt;
 
 	// network buffers
 	tcnn::network_precision_t* network_sigma;
@@ -103,8 +104,9 @@ struct RenderingWorkspace: Workspace {
 		ray_sigma[1]	= ray_sigma[0] + batch_size;
 
 		// samples
-		sample_pos		= allocate<float>(stream, 3 * batch_size);
-		sample_dt		= allocate<float>(stream, batch_size);
+		network_pos		= allocate<float>(stream, 3 * batch_size);
+		network_dir		= allocate<float>(stream, 3 * batch_size);
+		network_dt		= allocate<float>(stream, batch_size);
 
 		// network
 		network_sigma	= allocate<tcnn::network_precision_t>(stream, n_network_sigma_elements * batch_size);
