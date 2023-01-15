@@ -7,7 +7,8 @@
 NRC_NAMESPACE_BEGIN
 
 // https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
-inline NRC_HOST_DEVICE uint32_t next_power_of_two(uint32_t v) {
+template <typename T>
+inline NRC_HOST_DEVICE T next_power_of_two(T v) {
     v--;
     v |= v >> 1;
     v |= v >> 2;
