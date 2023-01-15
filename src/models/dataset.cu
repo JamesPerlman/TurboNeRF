@@ -44,7 +44,7 @@ Dataset::Dataset(string file_path) {
 
 
     for (json frame : json_data["frames"]) {
-        float near = frame.value("near", 0.1f);
+        float near = frame.value("near", 2.0f);
         float far = frame.value("far", 16.0f);
 
         Matrix4f transform_matrix(frame["transform_matrix"]);
