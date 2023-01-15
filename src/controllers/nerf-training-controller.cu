@@ -30,7 +30,10 @@ NeRFTrainingController::~NeRFTrainingController() {
 
 // NeRFTrainingController member functions
 
-void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t batch_size) {
+void NeRFTrainingController::prepare_for_training(
+	const cudaStream_t& stream,
+	const uint32_t& batch_size
+) {
 	// This allocates memory for all the elements we need during training
 	workspace.enlarge(stream,
 		dataset.images.size(),
@@ -38,7 +41,9 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 		dataset.n_channels_per_image,
 		batch_size,
 		n_occ_grid_levels,
-		occ_grid_resolution
+		occ_grid_resolution,
+		nerf->network.get_color_network_input_width(),
+		nerf->network.get_color_network_output_width()
 	);
 
 	// Create a CascadedOccupancyGrid object and copy it to the GPU
@@ -73,7 +78,7 @@ void NeRFTrainingController::prepare_for_training(cudaStream_t stream, uint32_t 
 	nerf->network.prepare_for_training(stream);
 }
 
-void NeRFTrainingController::load_images(cudaStream_t stream) {
+void NeRFTrainingController::load_images(const cudaStream_t& stream) {
 	// make sure images are all loaded into CPU and GPU
 	size_t n_image_elements = dataset.n_channels_per_image * dataset.n_pixels_per_image;
 	size_t image_size = n_image_elements * sizeof(stbi_uc);
@@ -257,7 +262,9 @@ void NeRFTrainingController::train_step(cudaStream_t stream) {
 		workspace.network_pos,
 		workspace.network_dir,
 		workspace.network_dt,
-		workspace.pix_rgba
+		workspace.pix_rgba,
+		workspace.network_sigma,
+		workspace.network_color
 	);
 
 	++training_step;

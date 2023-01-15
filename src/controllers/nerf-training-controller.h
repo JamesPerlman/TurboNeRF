@@ -27,9 +27,9 @@ struct NeRFTrainingController {
 	// public properties
 
 	// public methods
-	void prepare_for_training(cudaStream_t stream, uint32_t batch_size);
-	void load_images(cudaStream_t stream);
-	void train_step(cudaStream_t stream);
+	void prepare_for_training(const cudaStream_t& stream, const uint32_t& batch_size);
+	void load_images(const cudaStream_t& stream);
+	void train_step(const cudaStream_t& stream);
 
 	uint32_t get_training_step() const {
 		return training_step;

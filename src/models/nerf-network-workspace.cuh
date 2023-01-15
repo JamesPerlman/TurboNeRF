@@ -10,9 +10,6 @@ NRC_NAMESPACE_BEGIN
 struct NeRFNetworkWorkspace : Workspace {
     uint32_t batch_size;
 
-    tcnn::network_precision_t* color_network_input;
-    tcnn::network_precision_t* color_network_output;
-
     // gradient calculation buffers
     float* trans_buf;
     float* alpha_buf;
@@ -21,11 +18,6 @@ struct NeRFNetworkWorkspace : Workspace {
     float* ray_rgba; // accumulated ray colors from samples
     float* loss_buf;
     tcnn::network_precision_t* grad_buf;
-
-	// buffers for normalized data
-    float* normal_pos_batch;
-    float* normal_dir_batch;
-    float* normal_dt_batch;
 
 	// buffers for backpropagation
     float* density_network_dL_dinput;
@@ -44,9 +36,6 @@ struct NeRFNetworkWorkspace : Workspace {
         free_allocations();
 
         batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
-
-        color_network_input = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);
-        color_network_output = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
 
         density_network_dL_dinput = allocate<float>(stream, density_network_input_width * batch_size);
         color_network_dL_dinput = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);

@@ -35,7 +35,9 @@ struct NerfNetwork {
 		float* pos_batch,
 		float* dir_batch,
 		float* dt_batch,
-		float* target_rgba
+		float* target_rgba,
+		tcnn::network_precision_t* network_sigma,
+		tcnn::network_precision_t* network_color
 	);
 
 	void NerfNetwork::inference(
@@ -83,12 +85,14 @@ private:
 		std::unique_ptr<tcnn::Context> density_ctx;
 		std::unique_ptr<tcnn::Context> color_ctx;
 	};
-	
+
 	std::unique_ptr<ForwardContext> forward(
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,
 		float* pos_batch,
-		float* dir_batch
+		float* dir_batch,
+		tcnn::network_precision_t* network_sigma,
+		tcnn::network_precision_t* network_color
 	);
 
 	float calculate_loss(
@@ -99,7 +103,9 @@ private:
 		const uint32_t* ray_steps,
 		const uint32_t* ray_steps_cumulative,
 		const float* sample_dt,
-		const float* target_rgba
+		const float* target_rgba,
+		const tcnn::network_precision_t* network_sigma,
+		const tcnn::network_precision_t* network_color
 	);
 
 	void optimizer_step(const cudaStream_t& stream);

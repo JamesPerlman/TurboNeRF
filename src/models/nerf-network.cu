@@ -171,13 +171,22 @@ void NerfNetwork::train(
 	float* pos_batch,
 	float* dir_batch,
 	float* dt_batch,
-	float* target_rgba
+	float* target_rgba,
+	network_precision_t* network_sigma,
+	network_precision_t* network_color
 ) {
 	
 	enlarge_workspace_if_needed(stream, batch_size);
 
 	// Forward
-	auto fwd_ctx = forward(stream, batch_size, pos_batch, dir_batch);
+	auto fwd_ctx = forward(
+		stream,
+		batch_size,
+		pos_batch,
+		dir_batch,
+		network_sigma,
+		network_color
+	);
 
 	// Loss
 	float mse_loss = calculate_loss(
@@ -188,7 +197,9 @@ void NerfNetwork::train(
 		ray_steps,
 		ray_steps_cum,
 		dt_batch,
-		target_rgba
+		target_rgba,
+		network_sigma,
+		network_color
 	);
 
 	printf("Loss: %f / # Rays: %lu\n", mse_loss, n_rays);
@@ -280,7 +291,9 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	const cudaStream_t& stream,
 	const uint32_t& batch_size,
 	float* pos_batch,
-	float* dir_batch
+	float* dir_batch,
+	network_precision_t* network_sigma,
+	network_precision_t* network_color
 ) {
 	auto fwd_ctx = std::make_unique<ForwardContext>();
 
@@ -295,7 +308,7 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 
 	// Here we make the output of the density network a pointer to the first half of the color network's input buffer.
 	fwd_ctx->density_network_output_matrix = GPUMatrixDynamic(
-		workspace.color_network_input, 			// density network output = color network input
+		network_sigma,				 			// density network output = color network input
 		density_network->output_width(), 		// rows
 		batch_size,								// cols
 		MatrixLayout::RowMajor
@@ -310,9 +323,9 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	);
 
 	// Encode directions (dir_batch)
-	// Direction encoding gets concatenated with density_network_output (which will just be the second half of color_network_input)
+	// Direction encoding gets concatenated with density_network_output (which will just be the second half of network_sigma)
 
-	network_precision_t* direction_encoding_output = workspace.color_network_input + density_network->output_width() * batch_size;
+	network_precision_t* direction_encoding_output = network_sigma + density_network->padded_output_width() * batch_size;
 
 	fwd_ctx->direction_encoding_input_matrix = GPUMatrixDynamic(
 		dir_batch,									// pointer to source data
@@ -337,14 +350,14 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	// Perform the forward pass on the color network
 
 	fwd_ctx->color_network_input_matrix = GPUMatrixDynamic(
-		workspace.color_network_input,			// pointer to source data
+		network_sigma,							// pointer to source data
 		color_network->input_width(),			// matrix rows
 		batch_size,								// matrix columns
 		MatrixLayout::RowMajor
 	);
 
 	fwd_ctx->color_network_output_matrix = GPUMatrixDynamic(
-		workspace.color_network_output,			// pointer to destination data
+		network_color,							// pointer to destination data
 		color_network->padded_output_width(),	// matrix rows
 		batch_size,								// matrix columns
 		MatrixLayout::RowMajor
@@ -369,7 +382,9 @@ float NerfNetwork::calculate_loss(
 	const uint32_t* ray_steps,
 	const uint32_t* ray_steps_cum,
 	const float* sample_dt,
-	const float* target_rgba
+	const float* target_rgba,
+	const network_precision_t* network_sigma,
+	const network_precision_t* network_color
 ) {
 
 	float n_raysf = n_rays;
@@ -380,15 +395,14 @@ float NerfNetwork::calculate_loss(
 	 * https://arxiv.org/abs/2201.05989 - Muller, et al. page 9
 	 * 
 	 */
-	const tcnn::network_precision_t* log_space_density = workspace.color_network_input;
 
 	accumulate_ray_colors_from_samples_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		ray_steps,
 		ray_steps_cum,
-		workspace.color_network_output,
-		log_space_density,
+		network_sigma,
+		network_color,
 		sample_dt,
 		workspace.ray_rgba,
 		workspace.trans_buf,
@@ -413,7 +427,7 @@ float NerfNetwork::calculate_loss(
 		n_samples,
 		batch_size,
 		1.0f / (2.0f * n_raysf),
-		workspace.color_network_output,
+		network_color,
 		workspace.pxdiff_buf,
 		sample_dt,
 		workspace.trans_buf,
@@ -488,7 +502,8 @@ void NerfNetwork::backward(
 		MatrixLayout::RowMajor
 	);
 
-	// overwrite density_network_dL_doutput with manually calculated loss
+	// overwrite density_network_dL_doutput with manually calculated gradient
+
 	CUDA_CHECK_THROW(
 		cudaMemcpyAsync(
 			density_network_dL_doutput_matrix.data(),

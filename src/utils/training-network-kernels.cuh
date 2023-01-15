@@ -23,8 +23,8 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	const uint32_t* __restrict__ n_samples_cum,
 
 	// these input buffers organized based on the cumulative steps
-	const tcnn::network_precision_t* __restrict__ network_rgb,
 	const tcnn::network_precision_t* __restrict__ network_sigma,
+	const tcnn::network_precision_t* __restrict__ network_color,
 	const float* __restrict__ sample_dt,
 
 	// output buffers
@@ -42,7 +42,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	const uint32_t n_samples = n_samples_per_ray[i];
 	const uint32_t sample_offset = n_samples_cum[i] - n_samples;
 
-	const tcnn::network_precision_t* __restrict__ s_r = network_rgb + sample_offset;
+	const tcnn::network_precision_t* __restrict__ s_r = network_color + sample_offset;
 	const tcnn::network_precision_t* __restrict__ s_g = s_r + batch_size;
 	const tcnn::network_precision_t* __restrict__ s_b = s_g + batch_size;
 
@@ -157,7 +157,6 @@ __global__ void calculate_network_output_gradient(
 	const float* __restrict__ sample_trans,
 	const float* __restrict__ sample_alpha,
 	const float* __restrict__ sample_weight,
-
 	const float loss_scale,
 
 	// output

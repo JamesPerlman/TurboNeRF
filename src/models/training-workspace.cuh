@@ -60,6 +60,9 @@ public:
 	float* network_dir;
     float* network_dt;
 
+	tcnn::network_precision_t* network_sigma;
+	tcnn::network_precision_t* network_color;
+
 	CascadedOccupancyGrid* occ_grid;
 
 	// GPUMemory managed properties
@@ -77,7 +80,9 @@ public:
 		const size_t& n_channels_per_image,
 		const uint32_t& n_samples_per_batch,
 		const uint32_t& n_occ_grid_levels,
-		const uint32_t& n_occ_grid_cells_per_dimension
+		const uint32_t& n_occ_grid_cells_per_dimension,
+		const size_t& n_network_sigma_elements,
+		const size_t& n_network_color_elements
 	) {
 		free_allocations();
 		
@@ -92,7 +97,7 @@ public:
 		bounding_box 	= allocate<BoundingBox>(stream, 1);
 		image_data 		= allocate<stbi_uc>(stream, n_pixel_elements);
 
-		random_float 	= allocate<float>(stream, batch_size);
+		random_float 	= allocate<float>(stream, 3 * batch_size);
 
 		img_index 		= allocate<uint32_t>(stream, batch_size);
 		pix_index 		= allocate<uint32_t>(stream, batch_size);
@@ -115,6 +120,9 @@ public:
 		network_pos		= allocate<float>(stream, 3 * batch_size);
 		network_dir		= allocate<float>(stream, 3 * batch_size);
 		network_dt		= allocate<float>(stream, batch_size);
+		
+		network_sigma	= allocate<tcnn::network_precision_t>(stream, n_network_sigma_elements * batch_size);
+		network_color	= allocate<tcnn::network_precision_t>(stream, n_network_color_elements * batch_size);
 	}
 
 private:
