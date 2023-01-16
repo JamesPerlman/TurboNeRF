@@ -25,6 +25,7 @@ __global__ void generate_rays_pinhole_kernel(
 __global__ void march_rays_and_generate_network_inputs_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
+	const uint32_t network_stride,
 	const CascadedOccupancyGrid* occ_grid,
 	const BoundingBox* bbox,
 	const float inv_aabb_size, // TODO: get rid of this arg
@@ -74,7 +75,7 @@ __global__ void compact_rays_kernel(
 
 __global__ void composite_samples_kernel(
     const uint32_t n_samples,
-    const uint32_t batch_size,
+	const uint32_t network_stride,
 	const uint32_t output_stride,
     
     // read-only

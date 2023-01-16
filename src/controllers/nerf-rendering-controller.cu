@@ -2,9 +2,9 @@
 #include "nerf-rendering-controller.h"
 #include "../models/camera.cuh"
 #include "../utils/cu-compactor.cuh"
-#include "../utils/rendering-kernels.cuh"
+#include "../utils/nerf-constants.cuh"
 #include "../utils/parallel-utils.cuh"
-#include "../utils/gpu-image.cuh"
+#include "../utils/rendering-kernels.cuh"
 
 using namespace nrc;
 using namespace tcnn;
@@ -124,20 +124,23 @@ void NeRFRenderingController::request_render(
         CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_active[active_buf_idx], true, batch_size * sizeof(bool), stream));
 
         
-        float dt_min = sqrtf(3.0f) / 1024.0f;
-        float dt_max = nerf->bounding_box.size_x * sqrtf(3.0f) / 1024.0f;
-        const float cone_angle = 1.0f;
+        float dt_min = NeRFConstants::min_step_size;
+        float dt_max = nerf->bounding_box.size_x * dt_min;
+        const float cone_angle = 1.0f; // ???
 
         // ray marching loop
         uint32_t n_rays_alive = n_rays;
 
         // TODO: march rays to bounding box first
         while (n_rays_alive > 0) {
+            uint32_t network_batch = tcnn::next_multiple(n_rays_alive, tcnn::batch_size_granularity);
+
             // march each ray one step
             // TODO: should we march potentially multiple steps to maximize occupancy?
             march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
                 batch_size,
+                network_batch,
                 workspace.occupancy_grid,
                 workspace.bounding_box,
                 1.0f / nerf->bounding_box.size_x,
@@ -158,7 +161,7 @@ void NeRFRenderingController::request_render(
             // query the NeRF network for the samples
             nerf->network.inference(
                 stream,
-                batch_size,
+                network_batch,
                 workspace.network_pos,
                 workspace.network_dir,
                 workspace.network_sigma,
@@ -168,7 +171,7 @@ void NeRFRenderingController::request_render(
             // accumulate these samples into the pixel colors
             composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
-                batch_size,
+                network_batch,
                 request.output.stride,
                 workspace.network_sigma,
                 workspace.network_color,

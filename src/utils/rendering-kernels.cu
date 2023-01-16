@@ -68,6 +68,7 @@ __global__ void generate_rays_pinhole_kernel(
 __global__ void march_rays_and_generate_network_inputs_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
+	const uint32_t network_stride,
 	const CascadedOccupancyGrid* occ_grid,
 	const BoundingBox* bbox,
 	const float inv_aabb_size,
@@ -103,6 +104,10 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const uint32_t i_offset_0 = i;
 	const uint32_t i_offset_1 = i_offset_0 + batch_size;
 	const uint32_t i_offset_2 = i_offset_1 + batch_size;
+
+	const uint32_t net_offset_0 = i;
+	const uint32_t net_offset_1 = net_offset_0 + network_stride;
+	const uint32_t net_offset_2 = net_offset_1 + network_stride;
 
 	const float o_x = ray_ori[i_offset_0];
 	const float o_y = ray_ori[i_offset_1];
@@ -144,13 +149,13 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			// march t forward
 			ray_t[i] = t + dt;
 
-			network_pos[i_offset_0] = x * inv_aabb_size + 0.5f;
-			network_pos[i_offset_1] = y * inv_aabb_size + 0.5f;
-			network_pos[i_offset_2] = z * inv_aabb_size + 0.5f;
+			network_pos[net_offset_0] = x * inv_aabb_size + 0.5f;
+			network_pos[net_offset_1] = y * inv_aabb_size + 0.5f;
+			network_pos[net_offset_2] = z * inv_aabb_size + 0.5f;
 			
-			network_dir[i_offset_0] = d_x * 0.5f + 0.5f;
-			network_dir[i_offset_1] = d_x * 0.5f + 0.5f;
-			network_dir[i_offset_2] = d_x * 0.5f + 0.5f;
+			network_dir[net_offset_0] = d_x * 0.5f + 0.5f;
+			network_dir[net_offset_1] = d_x * 0.5f + 0.5f;
+			network_dir[net_offset_2] = d_x * 0.5f + 0.5f;
 
 			network_dt[i] = dt * inv_aabb_size;
             // for now, we only march samples once.
@@ -234,7 +239,7 @@ __global__ void compact_rays_kernel(
 // alpha compositing kernel, composites the latest samples into the output image
 __global__ void composite_samples_kernel(
     const uint32_t n_samples,
-	const uint32_t batch_size,
+	const uint32_t network_stride,
 	const uint32_t output_stride,
     
     // read-only
@@ -259,13 +264,13 @@ __global__ void composite_samples_kernel(
     // grab local references to global memory
 
     // sample colors
-    const uint32_t i_offset_0 = i;
-    const uint32_t i_offset_1 = i_offset_0 + batch_size;
-    const uint32_t i_offset_2 = i_offset_1 + batch_size;
+    const uint32_t net_offset_0 = i;
+    const uint32_t net_offset_1 = net_offset_0 + network_stride;
+    const uint32_t net_offset_2 = net_offset_1 + network_stride;
 
-    const float s_r = network_rgb[i_offset_0];
-    const float s_g = network_rgb[i_offset_1];
-    const float s_b = network_rgb[i_offset_2];
+    const float s_r = network_rgb[net_offset_0];
+    const float s_g = network_rgb[net_offset_1];
+    const float s_b = network_rgb[net_offset_2];
 
 	// sample sigma
 	const float sigma_dt = (float)network_sigma[i] * sample_dt[i];
