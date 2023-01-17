@@ -62,6 +62,8 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 
 	float sigma_dt_sum = 0.0f;
 
+	float trans = 1.0f;
+
 	// Accumulate samples
 	for (int j = 0; j < n_samples; ++j) {
 		// thank you NerfAcc (render_transmittance.cu - transmittance_from_sigma_forward_kernel)
@@ -71,11 +73,9 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 		const float sigma_j_dt = sigma_j * dt;
 
 		const float alpha = 1.0f - __expf(-sigma_j_dt);
-		const float trans = __expf(-sigma_dt_sum);
+		const float weight = alpha * trans;
 		
 		sigma_dt_sum += sigma_j_dt;
-
-		const float weight = alpha * trans;
 
 		// accumulate the color
 		ray_r += weight * (float)s_r[j];
@@ -87,6 +87,9 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 		s_trans[j] = trans;
 		s_alpha[j] = alpha;
 		s_weight[j] = weight;
+
+		// update transmittance
+		trans *= 1.0f - alpha;
 	}
 	
 	// write out the accumulated ray color

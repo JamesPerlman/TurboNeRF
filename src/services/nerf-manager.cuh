@@ -38,11 +38,10 @@ public:
 		);
 
 		NeRF& nerf = nerfs.back();
-		
+
 		// for now we will initialize the occupancy grid here, but it should probably done somewhere else
-		nerf.occupancy_grid.initialize_bitfield(stream);
-		nerf.occupancy_grid.initialize_values(stream);
-		
+		nerf.occupancy_grid.initialize(stream, true);
+
 		// Initialize occupancy grid bitfield (all bits set to 1)
 		nerf.occupancy_grid.set_bitfield(stream, 0b11111111);
 

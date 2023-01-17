@@ -37,7 +37,7 @@ Dataset::Dataset(string file_path) {
     // sensor size is the size of the sensor at distance 1 from the camera's origin
     float2 sensor_size = angle_tans;//2.0f * focal_length.cwiseProduct(0.5f * angle_tans);
 
-    uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
+    uint32_t aabb_size = std::min(json_data.value("aabb_size", 4), 128);
     bounding_box = BoundingBox((float)aabb_size);
     
     path base_dir = path(file_path).parent_path(); // get the parent directory of file_path

@@ -124,16 +124,11 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	// Perform raymarching
 
 	float t = ray_t[i];
-	float dt = 0.0f;
-	float x, y, z;
 
 	while (true) {
-
-		t += dt;
-
-		x = o_x + t * d_x;
-		y = o_y + t * d_y;
-		z = o_z + t * d_z;
+		const float x = o_x + t * d_x;
+		const float y = o_y + t * d_y;
+		const float z = o_z + t * d_z;
 
 		if (!bbox->contains(x, y, z)) {
 			ray_alive[i] = false;
@@ -143,26 +138,27 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
-			// if grid is occupied here, march forward by a calculated dt
-			dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-
-			// march t forward
+			const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 			ray_t[i] = t + dt;
 
 			network_pos[net_offset_0] = x * inv_aabb_size + 0.5f;
 			network_pos[net_offset_1] = y * inv_aabb_size + 0.5f;
 			network_pos[net_offset_2] = z * inv_aabb_size + 0.5f;
 			
-			network_dir[net_offset_0] = d_x * 0.5f + 0.5f;
-			network_dir[net_offset_1] = d_x * 0.5f + 0.5f;
-			network_dir[net_offset_2] = d_x * 0.5f + 0.5f;
+			network_dir[net_offset_0] = (d_x + 1.0f) * 0.5f;
+			network_dir[net_offset_1] = (d_y + 1.0f) * 0.5f;
+			network_dir[net_offset_2] = (d_z + 1.0f) * 0.5f;
 
 			network_dt[i] = dt * inv_aabb_size;
+
             // for now, we only march samples once.
             break;
+			
+			// t += dt;
+
 		} else {
 			// otherwise we need to find the next occupied cell
-			dt = occ_grid->get_dt_to_next_voxel(
+			t += occ_grid->get_dt_to_next_voxel(
 				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
@@ -314,7 +310,7 @@ __global__ void composite_samples_kernel(
 	const float out_a = output_rgba[idx_offset_3];
 	if (out_a >= 1.0f) {
 		ray_alive[i] = false;
-		
+	
 		output_rgba[idx_offset_0] /= out_a;
 		output_rgba[idx_offset_1] /= out_a;
 		output_rgba[idx_offset_2] /= out_a;

@@ -30,6 +30,7 @@ struct NeRFTrainingController {
 	void prepare_for_training(const cudaStream_t& stream, const uint32_t& batch_size);
 	void load_images(const cudaStream_t& stream);
 	void train_step(const cudaStream_t& stream);
+	void update_occupancy_grid(const cudaStream_t& stream, const float& selection_threshold);
 
 	uint32_t get_training_step() const {
 		return training_step;

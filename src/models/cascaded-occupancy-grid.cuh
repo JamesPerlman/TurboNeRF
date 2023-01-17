@@ -20,15 +20,12 @@
 NRC_NAMESPACE_BEGIN
 
 struct CascadedOccupancyGrid {
-private:
-	int n_levels;
-	float resolution_f;
-	float inv_resolution_f;
-	float max_size;
-	float inv_size;
-	uint32_t resolution_i;
+	const int n_levels;
+	const float resolution_f;
+	const float inv_resolution_f;
+	const uint32_t resolution_i;
+	const uint32_t volume_i;
 
-public:
 	CascadedOccupancyGridWorkspace workspace;
 	// level is the power of two domain size (K from pg. 15 of Müller, et al. 2022)
 	// grid goes from [-2^(level - 1) + 0.5, 2^(level - 1) + 0.5] in each dimension
@@ -36,9 +33,8 @@ public:
 		: n_levels(n_levels)
 		, resolution_i(resolution)
 		, resolution_f(resolution)
-		, max_size(1 << (n_levels - 1))
-		, inv_size(1.0f / max_size)
-		, inv_resolution_f(resolution_f)
+		, inv_resolution_f(1.0f / resolution_f)
+		, volume_i(resolution * resolution * resolution)
 	{};
 
 	CascadedOccupancyGrid() = default;
@@ -53,14 +49,13 @@ public:
 	}
 	
 	// allocators/initializers
-	uint8_t* initialize_bitfield(const cudaStream_t& stream) {
-		workspace.enlarge_bitfield(stream, CascadedOccupancyGrid::get_n_total_elements(n_levels, resolution_i));
+	uint8_t* initialize(const cudaStream_t& stream, const bool& use_full_precision_values) {
+		workspace.enlarge(
+			stream,
+			CascadedOccupancyGrid::get_n_total_elements(n_levels, resolution_i),
+			use_full_precision_values
+		);
 		return workspace.bitfield;
-	}
-	
-	float* initialize_values(const cudaStream_t& stream) {
-		workspace.enlarge_values(stream, CascadedOccupancyGrid::get_n_total_elements(n_levels, resolution_i));
-		return workspace.values;
 	}
 
 	// pointer getters
@@ -68,7 +63,7 @@ public:
 		return workspace.bitfield;
 	}
 
-	inline NRC_HOST_DEVICE float* get_values() const {
+	inline NRC_HOST_DEVICE float* get_density() const {
 		return workspace.values;
 	}
 
@@ -92,16 +87,15 @@ public:
 	inline uint32_t NRC_HOST_DEVICE get_n_bitfield_elements() const {
 		return workspace.n_bitfield_elements;
 	}
-
-	// returns the total volume of a grid
-	inline NRC_HOST_DEVICE uint32_t volume() const {
-		return resolution_i * resolution_i * resolution_i;
-	}
-
 	
 	// get the size of the grid at a given level
 	inline NRC_HOST_DEVICE float get_level_size(const int& level) const {
-		return 1.0f / (float)(1 << level);
+		return (float)(1 << level);
+	}
+
+	// gets the voxel size at a given level
+	inline NRC_HOST_DEVICE float get_voxel_size(const int& level) const {
+		return get_level_size(level) / resolution_f;
 	}
 	
 	// returns the index of the voxel containing the point
@@ -111,8 +105,7 @@ public:
 		const float& x, const float& y, const float& z
 	) const {
 		// scale factor for each coordinate, based on the level
-		// converts [0, 1] -> [0, resolution] for the current level
-		const float s = 1.0f / (float)(1 << level);
+		const float s = 1.0f / get_level_size(level);
 		
 		const uint32_t x_i = (x * s + 0.5f) * resolution_f;
 		const uint32_t y_i = (y * s + 0.5f) * resolution_f;
@@ -121,15 +114,36 @@ public:
 		// using morton code (Z-order curve), from Müller, et al. 2022 (page 15, "Occupancy Grids")
 		return tcnn::morton3D(x_i, y_i, z_i);
 	}
-	
-	// checks if the grid is occupied or not*
+
+	// assigns x, y, z from the morton index
+	// returns just the x,y,z indices from their respective axes
+	inline NRC_HOST_DEVICE uint32_t get_voxel_xyz_index_from_morton_index(
+		const uint32_t& morton_index,
+		uint32_t& x, uint32_t& y, uint32_t& z
+	) const {
+		// scale factor for each coordinate, based on the level
+		// converts [0, 1] -> [0, resolution] for the current level
+		x = tcnn::morton3D_invert(morton_index >> 0);
+		y = tcnn::morton3D_invert(morton_index >> 1);
+		z = tcnn::morton3D_invert(morton_index >> 2);
+	}
+
+	// checks if the grid is occupied at a morton index of the given level
+	inline NRC_HOST_DEVICE bool is_occupied_at(
+		const int& level,
+		const uint32_t& byte_idx
+	) const {
+		const uint8_t bitmask = (uint8_t)1 << (level % 8);
+		return workspace.bitfield[byte_idx] & bitmask;
+	}
+
+	// checks if the grid is occupied at a position in the given level
 	inline NRC_HOST_DEVICE bool is_occupied_at(
 		const int& level,
 		const float& x, const float& y, const float& z
 	) const {
 		const uint32_t byte_idx = get_voxel_morton_index(level, x, y, z) / 8;
-		const uint8_t bitmask = 1 << ((n_levels * byte_idx + (uint32_t)level) % 8);
-		return workspace.bitfield[byte_idx] & bitmask;
+		return is_occupied_at(level, byte_idx);
 	}
 
 	/* From Müller, et al. 2022
@@ -158,24 +172,28 @@ public:
 	}
 
 	// Stepping along a ray as in a Digital Differential Analyzer (DDA), get the distance to the next voxel
-	// ray_pos is assumed to be normalized in [0, 1].  Output is in normalized space as well.
 	// thank you NerfAcc
 	inline NRC_HOST_DEVICE float get_t_to_next_voxel(
 		const float& ray_pos_x, const float& ray_pos_y, const float& ray_pos_z,
 		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
 		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z,
+		const float& dt_min,
 		const int& grid_level
 	) const {
-		const float i_level_size = 1.0f / get_level_size(grid_level);
+		const float level_size= get_level_size(grid_level);
+		const float i_level_size = 1.0f / level_size;
+
+		// normalize xyz to [0, 1] for the current level
 		const float x = (ray_pos_x * i_level_size + 0.5f) * resolution_f;
 		const float y = (ray_pos_y * i_level_size + 0.5f) * resolution_f;
 		const float z = (ray_pos_z * i_level_size + 0.5f) * resolution_f;
 		
+		// not really sure how this works, it's from NerfAcc.  It finds the t-space distance to the next voxel
 		const float tx = ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
 		const float ty = ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
 		const float tz = ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
 
-		return fmaxf(0.0f, fminf(fminf(tx, ty), tz)) / resolution_f;
+		return fmaxf(dt_min, fminf(fminf(tx, ty), tz)) / resolution_f * level_size;
 	}
 
 	// Gets the t-value required to step the ray to the next voxel
@@ -191,9 +209,10 @@ public:
 			ray_pos_x, ray_pos_y, ray_pos_z,
 			ray_dir_x, ray_dir_y, ray_dir_z,
 			inv_dir_x, inv_dir_y, inv_dir_z,
+			dt_min,
 			grid_level
 		);
-
+		
 		return ceilf(t_target / dt_min) * dt_min;
 	}
 

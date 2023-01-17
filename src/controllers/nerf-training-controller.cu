@@ -6,6 +6,8 @@
 
 
 #include "nerf-training-controller.h"
+#include "../utils/nerf-constants.cuh"
+#include "../utils/occupancy-grid-kernels.cuh"
 #include "../utils/training-batch-kernels.cuh"
 #include "../utils/parallel-utils.cuh"
 
@@ -153,9 +155,9 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 
 	/* Begin volumetric sampling of the previous network outputs */
 	
-	float dt_min = sqrtf(3.0f) / 1024.0f;
-	float dt_max = dataset.bounding_box.size_x * sqrtf(3.0f) / 1024.0f;
-	float cone_angle = 1.0f;
+	float dt_min = NeRFConstants::min_step_size;
+	float dt_max = dataset.bounding_box.size_x * dt_min;
+	float cone_angle = 1.0f; // ???
 
 	// Count the number of steps each ray would take.  We only need to do this for the new rays.
 	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
@@ -183,7 +185,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 
 	// cumsum
 	thrust::inclusive_scan(thrust::cuda::par.on(stream), n_steps_in_ptr, n_steps_in_ptr + workspace.batch_size, n_steps_cum_ptr);
-
 
 	/**
 	 * Populate the t0 and t1 buffers with the starts and ends of each ray's samples.
@@ -244,14 +245,103 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	cudaMemcpyAsync(&n_samples_in_batch, n_steps_cum_ptr.get() + n_ray_max_idx, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream);
 }
 
-void NeRFTrainingController::train_step(cudaStream_t stream) {
+void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, const float& selection_threshold) {
+	const uint32_t grid_volume = nerf->occupancy_grid.volume_i;
+	const uint32_t n_bitfield_bytes = nerf->occupancy_grid.get_n_bitfield_elements();
+	const uint32_t n_levels = nerf->occupancy_grid.n_levels;
+	
+	// decay occupancy grid values by 0.95
+	decay_occupancy_grid_values_kernel<<<n_blocks_linear(grid_volume), n_threads_linear, 0, stream>>>(
+		grid_volume,
+		nerf->occupancy_grid.n_levels,
+		0.95f,
+		nerf->occupancy_grid.get_density()
+	);
+
+	// loop through each grid level, querying the network for the density at each cell and updating the occupancy grid's density
+	for (int level = 0; level < n_levels; ++level) {
+
+		// update occupancy grid values
+		uint32_t n_cells_updated = 0;
+		while (n_cells_updated < grid_volume) {
+			uint32_t n_cells_to_update = std::min(grid_volume - n_cells_updated, workspace.batch_size);
+
+			// generate random floats for sampling
+			curandStatus_t status = curandGenerateUniform(rng, workspace.random_float, 4 * workspace.batch_size);
+			if (status != CURAND_STATUS_SUCCESS) {
+				printf("Error generating random floats for occupancy grid update.\n");
+			}
+
+			// generate random sampling points
+			generate_grid_cell_network_sample_points_kernel<<<n_blocks_linear(n_cells_to_update), n_threads_linear, 0, stream>>>(
+				n_cells_to_update,
+				workspace.batch_size,
+				n_cells_updated,
+				workspace.occ_grid,
+				level,
+				workspace.random_float,
+				workspace.network_pos
+			);
+
+			// query the density network
+			nerf->network.inference(
+				stream,
+				workspace.batch_size,
+				workspace.network_pos,
+				nullptr,
+				workspace.network_sigma,
+				nullptr
+			);
+
+			// update occupancy grid values
+			update_occupancy_with_density_kernel<<<n_blocks_linear(n_cells_to_update), n_threads_linear, 0, stream>>>(
+				n_cells_to_update,
+				n_cells_updated,
+				workspace.occ_grid,
+				level,
+				selection_threshold,
+				workspace.random_float + 3 * workspace.batch_size, // (ptr + 3 * batch_size) is so thresholding doesn't correspond to x,y,z positions
+				workspace.network_sigma,
+				nerf->occupancy_grid.get_density()
+			);
+
+			n_cells_updated += workspace.batch_size;
+		}
+	}
+
+	// update the bits by thresholding the density values
+
+	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
+	const float threshold = 0.01f * NeRFConstants::min_step_size;
+
+	// CHECK_DATA(grid_dens_cpu, float, nerf->occupancy_grid.get_density(), nerf->occupancy_grid.get_n_total_elements());
+
+	// // get number of elements > threshold
+	// uint32_t n_occupied_grid_elements_above_threshold = 0;
+	// for (int i = 0; i < nerf->occupancy_grid.get_n_total_elements(); ++i) {
+	// 	if (grid_dens_cpu[i] > threshold) {
+	// 		++n_occupied_grid_elements_above_threshold;
+	// 	}
+	// }
+
+	// printf("Occupied grid percentage: %f\n", 100.f * (float)n_occupied_grid_elements_above_threshold / (float)nerf->occupancy_grid.get_n_total_elements());
+
+	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
+		n_bitfield_bytes,
+		n_levels,
+		threshold,
+		nerf->occupancy_grid.get_density(),
+		nerf->occupancy_grid.get_bitfield()
+	);
+}
+
+void NeRFTrainingController::train_step(const cudaStream_t& stream) {
 	//printf("Training step %d...\n", training_step);
 
 	// Generate training batch
 	generate_next_training_batch(stream);
 
 	//printf("Using %d rays and %d samples\n", n_rays_in_batch, n_samples_in_batch);
-	
 	nerf->network.train(
 		stream,
 		workspace.batch_size,

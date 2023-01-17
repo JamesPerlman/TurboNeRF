@@ -97,7 +97,7 @@ public:
 		bounding_box 	= allocate<BoundingBox>(stream, 1);
 		image_data 		= allocate<stbi_uc>(stream, n_pixel_elements);
 
-		random_float 	= allocate<float>(stream, 3 * batch_size);
+		random_float 	= allocate<float>(stream, 4 * batch_size);
 
 		img_index 		= allocate<uint32_t>(stream, batch_size);
 		pix_index 		= allocate<uint32_t>(stream, batch_size);

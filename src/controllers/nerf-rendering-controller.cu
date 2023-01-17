@@ -168,6 +168,19 @@ void NeRFRenderingController::request_render(
                 workspace.network_color
             );
 
+            // CHECK_DATA(color_cpu, float, workspace.network_color, network_batch * 3);
+
+            // check how many color values in color_cpu are >1
+            // uint32_t color_values_great_than_1 = 0;
+
+            // for (uint32_t i = 0; i < network_batch * 3; i++) {
+            //     if (color_cpu[i] > 1.0f) {
+            //         color_values_great_than_1++;
+            //     }
+            // }
+
+            // printf("# of color values >1: %d\n", color_values_great_than_1);
+
             // accumulate these samples into the pixel colors
             composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
@@ -234,6 +247,8 @@ void NeRFRenderingController::request_render(
                     workspace.ray_idir[compact_buf_idx],
                     workspace.ray_sigma[compact_buf_idx]
                 );
+
+                
 
                 // all compacted rays are alive
                 CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_compact * sizeof(bool), stream));

@@ -242,6 +242,11 @@ void NerfNetwork::inference(
 		density_network_output_matrix
 	);
 
+	// dir_batch or color can be nullptr if we only want to run inference on the density network
+	if (dir_batch == nullptr || color == nullptr) {
+		return;
+	}
+
 	// Inference (direction encoding)
 	network_precision_t* direction_encoding_output = sigma + density_network->padded_output_width() * batch_size;
 

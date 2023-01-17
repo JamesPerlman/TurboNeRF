@@ -182,8 +182,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			// if grid is occupied here, march forward by a calculated dt
-			const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-			t += dt;
+			t += occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 
 			++n_steps_taken;
 		} else {
@@ -328,7 +327,6 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			out_dir_xyz[step_offset_2] = d_z;
 
 			++n_steps_taken;
-
 		} else {
 			// otherwise we need to find the next occupied cell
 			t += occ_grid->get_dt_to_next_voxel(
@@ -348,8 +346,8 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
  * We also convert unit directions in [-1, 1] to normalized directions in [0, 1]
  */
 __global__ void generate_network_inputs_kernel(
-	uint32_t batch_size,
-	float inv_aabb_size,
+	const uint32_t batch_size,
+	const float inv_aabb_size,
 	const float* __restrict__ t0,
 	const float* __restrict__ t1,
 	const float* __restrict__ random_float,
@@ -369,10 +367,10 @@ __global__ void generate_network_inputs_kernel(
 	const uint32_t i_offset_1 = i_offset_0 + batch_size;
 	const uint32_t i_offset_2 = i_offset_1 + batch_size;
 
-	const float t0_i = t0[i_offset_0];
-	const float t1_i = t1[i_offset_0];
+	const float t0_i = t0[i];
+	const float t1_i = t1[i];
 	
-	const float k = random_float[i_offset_0];
+	const float k = random_float[i];
 	
 	const float o_x = in_xyz[i_offset_0];
 	const float o_y = in_xyz[i_offset_1];
@@ -386,7 +384,7 @@ __global__ void generate_network_inputs_kernel(
 	const float dt = t1_i - t0_i;
 	const float t = t0_i + dt * k;
 
-	out_dt[i_offset_0] = dt * inv_aabb_size;
+	out_dt[i] = dt * inv_aabb_size;
 
 	out_xyz[i_offset_0] = (o_x + t * d_x) * inv_aabb_size + 0.5f;
 	out_xyz[i_offset_1] = (o_y + t * d_y) * inv_aabb_size + 0.5f;
