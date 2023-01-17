@@ -14,12 +14,15 @@ NRC_NAMESPACE_BEGIN
 __global__ void generate_rays_pinhole_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
+	const BoundingBox* __restrict__ bbox,
 	const Camera* __restrict__ cam,
 	float* __restrict__ ray_ori,
 	float* __restrict__ ray_dir,
 	float* __restrict__ ray_idir,
+	float* __restrict__ ray_t,
     uint32_t* __restrict__ ray_idx,
-	const uint32_t start_idx = 0
+	bool* __restrict__ ray_alive,
+	const uint32_t start_idx
 );
 
 __global__ void march_rays_and_generate_network_inputs_kernel(

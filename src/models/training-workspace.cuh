@@ -52,8 +52,12 @@ public:
 	float* ray_inv_dir;
 
 	// ray t components
+	float* ray_t;
 	float* sample_t0; // t_start
 	float* sample_t1; // t_end
+
+	// ray alive is basically just a check for if the ray hits the bounding box
+	bool* ray_alive;
 
 	// normalized network input
     float* network_pos;
@@ -114,8 +118,11 @@ public:
 		sample_dir 		= allocate<float>(stream, 3 * batch_size);
 		ray_inv_dir 	= allocate<float>(stream, 3 * batch_size);
 
+		ray_t 			= allocate<float>(stream, batch_size);
 		sample_t0 		= allocate<float>(stream, batch_size);
 		sample_t1 		= allocate<float>(stream, batch_size);
+
+		ray_alive 		= allocate<bool>(stream, batch_size);
 		
 		network_pos		= allocate<float>(stream, 3 * batch_size);
 		network_dir		= allocate<float>(stream, 3 * batch_size);

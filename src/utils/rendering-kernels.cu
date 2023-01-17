@@ -15,11 +15,14 @@ NRC_NAMESPACE_BEGIN
 __global__ void generate_rays_pinhole_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
+	const BoundingBox* __restrict__ bbox,
 	const Camera* __restrict__ cam,
 	float* __restrict__ ray_ori,
 	float* __restrict__ ray_dir,
 	float* __restrict__ ray_idir,
+	float* __restrict__ ray_t,
     uint32_t* __restrict__ ray_idx,
+	bool* __restrict__ ray_alive,
 	const uint32_t start_idx
 ) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -41,9 +44,13 @@ __global__ void generate_rays_pinhole_kernel(
 	// normalize ray directions
 	const float n = rnorm3df(global_direction.x, global_direction.y, global_direction.z);
 
-	const float ray_dx = n * global_direction.x;
-	const float ray_dy = n * global_direction.y;
-	const float ray_dz = n * global_direction.z;
+	const float dir_x = n * global_direction.x;
+	const float dir_y = n * global_direction.y;
+	const float dir_z = n * global_direction.z;
+
+	const float idir_x = 1.0f / dir_x;
+	const float idir_y = 1.0f / dir_y;
+	const float idir_z = 1.0f / dir_z;
 
     // save data to buffers
 	uint32_t i_offset_0 = i;
@@ -54,13 +61,25 @@ __global__ void generate_rays_pinhole_kernel(
 	ray_ori[i_offset_1] = global_origin.y;
 	ray_ori[i_offset_2] = global_origin.z;
 
-	ray_dir[i_offset_0] = ray_dx;
-	ray_dir[i_offset_1] = ray_dy;
-	ray_dir[i_offset_2] = ray_dz;
+	ray_dir[i_offset_0] = dir_x;
+	ray_dir[i_offset_1] = dir_y;
+	ray_dir[i_offset_2] = dir_z;
 
-	ray_idir[i_offset_0] = 1.0f / ray_dx;
-	ray_idir[i_offset_1] = 1.0f / ray_dy;
-	ray_idir[i_offset_2] = 1.0f / ray_dz;
+	ray_idir[i_offset_0] = idir_x;
+	ray_idir[i_offset_1] = idir_y;
+	ray_idir[i_offset_2] = idir_z;
+
+	float t;
+	const bool intersects_bbox = bbox->get_ray_t_intersection(
+		global_origin.x, global_origin.y, global_origin.z,
+		dir_x, dir_y, dir_z,
+		idir_x, idir_y, idir_z,
+		t
+	);
+
+	ray_t[i] = intersects_bbox ? fmaxf(0.0f, t + 1e-5f) : 0.0f;
+
+	ray_alive[i] = intersects_bbox;
 
     ray_idx[i] = idx;
 }
@@ -126,9 +145,14 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	float t = ray_t[i];
 
 	while (true) {
-		const float x = o_x + t * d_x;
-		const float y = o_y + t * d_y;
-		const float z = o_z + t * d_z;
+		const float t0 = t;
+		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+		t += dt;
+		const float tmid = 0.5f * (t0 + t);
+
+		const float x = o_x + tmid * d_x;
+		const float y = o_y + tmid * d_y;
+		const float z = o_z + tmid * d_z;
 
 		if (!bbox->contains(x, y, z)) {
 			ray_alive[i] = false;
@@ -138,8 +162,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
-			const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-			ray_t[i] = t + dt;
+			ray_t[i] = tmid;
 
 			network_pos[net_offset_0] = x * inv_aabb_size + 0.5f;
 			network_pos[net_offset_1] = y * inv_aabb_size + 0.5f;

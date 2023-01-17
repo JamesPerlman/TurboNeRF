@@ -102,23 +102,21 @@ void NeRFRenderingController::request_render(
         generate_rays_pinhole_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
             n_rays,
             batch_size,
+            workspace.bounding_box,
             workspace.camera,
             workspace.ray_origin[active_buf_idx],
             workspace.ray_dir[active_buf_idx],
             workspace.ray_idir[active_buf_idx],
+            workspace.ray_t[active_buf_idx],
             workspace.ray_idx[active_buf_idx],
+            workspace.ray_alive,
             pixel_start
         );
 
         // initialize other ray properties
-        // ray_t = 0
-        CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_t[active_buf_idx], 0, batch_size * sizeof(float), stream));
 
         // ray_sigma = 0
         CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_sigma[active_buf_idx], 0, batch_size * sizeof(float), stream));
-
-        // ray_alive = true
-        CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, batch_size * sizeof(bool), stream));
 
         // ray_active = true
         CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_active[active_buf_idx], true, batch_size * sizeof(bool), stream));

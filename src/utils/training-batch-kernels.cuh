@@ -62,14 +62,19 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t n_images,
 	const uint32_t image_data_stride,
 	const int2 image_dimensions,
+	const BoundingBox* __restrict__ bbox,
 	const Camera* __restrict__ cameras,
 	const stbi_uc* __restrict__ image_data,
 	const uint32_t* __restrict__ img_index,
 	const uint32_t* __restrict__ pix_index,
+
+	// output buffers
 	float* __restrict__ pix_rgba,
 	float* __restrict__ ori_xyz,
 	float* __restrict__ dir_xyz,
-	float* __restrict__ idir_xyz
+	float* __restrict__ idir_xyz,
+	float* __restrict__ ray_t,
+	bool* __restrict__ ray_alive
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i >= n_rays) return;
@@ -114,17 +119,32 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	// normalize ray directions
 	const float n = rnorm3df(global_direction.x, global_direction.y, global_direction.z);
 
-	const float ray_dx = n * global_direction.x;
-	const float ray_dy = n * global_direction.y;
-	const float ray_dz = n * global_direction.z;
+	const float dir_x = n * global_direction.x;
+	const float dir_y = n * global_direction.y;
+	const float dir_z = n * global_direction.z;
+	
+	const float idir_x = 1.0f / dir_x;
+	const float idir_y = 1.0f / dir_y;
+	const float idir_z = 1.0f / dir_z;
+	
+	dir_xyz[i_offset_0] = dir_x;
+	dir_xyz[i_offset_1] = dir_y;
+	dir_xyz[i_offset_2] = dir_z;
 
-	dir_xyz[i_offset_0] = ray_dx;
-	dir_xyz[i_offset_1] = ray_dy;
-	dir_xyz[i_offset_2] = ray_dz;
+	idir_xyz[i_offset_0] = idir_x;
+	idir_xyz[i_offset_1] = idir_y;
+	idir_xyz[i_offset_2] = idir_z;
+	
+	float t;
+	const bool intersects_bbox = bbox->get_ray_t_intersection(
+		global_origin.x, global_origin.y, global_origin.z,
+		dir_x, dir_y, dir_z,
+		idir_x, idir_y, idir_z,
+		t
+	);
 
-	idir_xyz[i_offset_0] = 1.0f / ray_dx;
-	idir_xyz[i_offset_1] = 1.0f / ray_dy;
-	idir_xyz[i_offset_2] = 1.0f / ray_dz;
+	ray_alive[i] = intersects_bbox;
+	ray_t[i] = intersects_bbox ? fmaxf(0.0f, t + 1e-5f) : 0.0f;
 }
 
 // CONSIDER: move rays inside bounding box first?
@@ -140,6 +160,8 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	const float* __restrict__ ori_xyz,
 	const float* __restrict__ dir_xyz,
 	const float* __restrict__ idir_xyz,
+	const float* __restrict__ ray_t,
+	const bool* __restrict__ ray_alive,
 	uint32_t* __restrict__ n_steps // one per ray
 ) {
 	// get thread index
@@ -147,6 +169,11 @@ __global__ void march_and_count_steps_per_ray_kernel(
 
 	// check if thread is out of bounds
 	if (i >= n_rays) return;
+
+	if (!ray_alive[i]) {
+		n_steps[i] = 0;
+		return;
+	};
 
 	const uint32_t i_offset_0 = i;
 	const uint32_t i_offset_1 = i_offset_0 + batch_size;
@@ -166,13 +193,16 @@ __global__ void march_and_count_steps_per_ray_kernel(
 
 	uint32_t n_steps_taken = 0;
 	
-	float t = 0.0f;
+	float t = ray_t[i];
 
 	while (true) {
+		const float t0 = t;
+		t += occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+		const float tmid = 0.5f * (t0 + t);
 
-		const float x = o_x + t * d_x;
-		const float y = o_y + t * d_y;
-		const float z = o_z + t * d_z;
+		const float x = o_x + tmid * d_x;
+		const float y = o_y + tmid * d_y;
+		const float z = o_z + tmid * d_z;
 
 		if (!bbox->contains(x, y, z)) {
 			break;
@@ -181,9 +211,6 @@ __global__ void march_and_count_steps_per_ray_kernel(
 		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
-			// if grid is occupied here, march forward by a calculated dt
-			t += occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-
 			++n_steps_taken;
 		} else {
 			// otherwise we need to find the next occupied cell
@@ -219,6 +246,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const float* __restrict__ in_ori_xyz,
 	const float* __restrict__ in_dir_xyz,
 	const float* __restrict__ in_idir_xyz,
+	const float* __restrict__ in_ray_t,
 	const uint32_t* __restrict__ n_ray_steps, // one per ray
 	const uint32_t* __restrict__ n_steps_cum, // one per ray
 
@@ -272,14 +300,19 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 
 	// Perform raymarching
 
-	float t = 0.0f;
+	float t = in_ray_t[i];
 	uint32_t n_steps_taken = 0;
 
 	while (true) {
+		const float t0 = t;
+		t += occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+		const float t1 = t;
 
-		const float x = o_x + t * d_x;
-		const float y = o_y + t * d_y;
-		const float z = o_z + t * d_z;
+		const float tmid = (t0 + t1) * 0.5f;
+
+		const float x = o_x + tmid * d_x;
+		const float y = o_y + tmid * d_y;
+		const float z = o_z + tmid * d_z;
 
 		if (!bbox->contains(x, y, z)) {
 			break;
@@ -288,9 +321,6 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
-			// if grid is occupied here, march forward by a calculated dt
-			const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-
 			/**
 			 * Here is where we assign training data to our compacted sample buffers.
 			 * RIP coalesced memory accesses :(
@@ -302,14 +332,8 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			const uint32_t step_offset_2 = sample_offset_2 + n_steps_taken;
 
 			// assign start/end t-values for this sampling interval
-			// t0 (t_start) is our most recent t-value
-			out_t0[step_offset_0] = t;
-
-			// march t forward
-			t += dt;
-
-			// t1 (t_end) is our new t-value
-			out_t1[step_offset_0] = t;
+			out_t0[step_offset_0] = t0;
+			out_t1[step_offset_0] = t1;
 
 			/**
 			 * Compact the rest of the buffers.

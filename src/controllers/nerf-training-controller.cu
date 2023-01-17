@@ -143,6 +143,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		dataset.images.size(),
 		dataset.n_pixels_per_image * dataset.n_channels_per_image,
 		dataset.image_dimensions,
+		workspace.bounding_box,
 		workspace.cameras.data(),
 		workspace.image_data,
 		workspace.img_index,
@@ -150,7 +151,9 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.pix_rgba,
 		workspace.ray_origin,
 		workspace.ray_dir,
-		workspace.ray_inv_dir
+		workspace.ray_inv_dir,
+		workspace.ray_t,
+		workspace.ray_alive
 	);
 
 	/* Begin volumetric sampling of the previous network outputs */
@@ -171,6 +174,8 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_origin,
 		workspace.ray_dir,
 		workspace.ray_inv_dir,
+		workspace.ray_t,
+		workspace.ray_alive,
 		workspace.ray_steps
 	);
 
@@ -203,16 +208,17 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_origin,
 		workspace.ray_dir,
 		workspace.ray_inv_dir,
+		workspace.ray_t,
 		workspace.ray_steps,
 		workspace.ray_steps_cum,
-		
+
 		// output buffers
 		workspace.sample_origin,
 		workspace.sample_dir,
 		workspace.sample_t0,
 		workspace.sample_t1
 	);
-
+	
 	// Generate stratified sampling positions
 	generate_network_inputs_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
 		workspace.batch_size,
