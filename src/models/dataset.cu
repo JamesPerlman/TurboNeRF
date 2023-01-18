@@ -39,9 +39,8 @@ Dataset::Dataset(string file_path) {
 
     uint32_t aabb_size = std::min(json_data.value("aabb_size", 4), 128);
     bounding_box = BoundingBox((float)aabb_size);
-    
-    path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
 
+    path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
 
     for (json frame : json_data["frames"]) {
         float near = frame.value("near", 2.0f);

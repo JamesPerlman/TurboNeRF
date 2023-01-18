@@ -10,6 +10,20 @@
 
 NRC_NAMESPACE_BEGIN
 
+/**
+ * Apply exponential scaling to density network output
+ * (log-space density!)
+ */
+__global__ void apply_exp_to_density_kernel(
+	uint32_t batch_size,
+	tcnn::network_precision_t* __restrict__ values
+) {
+	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i < batch_size) {
+		values[i] = __expf(values[i]);
+	}
+}
+
 // TODO: These can be rewritten with cuBLAS - check out NerfAcc
 
 /**

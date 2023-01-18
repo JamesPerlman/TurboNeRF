@@ -11,6 +11,9 @@
 #include "../utils/training-batch-kernels.cuh"
 #include "../utils/parallel-utils.cuh"
 
+#include <iostream>
+#include <fstream>
+
 using namespace nrc;
 using namespace tcnn;
 using namespace nlohmann;
@@ -42,8 +45,8 @@ void NeRFTrainingController::prepare_for_training(
 		dataset.n_pixels_per_image,
 		dataset.n_channels_per_image,
 		batch_size,
-		n_occ_grid_levels,
-		occ_grid_resolution,
+		nerf->occupancy_grid.n_levels,
+		nerf->occupancy_grid.resolution_i,
 		nerf->network.get_color_network_input_width(),
 		nerf->network.get_color_network_output_width()
 	);
@@ -160,7 +163,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	
 	float dt_min = NeRFConstants::min_step_size;
 	float dt_max = dataset.bounding_box.size_x * dt_min;
-	float cone_angle = 1.0f; // ???
+	float cone_angle = 1.0f / 256.0f; // ???
 
 	// Count the number of steps each ray would take.  We only need to do this for the new rays.
 	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
@@ -218,7 +221,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.sample_t0,
 		workspace.sample_t1
 	);
-	
+
 	// Generate stratified sampling positions
 	generate_network_inputs_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
 		workspace.batch_size,
@@ -255,6 +258,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 	const uint32_t grid_volume = nerf->occupancy_grid.volume_i;
 	const uint32_t n_bitfield_bytes = nerf->occupancy_grid.get_n_bitfield_elements();
 	const uint32_t n_levels = nerf->occupancy_grid.n_levels;
+	const float inv_aabb_size = 1.0f / nerf->bounding_box.size_x;
 	
 	// decay occupancy grid values by 0.95
 	decay_occupancy_grid_values_kernel<<<n_blocks_linear(grid_volume), n_threads_linear, 0, stream>>>(
@@ -285,6 +289,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				n_cells_updated,
 				workspace.occ_grid,
 				level,
+				inv_aabb_size,
 				workspace.random_float,
 				workspace.network_pos
 			);
@@ -320,18 +325,6 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
 	const float threshold = 0.01f * NeRFConstants::min_step_size;
 
-	// CHECK_DATA(grid_dens_cpu, float, nerf->occupancy_grid.get_density(), nerf->occupancy_grid.get_n_total_elements());
-
-	// // get number of elements > threshold
-	// uint32_t n_occupied_grid_elements_above_threshold = 0;
-	// for (int i = 0; i < nerf->occupancy_grid.get_n_total_elements(); ++i) {
-	// 	if (grid_dens_cpu[i] > threshold) {
-	// 		++n_occupied_grid_elements_above_threshold;
-	// 	}
-	// }
-
-	// printf("Occupied grid percentage: %f\n", 100.f * (float)n_occupied_grid_elements_above_threshold / (float)nerf->occupancy_grid.get_n_total_elements());
-
 	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
 		n_bitfield_bytes,
 		n_levels,
@@ -339,6 +332,19 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 		nerf->occupancy_grid.get_density(),
 		nerf->occupancy_grid.get_bitfield()
 	);
+
+	CHECK_DATA(bitfield_cpu, uint8_t, nerf->occupancy_grid.get_bitfield(), n_bitfield_bytes);
+
+	int bits_occupied = 0;
+	for (int i = 0; i < n_bitfield_bytes; ++i) {
+		for (int j = 0; j < n_levels; ++j) {
+			if (bitfield_cpu[i] & (1 << j)) {
+				++bits_occupied;
+			}
+		}
+	}
+
+	printf("%% of bits occupied: %f\n", 100.f * (float)bits_occupied / (grid_volume * n_levels));
 }
 
 void NeRFTrainingController::train_step(const cudaStream_t& stream) {

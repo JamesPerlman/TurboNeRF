@@ -287,10 +287,6 @@ __global__ void composite_samples_kernel(
     const uint32_t net_offset_1 = net_offset_0 + network_stride;
     const uint32_t net_offset_2 = net_offset_1 + network_stride;
 
-    const float s_r = network_rgb[net_offset_0];
-    const float s_g = network_rgb[net_offset_1];
-    const float s_b = network_rgb[net_offset_2];
-
 	// sample sigma
 	const float sigma_dt = (float)network_sigma[i] * sample_dt[i];
 
@@ -324,13 +320,22 @@ __global__ void composite_samples_kernel(
     // new samples are composited behind current pixels
     // aka new sample is the background, current pixel is the foreground
 
-	output_rgba[idx_offset_0] += s_w * s_r;
-	output_rgba[idx_offset_1] += s_w * s_g;
-	output_rgba[idx_offset_2] += s_w * s_b;
+	output_rgba[idx_offset_0] += s_w * (float)network_rgb[net_offset_0];
+	output_rgba[idx_offset_1] += s_w * (float)network_rgb[net_offset_1];
+	output_rgba[idx_offset_2] += s_w * (float)network_rgb[net_offset_2];
 	output_rgba[idx_offset_3] += s_w;
 
 	// terminate ray if alpha >= 1.0
 	const float out_a = output_rgba[idx_offset_3];
+
+	if (r_t <= 1e-4f) {
+		ray_alive[i] = false;
+		output_rgba[idx_offset_0] /= out_a;
+		output_rgba[idx_offset_1] /= out_a;
+		output_rgba[idx_offset_2] /= out_a;
+		output_rgba[idx_offset_3] = 1.0f;
+	}
+
 	if (out_a >= 1.0f) {
 		ray_alive[i] = false;
 	

@@ -242,6 +242,11 @@ void NerfNetwork::inference(
 		density_network_output_matrix
 	);
 
+	// apply_exp_to_density_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
+	// 	batch_size,
+	// 	sigma
+	// );
+
 	// dir_batch or color can be nullptr if we only want to run inference on the density network
 	if (dir_batch == nullptr || color == nullptr) {
 		return;
@@ -326,6 +331,12 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		false,
 		true // prepare_input_gradients must be `true` otherwise backwards() fails (forward->dy_dx is not defined)
 	);
+
+	// Apply exp to density network output
+	// apply_exp_to_density_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
+	// 	batch_size,
+	// 	network_sigma
+	// );
 
 	// Encode directions (dir_batch)
 	// Direction encoding gets concatenated with density_network_output (which will just be the second half of network_sigma)

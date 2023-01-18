@@ -40,6 +40,7 @@ __global__ void generate_grid_cell_network_sample_points_kernel(
     const uint32_t start_idx,
     const CascadedOccupancyGrid* __restrict__ grid,
     const int level,
+    const float inv_aabb_size,
     const float* __restrict__ random_float,
     float* __restrict__ sample_pos
 ) {
@@ -47,27 +48,35 @@ __global__ void generate_grid_cell_network_sample_points_kernel(
     if (i >= n_cells) {
         return;
     }
-
+    
     const uint32_t idx = i + start_idx;
 
+    const float level_size = grid->get_level_size(level);
+    const float voxel_size = level_size * grid->inv_resolution_f;
+    
     const uint32_t i_offset_0 = i;
     const uint32_t i_offset_1 = i_offset_0 + batch_size;
     const uint32_t i_offset_2 = i_offset_1 + batch_size;
 
+    // get xyz positions of the grid cell according to the morton code index
     uint32_t ix, iy, iz;
     grid->get_voxel_xyz_index_from_morton_index(idx, ix, iy, iz);
 
-    float level_size = grid->get_level_size(level);
-    float voxel_size = level_size / grid->resolution_f;
-
     // origin of the grid cell (same value for all 3 axes)
     // this also centers xyz in the grid cell
-    float o = -0.5f * level_size;
+    const float o = -0.5f * level_size;
 
     // set each dimension of sample_pos to the corner of the grid cell + a random offset
-    sample_pos[i_offset_0] = o + (float)ix * voxel_size + random_float[i_offset_0];
-    sample_pos[i_offset_1] = o + (float)iy * voxel_size + random_float[i_offset_1];
-    sample_pos[i_offset_2] = o + (float)iz * voxel_size + random_float[i_offset_2];
+    // this x,y,z is in world coordinates
+    const float x = o + ((float)ix + random_float[i_offset_0]) * voxel_size;
+    const float y = o + ((float)iy + random_float[i_offset_1]) * voxel_size;
+    const float z = o + ((float)iz + random_float[i_offset_2]) * voxel_size;
+
+    // Normalize the sample position to the range [0, 1] (for the network)
+    sample_pos[i_offset_0] = x * inv_aabb_size + 0.5f;
+    sample_pos[i_offset_1] = y * inv_aabb_size + 0.5f;
+    sample_pos[i_offset_2] = z * inv_aabb_size + 0.5f;
+
 }
 
 // occupancy cell values are updated to the maximum of the current value and a newly sampled density value

@@ -124,7 +124,7 @@ void NeRFRenderingController::request_render(
         
         float dt_min = NeRFConstants::min_step_size;
         float dt_max = nerf->bounding_box.size_x * dt_min;
-        const float cone_angle = 1.0f; // ???
+        const float cone_angle = 1.0f / 256.0f; // ???
 
         // ray marching loop
         uint32_t n_rays_alive = n_rays;

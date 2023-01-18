@@ -27,8 +27,7 @@ struct CascadedOccupancyGrid {
 	const uint32_t volume_i;
 
 	CascadedOccupancyGridWorkspace workspace;
-	// level is the power of two domain size (K from pg. 15 of Müller, et al. 2022)
-	// grid goes from [-2^(level - 1) + 0.5, 2^(level - 1) + 0.5] in each dimension
+
 	CascadedOccupancyGrid(const int& n_levels, const int& resolution = 128)
 		: n_levels(n_levels)
 		, resolution_i(resolution)
@@ -47,12 +46,18 @@ struct CascadedOccupancyGrid {
 		const int side_length = next_power_of_two(grid_resolution);
 		return (size_t)(n_levels * side_length * side_length * side_length);
 	}
+
+	// class function to calculate number of levels
+	static inline int get_max_n_levels(const int& aabb_size) {
+		return (int)log2(aabb_size) + 1;
+	}
 	
 	// allocators/initializers
 	uint8_t* initialize(const cudaStream_t& stream, const bool& use_full_precision_values) {
 		workspace.enlarge(
 			stream,
-			CascadedOccupancyGrid::get_n_total_elements(n_levels, resolution_i),
+			n_levels,
+			volume_i,
 			use_full_precision_values
 		);
 		return workspace.bitfield;
@@ -68,12 +73,23 @@ struct CascadedOccupancyGrid {
 	}
 
 	// memory setters
-	inline __host__ void set_bitfield(const cudaStream_t& stream, const uint8_t& value) {
+	inline __host__ void set_bitfield(const cudaStream_t& stream, const int value) {
 		CUDA_CHECK_THROW(
 			cudaMemsetAsync(
 				workspace.bitfield,
 				value,
 				workspace.n_bitfield_elements * sizeof(uint8_t),
+				stream
+			)
+		);
+	}
+
+	inline __host__ void set_density(const cudaStream_t& stream, const int value) {
+		CUDA_CHECK_THROW(
+			cudaMemsetAsync(
+				workspace.values,
+				value,
+				workspace.n_total_elements * sizeof(float),
 				stream
 			)
 		);

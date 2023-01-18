@@ -45,10 +45,6 @@ private:
 	uint32_t n_rays_in_batch;
 	uint32_t n_samples_in_batch;
 
-	// configuration properties
-	uint32_t n_occ_grid_levels = 5;
-	uint32_t occ_grid_resolution = 128;
-
 	// workspace
 	TrainingWorkspace workspace;
 	curandGenerator_t rng;
