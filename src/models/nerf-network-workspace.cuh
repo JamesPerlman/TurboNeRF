@@ -12,7 +12,6 @@ struct NeRFNetworkWorkspace : Workspace {
 
     // gradient calculation buffers
     float* trans_buf;
-    float* alpha_buf;
     float* weight_buf; // alpha * transmittance
     float* pxdiff_buf; // pixel channel differences
     float* ray_rgba; // accumulated ray colors from samples
@@ -42,7 +41,6 @@ struct NeRFNetworkWorkspace : Workspace {
         color_network_dL_dinput = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);
 
         trans_buf = allocate<float>(stream, batch_size);
-        alpha_buf = allocate<float>(stream, batch_size);
         weight_buf = allocate<float>(stream, batch_size);
         pxdiff_buf = allocate<float>(stream, 4 * batch_size);
         ray_rgba = allocate<float>(stream, 4 * batch_size);

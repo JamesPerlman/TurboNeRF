@@ -316,13 +316,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				workspace.network_output + 3 * workspace.batch_size,
 				nerf->occupancy_grid.get_density()
 			);
-
-			CHECK_DATA(occ_dens_cpu, float, nerf->occupancy_grid.get_density() + level * grid_volume, grid_volume);
-
-			GPUMemory<float> gpu_sig(workspace.batch_size);
-			copy_and_cast(stream, workspace.batch_size, gpu_sig.data(), workspace.network_output + 3 * workspace.batch_size);
-			CHECK_DATA(cpu_sig, float, gpu_sig.data(), workspace.batch_size);
-
+			
 			n_cells_updated += workspace.batch_size;
 		}
 	}
@@ -330,7 +324,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 	// update the bits by thresholding the density values
 
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
-	const float threshold = 0.01f;// * NeRFConstants::min_step_size;
+	const float threshold = 0.01f * NeRFConstants::min_step_size;
 
 	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
 		n_bitfield_bytes,

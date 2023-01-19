@@ -47,7 +47,6 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	// output buffers
 	float* __restrict__ ray_rgba, // per ray
 	float* __restrict__ sample_trans, // per sample
-	float* __restrict__ sample_alpha,
 	float* __restrict__ sample_weight
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -70,7 +69,6 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	const float* __restrict__ s_dt = sample_dt + sample_offset;
 
 	float* __restrict__ s_trans = sample_trans + sample_offset;
-	float* __restrict__ s_alpha = sample_alpha + sample_offset;
 	float* __restrict__ s_weight = sample_weight + sample_offset;
 
 	// Values to accumulate samples into
@@ -102,9 +100,8 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 		ray_b += weight * (float)s_b[j];
 		ray_a += weight;
 
-		// save transmittance for gradient calculation
+		// save transmittance and weight for gradient calculation
 		s_trans[j] = trans;
-		s_alpha[j] = alpha;
 		s_weight[j] = weight;
 	}
 	
@@ -160,7 +157,7 @@ __global__ void calculate_sse_loss_per_ray_kernel(
 __global__ void calculate_network_output_gradient(
 	const uint32_t n_rays,
 	const uint32_t batch_size, // aka data stride
-	const float n_pixels,
+	const float inv_2npix,
 	const tcnn::network_precision_t* __restrict__ network_sigma,
 	const tcnn::network_precision_t* __restrict__ network_rgb,
 	const uint32_t* __restrict__ n_samples_per_ray,
@@ -168,7 +165,6 @@ __global__ void calculate_network_output_gradient(
 	const float* __restrict__ pixel_diffs, // signed difference per color channel, like (ray_r - gt_r)
 	const float* __restrict__ sample_dt, // per sample
 	const float* __restrict__ sample_trans,
-	const float* __restrict__ sample_alpha,
 	const float* __restrict__ sample_weight,
 	const float loss_scale,
 
@@ -192,10 +188,8 @@ __global__ void calculate_network_output_gradient(
 	tcnn::network_precision_t* grad_s = sigma_grad + sample_offset;
 
 	// local references to sample buffers
-
 	const float* dt = sample_dt + sample_offset;
 	const float* weight = sample_weight + sample_offset;
-	const float* alpha = sample_alpha + sample_offset;
 	const float* trans = sample_trans + sample_offset;
 
 	const float dr = pixel_diffs[i + 0 * batch_size];
@@ -219,36 +213,35 @@ __global__ void calculate_network_output_gradient(
 	// decrementing loop
 	for (int j = n_samples - 1; j >= 0; --j) {
 		// We need a lot of variables...
-		const float es_j = __expf(tcnn::clamp((float)sd[j], -15.0f, 15.0f));
+		const float es_j = __expf((float)sd[j]);
 		const float dt_j = dt[j];
 		const float T_j = trans[j];
-		const float a_j = alpha[j];
 		const float w_j = weight[j];
 		
 		const float r_j = sr[j];
 		const float g_j = sg[j];
 		const float b_j = sb[j];
 
-		//const float T_j_a_j = T_j * a_j;
-		const float dt_j_es_j = dt_j * es_j;
-		
-		sum_tn_an_rn += w_j * r_j;
-		sum_tn_an_gn += w_j * g_j;
-		sum_tn_an_bn += w_j * b_j;
-		sum_tn_an += w_j;
+		// RGB gradients are pretty simple...
 
-		grad_r[j] = (tcnn::network_precision_t)(loss_scale * (1.0f / (2.0f * n_pixels)) * dr * w_j);
-		grad_g[j] = (tcnn::network_precision_t)(loss_scale * (1.0f / (2.0f * n_pixels)) * dg * w_j);
-		grad_b[j] = (tcnn::network_precision_t)(loss_scale * (1.0f / (2.0f * n_pixels)) * db * w_j);
-		// grad_s[j] = (tcnn::network_precision_t)(loss_scale * (1.0f / (2.0f * n_pixels)) * (1.0f - 2.0f * a_j) * (dt_j * T_j * es_j) * (dr_j * r_j + dg_j * g_j + db_j * b_j + da_j));
+		grad_r[j] = (tcnn::network_precision_t)(loss_scale * inv_2npix * dr * w_j);
+		grad_g[j] = (tcnn::network_precision_t)(loss_scale * inv_2npix * dg * w_j);
+		grad_b[j] = (tcnn::network_precision_t)(loss_scale * inv_2npix * db * w_j);
 
-		const float k = T_j * (1.0f - a_j);
+		// Sigma gradients are a bit more complicated...
+
+		const float k = T_j - w_j;
 		const float dLr_dsj = dr * (k * r_j - sum_tn_an_rn);
 		const float dLg_dsj = dg * (k * g_j - sum_tn_an_gn);
 		const float dLb_dsj = db * (k * b_j - sum_tn_an_bn);
 		const float dLa_dsj = da * (k - sum_tn_an);
 
-		grad_s[j] = (tcnn::network_precision_t)(loss_scale * (1.0f / (2.0f * n_pixels)) * dt_j_es_j * (dLr_dsj + dLg_dsj + dLb_dsj + dLa_dsj));
+		grad_s[j] = (tcnn::network_precision_t)(loss_scale * inv_2npix * (dt_j * es_j) * (dLr_dsj + dLg_dsj + dLb_dsj + dLa_dsj));
+
+		sum_tn_an_rn += w_j * r_j;
+		sum_tn_an_gn += w_j * g_j;
+		sum_tn_an_bn += w_j * b_j;
+		sum_tn_an += w_j;
 	}
 }
 
