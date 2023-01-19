@@ -17,7 +17,8 @@ struct NeRFNetworkWorkspace : Workspace {
     float* pxdiff_buf; // pixel channel differences
     float* ray_rgba; // accumulated ray colors from samples
     float* loss_buf;
-    tcnn::network_precision_t* grad_buf;
+    tcnn::network_precision_t* sigma_grad_buf;
+    tcnn::network_precision_t* color_grad_buf;
 
 	// buffers for backpropagation
     float* density_network_dL_dinput;
@@ -46,7 +47,8 @@ struct NeRFNetworkWorkspace : Workspace {
         pxdiff_buf = allocate<float>(stream, 4 * batch_size);
         ray_rgba = allocate<float>(stream, 4 * batch_size);
         loss_buf = allocate<float>(stream, batch_size);
-        grad_buf = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
+        sigma_grad_buf = allocate<tcnn::network_precision_t>(stream, batch_size);
+        color_grad_buf = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);
     }
 };
 

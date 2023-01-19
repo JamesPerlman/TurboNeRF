@@ -64,8 +64,8 @@ public:
 	float* network_dir;
     float* network_dt;
 
-	tcnn::network_precision_t* network_sigma;
-	tcnn::network_precision_t* network_color;
+	tcnn::network_precision_t* network_concat;
+	tcnn::network_precision_t* network_output;
 
 	CascadedOccupancyGrid* occ_grid;
 
@@ -85,8 +85,8 @@ public:
 		const uint32_t& n_samples_per_batch,
 		const uint32_t& n_occ_grid_levels,
 		const uint32_t& n_occ_grid_cells_per_dimension,
-		const size_t& n_network_sigma_elements,
-		const size_t& n_network_color_elements
+		const size_t& n_network_concat_elements,
+		const size_t& n_network_output_elements
 	) {
 		free_allocations();
 		
@@ -128,8 +128,8 @@ public:
 		network_dir		= allocate<float>(stream, 3 * batch_size);
 		network_dt		= allocate<float>(stream, batch_size);
 		
-		network_sigma	= allocate<tcnn::network_precision_t>(stream, n_network_sigma_elements * batch_size);
-		network_color	= allocate<tcnn::network_precision_t>(stream, n_network_color_elements * batch_size);
+		network_concat	= allocate<tcnn::network_precision_t>(stream, n_network_concat_elements * batch_size);
+		network_output	= allocate<tcnn::network_precision_t>(stream, n_network_output_elements * batch_size);
 	}
 
 private:

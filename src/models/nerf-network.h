@@ -36,8 +36,8 @@ struct NerfNetwork {
 		float* dir_batch,
 		float* dt_batch,
 		float* target_rgba,
-		tcnn::network_precision_t* network_sigma,
-		tcnn::network_precision_t* network_color
+		tcnn::network_precision_t* concat_buffer,
+		tcnn::network_precision_t* output_buffer
 	);
 
 	void NerfNetwork::inference(
@@ -45,15 +45,16 @@ struct NerfNetwork {
 		const uint32_t& batch_size,
 		float* pos_batch,
 		float* dir_batch,
-		tcnn::network_precision_t* sigma, // density network output needs to be sized to get_network_input_width()
-		tcnn::network_precision_t* color // color network output needs to be sized to get_network_output_width()
+		tcnn::network_precision_t* concat_buffer,
+		tcnn::network_precision_t* output_buffer,
+		const bool& use_color_network = true // if this flag is false, we only run inference on the density network
 	);
 
-	size_t get_color_network_input_width() const {
+	size_t get_concat_buffer_width() const {
 		return color_network->input_width();
 	};
 
-	size_t get_color_network_output_width() const {
+	size_t get_padded_output_width() const {
 		return color_network->padded_output_width();
 	};
 
@@ -91,8 +92,8 @@ private:
 		const uint32_t& batch_size,
 		float* pos_batch,
 		float* dir_batch,
-		tcnn::network_precision_t* network_sigma,
-		tcnn::network_precision_t* network_color
+		tcnn::network_precision_t* concat_buffer,
+		tcnn::network_precision_t* output_buffer
 	);
 
 	float calculate_loss(
@@ -104,8 +105,8 @@ private:
 		const uint32_t* ray_steps_cumulative,
 		const float* sample_dt,
 		const float* target_rgba,
-		const tcnn::network_precision_t* network_sigma,
-		const tcnn::network_precision_t* network_color
+		const tcnn::network_precision_t* sigma_output,
+		const tcnn::network_precision_t* color_output
 	);
 
 	void optimizer_step(const cudaStream_t& stream);

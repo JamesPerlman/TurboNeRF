@@ -44,8 +44,8 @@ struct RenderingWorkspace: Workspace {
 	float* network_dt;
 
 	// network buffers
-	tcnn::network_precision_t* network_sigma;
-	tcnn::network_precision_t* network_color;
+	tcnn::network_precision_t* network_concat;
+	tcnn::network_precision_t* network_output;
 
 	// output buffers
 	float* pixel_buffer;
@@ -56,8 +56,8 @@ struct RenderingWorkspace: Workspace {
 		const uint32_t& output_width,
 		const uint32_t& output_height,
 		const uint32_t& n_elements_per_batch,
-		const uint32_t& n_network_sigma_elements,
-		const uint32_t& n_network_color_elements,
+		const uint32_t& n_network_concat_elements,
+		const uint32_t& n_network_output_elements,
 		const uint32_t& compaction_block_size
 	) {
 		free_allocations();
@@ -109,8 +109,8 @@ struct RenderingWorkspace: Workspace {
 		network_dt		= allocate<float>(stream, batch_size);
 
 		// network
-		network_sigma	= allocate<tcnn::network_precision_t>(stream, n_network_sigma_elements * batch_size);
-		network_color	= allocate<tcnn::network_precision_t>(stream, n_network_color_elements * batch_size);
+		network_concat	= allocate<tcnn::network_precision_t>(stream, n_network_concat_elements * batch_size);
+		network_output	= allocate<tcnn::network_precision_t>(stream, n_network_output_elements * batch_size);
 
 		// output
 		pixel_buffer	= allocate<float>(stream, n_output_pixel_elements);

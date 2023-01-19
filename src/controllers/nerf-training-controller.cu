@@ -47,8 +47,8 @@ void NeRFTrainingController::prepare_for_training(
 		batch_size,
 		nerf->occupancy_grid.n_levels,
 		nerf->occupancy_grid.resolution_i,
-		nerf->network.get_color_network_input_width(),
-		nerf->network.get_color_network_output_width()
+		nerf->network.get_concat_buffer_width(),
+		nerf->network.get_padded_output_width()
 	);
 
 	// Create a CascadedOccupancyGrid object and copy it to the GPU
@@ -300,8 +300,9 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				workspace.batch_size,
 				workspace.network_pos,
 				nullptr,
-				workspace.network_sigma,
-				nullptr
+				workspace.network_concat,
+				workspace.network_output,
+				false
 			);
 
 			// update occupancy grid values
@@ -312,9 +313,15 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				level,
 				selection_threshold,
 				workspace.random_float + 3 * workspace.batch_size, // (ptr + 3 * batch_size) is so thresholding doesn't correspond to x,y,z positions
-				workspace.network_sigma,
+				workspace.network_output + 3 * workspace.batch_size,
 				nerf->occupancy_grid.get_density()
 			);
+
+			CHECK_DATA(occ_dens_cpu, float, nerf->occupancy_grid.get_density() + level * grid_volume, grid_volume);
+
+			GPUMemory<float> gpu_sig(workspace.batch_size);
+			copy_and_cast(stream, workspace.batch_size, gpu_sig.data(), workspace.network_output + 3 * workspace.batch_size);
+			CHECK_DATA(cpu_sig, float, gpu_sig.data(), workspace.batch_size);
 
 			n_cells_updated += workspace.batch_size;
 		}
@@ -323,7 +330,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 	// update the bits by thresholding the density values
 
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
-	const float threshold = 0.01f * NeRFConstants::min_step_size;
+	const float threshold = 0.01f;// * NeRFConstants::min_step_size;
 
 	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
 		n_bitfield_bytes,
@@ -365,8 +372,8 @@ void NeRFTrainingController::train_step(const cudaStream_t& stream) {
 		workspace.network_dir,
 		workspace.network_dt,
 		workspace.pix_rgba,
-		workspace.network_sigma,
-		workspace.network_color
+		workspace.network_concat,
+		workspace.network_output
 	);
 
 	++training_step;

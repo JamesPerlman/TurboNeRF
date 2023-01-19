@@ -33,8 +33,8 @@ void NeRFRenderingController::request_render(
         request.output.width,
         request.output.height,
         batch_size,
-        nerf->network.get_color_network_input_width(),
-        nerf->network.get_color_network_output_width(),
+        nerf->network.get_concat_buffer_width(),
+        nerf->network.get_padded_output_width(),
         n_threads_linear
     );
 
@@ -50,7 +50,6 @@ void NeRFRenderingController::request_render(
             stream
         )
     );
-
 
     // workspace.bounding_box = nerf->bounding_box
     CUDA_CHECK_THROW(
@@ -162,8 +161,8 @@ void NeRFRenderingController::request_render(
                 network_batch,
                 workspace.network_pos,
                 workspace.network_dir,
-                workspace.network_sigma,
-                workspace.network_color
+                workspace.network_concat,
+                workspace.network_output
             );
 
             // CHECK_DATA(color_cpu, float, workspace.network_color, network_batch * 3);
@@ -184,8 +183,7 @@ void NeRFRenderingController::request_render(
                 n_rays_alive,
                 network_batch,
                 request.output.stride,
-                workspace.network_sigma,
-                workspace.network_color,
+                workspace.network_output,
                 workspace.network_dt,
                 workspace.ray_idx[active_buf_idx],
                 workspace.ray_active[active_buf_idx],

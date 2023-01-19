@@ -82,8 +82,7 @@ __global__ void composite_samples_kernel(
 	const uint32_t output_stride,
     
     // read-only
-    const tcnn::network_precision_t* __restrict__ network_sigma,
-    const tcnn::network_precision_t* __restrict__ network_rgb,
+    const tcnn::network_precision_t* __restrict__ network_output,
     const float* __restrict__ sample_dt,
     const uint32_t* __restrict__ sample_idx,
 	const bool* __restrict__ ray_active,

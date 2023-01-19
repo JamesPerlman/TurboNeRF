@@ -1,5 +1,6 @@
 
 #include <device_launch_parameters.h>
+#include <crt/device_functions.h>
 
 #include "rendering-kernels.cuh"
 #include "../models/bounding-box.cuh"
@@ -262,8 +263,7 @@ __global__ void composite_samples_kernel(
 	const uint32_t output_stride,
     
     // read-only
-    const network_precision_t* __restrict__ network_sigma,
-    const network_precision_t* __restrict__ network_rgb,
+    const network_precision_t* __restrict__ network_output,
     const float* __restrict__ sample_dt,
     const uint32_t* __restrict__ sample_idx,
 	const bool* __restrict__ ray_active,
@@ -286,9 +286,15 @@ __global__ void composite_samples_kernel(
     const uint32_t net_offset_0 = i;
     const uint32_t net_offset_1 = net_offset_0 + network_stride;
     const uint32_t net_offset_2 = net_offset_1 + network_stride;
+	const uint32_t net_offset_3 = net_offset_2 + network_stride;
+
+	const float s_r = (float)network_output[net_offset_0];
+	const float s_g = (float)network_output[net_offset_1];
+	const float s_b = (float)network_output[net_offset_2];
+	const float s_s = (float)network_output[net_offset_3];
 
 	// sample sigma
-	const float sigma_dt = (float)network_sigma[i] * sample_dt[i];
+	const float sigma_dt = s_s * sample_dt[i];
 
     // sample alpha
     const float s_a = 1.0f - __expf(-sigma_dt);
@@ -308,21 +314,10 @@ __global__ void composite_samples_kernel(
     const uint32_t idx_offset_2 = idx_offset_1 + output_stride;
     const uint32_t idx_offset_3 = idx_offset_2 + output_stride;
 
-    // const float p_r = output_rgba[idx_offset_0];
-    // const float p_g = output_rgba[idx_offset_1];
-    // const float p_b = output_rgba[idx_offset_2];
-    // const float p_a = output_rgba[idx_offset_3];
-
-    // transmittance
-    // const float p_t = 1.0f - p_a;
-
-    // alpha compositing
-    // new samples are composited behind current pixels
-    // aka new sample is the background, current pixel is the foreground
-
-	output_rgba[idx_offset_0] += s_w * (float)network_rgb[net_offset_0];
-	output_rgba[idx_offset_1] += s_w * (float)network_rgb[net_offset_1];
-	output_rgba[idx_offset_2] += s_w * (float)network_rgb[net_offset_2];
+	// composite the same way we do accumulation during training
+	output_rgba[idx_offset_0] += s_w * s_r;
+	output_rgba[idx_offset_1] += s_w * s_g;
+	output_rgba[idx_offset_2] += s_w * s_b;
 	output_rgba[idx_offset_3] += s_w;
 
 	// terminate ray if alpha >= 1.0

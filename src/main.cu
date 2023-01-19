@@ -81,25 +81,23 @@ int main()
 		nerf_ptrs.emplace_back(nerf);
 	}
 
-	for (int i = 0; i <= 30 * 60; ++i) {
-		if (i < 500) {
-			trainer.train_step(stream);
+	for (int i = 0; i <= 100000; ++i) {
+		trainer.train_step(stream);
 
-			// every 16 training steps, update the occupancy grid
+		// every 16 training steps, update the occupancy grid
 
-			if (i % 16 == 0 && i > 0) {
-				// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
-				const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
-				trainer.update_occupancy_grid(stream, cell_selection_threshold);
-			}
+		if (i % 16 == 0 && i > 0) {
+			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
+			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
+			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
 
-		if (i % 1 == 0 && i > 500) {
-			float progress = (float)i / (30.0f * 60.0f);
+		if (i % 16 == 0 && i > 0) {
+			float progress = 0.0f;// (float)i / (30.0f * 60.0f);
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(3.0f * progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
-				cam0.near,
+				4.0f,
 				cam0.far,
 				cam0.focal_length,
 				make_int2(1024, 1024),
