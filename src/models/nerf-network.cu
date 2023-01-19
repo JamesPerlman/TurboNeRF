@@ -52,6 +52,8 @@ NerfNetwork::NerfNetwork(const float& aabb_size) {
 		{"log2_hashmap_size", 19},
 		{"base_resolution", 16},
 		{"per_level_scale", per_level_scale},
+		// used by recommendation of Müller et al (instant-NGP paper, page 13 "Smooth Interpolation")
+		{"interpolation", "Smoothstep"},
 	};
 
 	json density_network_config = {
@@ -197,7 +199,6 @@ void NerfNetwork::train(
 		ray_steps_cum,
 		dt_batch,
 		target_rgba,
-		concat_buffer,
 		output_buffer
 	);
 
@@ -331,6 +332,14 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		true // prepare_input_gradients must be `true` otherwise backward() fails (forward->dy_dx is not defined)
 	);
 
+	// copy and exponentiate density network output
+
+	apply_exp_to_density_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
+		batch_size,
+		fwd_ctx->density_network_output_matrix.data(),
+		workspace.sigma_buf
+	);
+
 	// Encode directions (dir_batch)
 	// Direction encoding gets concatenated with density_network_output (which will just be the second half of concat_buffer)
 
@@ -392,7 +401,6 @@ float NerfNetwork::calculate_loss(
 	const uint32_t* ray_steps_cumulative,
 	const float* sample_dt,
 	const float* target_rgba,
-	const tcnn::network_precision_t* sigma_output,
 	const tcnn::network_precision_t* color_output
 ) {
 
@@ -410,8 +418,8 @@ float NerfNetwork::calculate_loss(
 		batch_size,
 		ray_steps,
 		ray_steps_cumulative,
-		sigma_output,
 		color_output,
+		workspace.sigma_buf,
 		sample_dt,
 		workspace.ray_rgba,
 		workspace.trans_buf,
@@ -445,7 +453,6 @@ float NerfNetwork::calculate_loss(
 		n_rays,
 		batch_size,
 		1.0f / (2.0f * n_raysf),
-		sigma_output,
 		color_output,
 		ray_steps,
 		ray_steps_cumulative,
@@ -453,6 +460,7 @@ float NerfNetwork::calculate_loss(
 		sample_dt,
 		workspace.trans_buf,
 		workspace.weight_buf,
+		workspace.sigma_buf,
 		LOSS_SCALE,
 		workspace.sigma_grad_buf,
 		workspace.color_grad_buf
