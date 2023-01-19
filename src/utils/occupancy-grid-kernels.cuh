@@ -33,8 +33,7 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t level,
     const float selection_threshold,
     const float* __restrict__ random_float,
-    const tcnn::network_precision_t* __restrict__ network_density,
-    float* __restrict__ grid_density
+    const tcnn::network_precision_t* __restrict__ network_density
 );
 
 __global__ void update_occupancy_grid_bits_kernel(

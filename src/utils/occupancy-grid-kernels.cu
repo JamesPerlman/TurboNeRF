@@ -87,8 +87,7 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t level,
     const float selection_threshold,
     const float* __restrict__ random_float,
-    const tcnn::network_precision_t* __restrict__ network_density,
-    float* __restrict__ grid_density
+    const tcnn::network_precision_t* __restrict__ network_density
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_samples) {
@@ -102,9 +101,9 @@ __global__ void update_occupancy_with_density_kernel(
         return;
     }
 
-    const uint32_t cell_idx = level * grid->volume_i + idx;
+    float* grid_density = grid->get_density() + level * grid->volume_i + idx;
 
-    grid_density[cell_idx] = fmaxf(grid_density[cell_idx], (float)network_density[idx]);
+    *grid_density = fmaxf(*grid_density, (float)network_density[idx]);
 }
 
 // occupancy bits are updated by thresholding each cell's density, default = 0.01 * 1024 / sqrt(3)

@@ -294,6 +294,8 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				workspace.network_pos
 			);
 
+			CHECK_DATA(netpos_cpu, float, workspace.network_pos, workspace.batch_size * 3);
+
 			// query the density network
 			nerf->network.inference(
 				stream,
@@ -305,6 +307,12 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				false
 			);
 
+			GPUMemory<float> netout_gpu(workspace.batch_size * 1);
+			copy_and_cast(stream, workspace.batch_size, netout_gpu.data(), workspace.network_output + 3 * workspace.batch_size);
+
+			CHECK_DATA(netout_cpu, float, netout_gpu.data(), workspace.batch_size * 1);
+
+			CHECK_DATA(grid_dens_cpu1, float, nerf->occupancy_grid.get_density() + grid_volume * level, grid_volume);
 			// update occupancy grid values
 			update_occupancy_with_density_kernel<<<n_blocks_linear(n_cells_to_update), n_threads_linear, 0, stream>>>(
 				n_cells_to_update,
@@ -312,11 +320,12 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				workspace.occ_grid,
 				level,
 				selection_threshold,
-				workspace.random_float + 3 * workspace.batch_size, // (ptr + 3 * batch_size) is so thresholding doesn't correspond to x,y,z positions
-				workspace.network_output + 3 * workspace.batch_size,
-				nerf->occupancy_grid.get_density()
+				workspace.random_float + 3 * workspace.batch_size, // (random_float + 3 * batch_size) is so thresholding doesn't correspond to x,y,z positions
+				workspace.network_output + 3 * workspace.batch_size
 			);
-			
+
+			CHECK_DATA(grid_dens_cpu, float, nerf->occupancy_grid.get_density() + grid_volume * level, grid_volume);
+
 			n_cells_updated += workspace.batch_size;
 		}
 	}
@@ -324,7 +333,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 	// update the bits by thresholding the density values
 
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
-	const float threshold = 0.01f * NeRFConstants::min_step_size;
+	const float threshold = 1000.01f * NeRFConstants::min_step_size;
 
 	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
 		n_bitfield_bytes,
