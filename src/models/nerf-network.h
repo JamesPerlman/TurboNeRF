@@ -105,7 +105,6 @@ private:
 		const uint32_t* ray_steps_cumulative,
 		const float* sample_dt,
 		const float* target_rgba,
-		const tcnn::network_precision_t* sigma_output,
 		const tcnn::network_precision_t* color_output
 	);
 

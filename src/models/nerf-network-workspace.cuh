@@ -13,6 +13,7 @@ struct NeRFNetworkWorkspace : Workspace {
     // gradient calculation buffers
     float* trans_buf;
     float* weight_buf; // alpha * transmittance
+    float* sigma_buf; // e^(sigma - 1) 
     float* pxdiff_buf; // pixel channel differences
     float* ray_rgba; // accumulated ray colors from samples
     float* loss_buf;
@@ -42,6 +43,7 @@ struct NeRFNetworkWorkspace : Workspace {
 
         trans_buf = allocate<float>(stream, batch_size);
         weight_buf = allocate<float>(stream, batch_size);
+        sigma_buf = allocate<float>(stream, batch_size);
         pxdiff_buf = allocate<float>(stream, 4 * batch_size);
         ray_rgba = allocate<float>(stream, 4 * batch_size);
         loss_buf = allocate<float>(stream, batch_size);

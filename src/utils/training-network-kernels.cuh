@@ -23,7 +23,7 @@ __global__ void apply_exp_to_density_kernel(
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i < batch_size) {
-		output[i] = (Output)__expf((float)input[i]);
+		output[i] = (Output)__expf((float)input[i] - 1.0f);
 	}
 }
 
@@ -40,8 +40,8 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	const uint32_t* __restrict__ n_samples_cum,
 
 	// these input buffers organized based on the cumulative steps
-	const tcnn::network_precision_t* __restrict__ network_sigma,
 	const tcnn::network_precision_t* __restrict__ network_color,
+	const float* __restrict__ sample_sigma,
 	const float* __restrict__ sample_dt,
 
 	// output buffers
@@ -59,7 +59,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	const uint32_t sample_offset = n_samples_cum[i] - n_samples;
 
 	// sigma
-	const tcnn::network_precision_t* __restrict__ s_s = network_sigma + sample_offset;
+	const float* __restrict__ s_s = sample_sigma + sample_offset;
 
 	// rgb
 	const tcnn::network_precision_t* __restrict__ s_r = network_color + sample_offset;
@@ -84,8 +84,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 		// thank you NerfAcc (render_transmittance.cu - transmittance_from_sigma_forward_kernel)
 		const float dt = s_dt[j];
 		
-		// we need to apply the __expf post-activation to treat the density network output as being in logarithmic space.
-		const float sigma_j = __expf((float)s_s[j]);
+		const float sigma_j = s_s[j];
 		const float sigma_j_dt = sigma_j * dt;
 
 		const float trans = __expf(-sigma_dt_sum);
@@ -158,7 +157,6 @@ __global__ void calculate_network_output_gradient(
 	const uint32_t n_rays,
 	const uint32_t batch_size, // aka data stride
 	const float inv_2npix,
-	const tcnn::network_precision_t* __restrict__ network_sigma,
 	const tcnn::network_precision_t* __restrict__ network_rgb,
 	const uint32_t* __restrict__ n_samples_per_ray,
 	const uint32_t* __restrict__ n_samples_cum,
@@ -166,6 +164,7 @@ __global__ void calculate_network_output_gradient(
 	const float* __restrict__ sample_dt, // per sample
 	const float* __restrict__ sample_trans,
 	const float* __restrict__ sample_weight,
+	const float* __restrict__ sample_sigma,
 	const float loss_scale,
 
 	// output
@@ -191,6 +190,7 @@ __global__ void calculate_network_output_gradient(
 	const float* dt = sample_dt + sample_offset;
 	const float* weight = sample_weight + sample_offset;
 	const float* trans = sample_trans + sample_offset;
+	const float* sigma = sample_sigma + sample_offset;
 
 	const float dr = pixel_diffs[i + 0 * batch_size];
 	const float dg = pixel_diffs[i + 1 * batch_size];
@@ -200,8 +200,6 @@ __global__ void calculate_network_output_gradient(
 	const tcnn::network_precision_t* sr = network_rgb + sample_offset;
 	const tcnn::network_precision_t* sg = sr + batch_size;
 	const tcnn::network_precision_t* sb = sg + batch_size;
-
-	const tcnn::network_precision_t* sd = network_sigma + sample_offset;
 
 	// for gradient formula derivations, look at "/research/NeRF Loss Function Derivation.pdf"
 
@@ -213,7 +211,7 @@ __global__ void calculate_network_output_gradient(
 	// decrementing loop
 	for (int j = n_samples - 1; j >= 0; --j) {
 		// We need a lot of variables...
-		const float es_j = __expf((float)sd[j]);
+		const float es_j = sigma[j];
 		const float dt_j = dt[j];
 		const float T_j = trans[j];
 		const float w_j = weight[j];
