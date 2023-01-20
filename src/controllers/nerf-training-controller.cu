@@ -161,9 +161,9 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 
 	/* Begin volumetric sampling of the previous network outputs */
 	
-	float dt_min = NeRFConstants::min_step_size;
-	float dt_max = dataset.bounding_box.size_x * dt_min;
-	float cone_angle = 1.0f / 256.0f; // ???
+	const float dt_min = NeRFConstants::min_step_size;
+	const float dt_max = dataset.bounding_box.size_x * dt_min;
+	const float cone_angle = 1.0f / 256.0f; // ???
 
 	// Count the number of steps each ray would take.  We only need to do this for the new rays.
 	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
@@ -254,6 +254,34 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	cudaMemcpyAsync(&n_samples_in_batch, n_steps_cum_ptr.get() + n_ray_max_idx, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream);
 }
 
+// just a debug tool
+
+template <typename T>
+void minmaxavg(T* arr, int n, std::string label = "") {
+	// // loop through grid_dens_cpu1, calculate min, max, and average
+	T min = numeric_limits<T>::max();
+	T max = numeric_limits<T>::min();
+	T avg = 0.0f;
+
+	for (int i = 0; i < n; ++i) {
+		T val = arr[i];
+		if (val < min) {
+			min = val;
+		}
+		if (val > max) {
+			max = val;
+		}
+		avg += val;
+	}
+
+	avg /= n;
+	printf("%s: ", label.c_str());
+
+	printf("min: %f, max: %f, avg: %f\n", min, max, avg);
+}
+
+// update occupancy grid
+
 void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, const float& selection_threshold) {
 	const uint32_t grid_volume = nerf->occupancy_grid.volume_i;
 	const uint32_t n_bitfield_bytes = nerf->occupancy_grid.get_n_bitfield_elements();
@@ -294,8 +322,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				workspace.network_pos
 			);
 
-			CHECK_DATA(netpos_cpu, float, workspace.network_pos, workspace.batch_size * 3);
-
+			// CHECK_DATA(netpos_cpu, float, workspace.network_pos, workspace.batch_size * 3);
 			// query the density network
 			nerf->network.inference(
 				stream,
@@ -307,12 +334,13 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				false
 			);
 
-			GPUMemory<float> netout_gpu(workspace.batch_size * 1);
-			copy_and_cast(stream, workspace.batch_size, netout_gpu.data(), workspace.network_output + 3 * workspace.batch_size);
+			// GPUMemory<float> netout_gpu(workspace.batch_size * 1);
+			// copy_and_cast(stream, workspace.batch_size, netout_gpu.data(), workspace.network_output + 3 * workspace.batch_size);
 
-			CHECK_DATA(netout_cpu, float, netout_gpu.data(), workspace.batch_size * 1);
+			// CHECK_DATA(netout_cpu, float, netout_gpu.data(), workspace.batch_size * 1);
 
-			CHECK_DATA(grid_dens_cpu1, float, nerf->occupancy_grid.get_density() + grid_volume * level, grid_volume);
+			// CHECK_DATA(grid_dens_cpu1, float, nerf->occupancy_grid.get_density() + grid_volume * level, grid_volume);
+
 			// update occupancy grid values
 			update_occupancy_with_density_kernel<<<n_blocks_linear(n_cells_to_update), n_threads_linear, 0, stream>>>(
 				n_cells_to_update,
@@ -326,6 +354,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 
 			CHECK_DATA(grid_dens_cpu, float, nerf->occupancy_grid.get_density() + grid_volume * level, grid_volume);
 
+			minmaxavg(grid_dens_cpu.data(), grid_dens_cpu.size(), "Density Grid");
 			n_cells_updated += workspace.batch_size;
 		}
 	}

@@ -23,7 +23,7 @@ __global__ void apply_exp_to_density_kernel(
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i < batch_size) {
-		output[i] = (Output)__expf((float)input[i] - 1.0f);
+		output[i] = (Output)__expf(fminf((float)input[i] - 1.0f, 80.f));
 	}
 }
 
@@ -88,10 +88,10 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 		const float sigma_j_dt = sigma_j * dt;
 
 		const float trans = __expf(-sigma_dt_sum);
+		sigma_dt_sum += sigma_j_dt;
+
 		const float alpha = 1.0f - __expf(-sigma_j_dt);
 		const float weight = alpha * trans;
-		
-		sigma_dt_sum += sigma_j_dt;
 
 		// accumulate the color
 		ray_r += weight * (float)s_r[j];
@@ -211,9 +211,10 @@ __global__ void calculate_network_output_gradient(
 	// decrementing loop
 	for (int j = n_samples - 1; j >= 0; --j) {
 		// We need a lot of variables...
-		const float es_j = sigma[j];
-		const float dt_j = dt[j];
 		const float T_j = trans[j];
+		// stop raymarching if transmittance is too small?
+		const float es_j = fminf(sigma[j], 1e7);
+		const float dt_j = dt[j];
 		const float w_j = weight[j];
 		
 		const float r_j = sr[j];

@@ -160,7 +160,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			break;
 		}
 
-		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
+		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			ray_t[i] = tmid;
@@ -191,7 +191,6 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			);
 		}
 	}
-
 }
 
 // ray compaction

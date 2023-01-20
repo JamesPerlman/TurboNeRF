@@ -30,9 +30,14 @@ using json = nlohmann::json;
 NerfNetwork::NerfNetwork(const float& aabb_size) {
 	this->aabb_size = aabb_size;
 
-	// TODO: set this properly based on the aabb
-	double per_level_scale = 1.4472692012786865;
+	// These values are from the Instant-NGP paper, page 4. "Multiresolution Hash Encoding"
+	double n_levels = 16.0;
+	double N_min = 16.0;
+	double N_max = 524288.0;
+	double b = exp((log(N_max) - log(N_min)) / (n_levels - 1.0));
 
+	// These network configurations were adapted from nerfstudio
+	
 	// Create the Direction Encoding
 	json direction_encoding_config = {
 		{"otype", "SphericalHarmonics"},
@@ -51,7 +56,7 @@ NerfNetwork::NerfNetwork(const float& aabb_size) {
 		{"n_features_per_level", 2},
 		{"log2_hashmap_size", 19},
 		{"base_resolution", 16},
-		{"per_level_scale", per_level_scale},
+		{"per_level_scale", b},
 		// used by recommendation of Müller et al (instant-NGP paper, page 13 "Smooth Interpolation")
 		{"interpolation", "Smoothstep"},
 	};

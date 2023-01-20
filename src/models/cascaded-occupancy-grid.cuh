@@ -158,7 +158,7 @@ struct CascadedOccupancyGrid {
 		const int& level,
 		const float& x, const float& y, const float& z
 	) const {
-		const uint32_t byte_idx = get_voxel_morton_index(level, x, y, z) / 8;
+		const uint32_t byte_idx = get_voxel_morton_index(level, x, y, z);
 		return is_occupied_at(level, byte_idx);
 	}
 
@@ -170,46 +170,21 @@ struct CascadedOccupancyGrid {
 	 */
 	inline NRC_HOST_DEVICE int get_grid_level_at(
 		const float& x, const float& y, const float& z,
-		const float& dt_min
+		const float& dt
 	) const {
 		for (int k = 0; k < n_levels; ++k) {
-			const float level_size = 1 << k;
+			const float level_size = get_level_size(k);
 			const float level_half_size = 0.5f * level_size;
 			const float cell_size = level_size * inv_resolution_f;
 			
 			// might be able to eliminate the = in <= here
-			const bool grid_k_covers_xyz = fabsf(x) <= level_half_size && fabsf(y) <= level_half_size && fabsf(z) <= level_half_size;
-			if (grid_k_covers_xyz && cell_size > dt_min) {
+			const bool grid_k_covers_xyz = fabsf(x) < level_half_size && fabsf(y) < level_half_size && fabsf(z) < level_half_size;
+			if (grid_k_covers_xyz && cell_size > dt) {
 				return k;
 			}
 		}
 		// fallthrough - return largest grid
 		return n_levels - 1;
-	}
-
-	// Stepping along a ray as in a Digital Differential Analyzer (DDA), get the distance to the next voxel
-	// thank you NerfAcc
-	inline NRC_HOST_DEVICE float get_t_to_next_voxel(
-		const float& ray_pos_x, const float& ray_pos_y, const float& ray_pos_z,
-		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
-		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z,
-		const float& dt_min,
-		const int& grid_level
-	) const {
-		const float level_size= get_level_size(grid_level);
-		const float i_level_size = 1.0f / level_size;
-
-		// normalize xyz to [0, 1] for the current level
-		const float x = (ray_pos_x * i_level_size + 0.5f) * resolution_f;
-		const float y = (ray_pos_y * i_level_size + 0.5f) * resolution_f;
-		const float z = (ray_pos_z * i_level_size + 0.5f) * resolution_f;
-		
-		// not really sure how this works, it's from NerfAcc.  It finds the t-space distance to the next voxel
-		const float tx = ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
-		const float ty = ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
-		const float tz = ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
-
-		return fmaxf(dt_min, fminf(fminf(tx, ty), tz)) / resolution_f * level_size;
 	}
 
 	// Gets the t-value required to step the ray to the next voxel
@@ -221,14 +196,22 @@ struct CascadedOccupancyGrid {
 		const float& dt_min,
 		const int& grid_level
 	) const {
-		const float t_target = get_t_to_next_voxel(
-			ray_pos_x, ray_pos_y, ray_pos_z,
-			ray_dir_x, ray_dir_y, ray_dir_z,
-			inv_dir_x, inv_dir_y, inv_dir_z,
-			dt_min,
-			grid_level
-		);
+		const float level_size = get_level_size(grid_level);
+		const float i_level_size = 1.0f / level_size;
+
+		// normalize xyz to [0, resolution] for the current level
+		const float x = (ray_pos_x * i_level_size + 0.5f) * resolution_f;
+		const float y = (ray_pos_y * i_level_size + 0.5f) * resolution_f;
+		const float z = (ray_pos_z * i_level_size + 0.5f) * resolution_f;
 		
+		// not really sure how this works, it's from NerfAcc.  It finds the t-space distance to the next voxel
+		const float tx = ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
+		const float ty = ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
+		const float tz = ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
+
+		const float t_target = fmaxf(dt_min, fminf(fminf(tx, ty), tz)) / resolution_f * level_size;
+
+		// replace with some fast round up/divide function
 		return ceilf(t_target / dt_min) * dt_min;
 	}
 

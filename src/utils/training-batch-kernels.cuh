@@ -197,7 +197,8 @@ __global__ void march_and_count_steps_per_ray_kernel(
 
 	while (true) {
 		const float t0 = t;
-		t += occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+		t += dt;
 		const float tmid = 0.5f * (t0 + t);
 
 		const float x = o_x + tmid * d_x;
@@ -208,7 +209,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 			break;
 		}
 
-		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
+		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			++n_steps_taken;
@@ -305,7 +306,8 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 
 	while (true) {
 		const float t0 = t;
-		t += occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+		t += dt;
 		const float t1 = t;
 
 		const float tmid = (t0 + t1) * 0.5f;
@@ -318,7 +320,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			break;
 		}
 
-		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt_min);
+		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			/**
