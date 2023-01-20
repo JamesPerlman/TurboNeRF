@@ -83,7 +83,6 @@ int main()
 
 	for (int i = 0; i <= 100000; ++i) {
 		trainer.train_step(stream);
-
 		// every 16 training steps, update the occupancy grid
 
 		if (i % 16 == 0 && i > 0) {
@@ -92,10 +91,10 @@ int main()
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
 
-		if (i % 1000 == 0 && i > 0) {
-			float progress = 0.0f;//(float)i / (30.0f * 60.0f);
+		if (i > 0 && i % 100 == 0) {
+			float progress = ((float)i - 1000.f) / 100.f;//(float)(i - 77) * 6.f / 360.f;//(float)i / (30.0f * 60.0f);
 			float tau = 2.0f * 3.14159f;
-			auto tform = nrc::Matrix4f::Rotation(3.0f * progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
+			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
 				cam0.near,
 				cam0.far,
@@ -108,7 +107,7 @@ int main()
 			auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);
 			render_request.output.clear(stream);
 			renderer.request_render(stream, render_request);
-			render_request.output.save_image(stream, fmt::format("H:\\test-render-2\\step-{}.png", i));
+			render_request.output.save_image(stream, fmt::format("H:\\expfix\\step-{}.png", i));
 		}
 	}
 
