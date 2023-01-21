@@ -62,7 +62,6 @@ set(HEADERS
 	# utils
 	src/utils/bit-utils.cuh
 	src/utils/coordinate-transformations.cuh
-	src/utils/cu-compactor.cuh
 	src/utils/gpu-image.cuh
 	src/utils/linalg/transform4f.cuh
 	src/utils/linalg.cuh
@@ -70,6 +69,7 @@ set(HEADERS
 	src/utils/occupancy-grid-kernels.cuh
 	src/utils/parallel-utils.cuh
 	src/utils/rendering-kernels.cuh
+	src/utils/stream-compaction.cuh
 	src/utils/training-batch-kernels.cuh
 	src/utils/training-network-kernels.cuh
 
@@ -93,10 +93,10 @@ set(SOURCES
 	src/models/training-image.cu
 
 	# utils
-	src/utils/cu-compactor.cu
 	src/utils/gpu-image.cu
 	src/utils/occupancy-grid-kernels.cu
 	src/utils/rendering-kernels.cu
+	src/utils/stream-compaction.cu
 
 	# common
 	src/main.cu	

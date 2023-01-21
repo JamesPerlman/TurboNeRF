@@ -1,10 +1,10 @@
 #include <tiny-cuda-nn/common.h>
 #include "nerf-rendering-controller.h"
 #include "../models/camera.cuh"
-#include "../utils/cu-compactor.cuh"
 #include "../utils/nerf-constants.cuh"
 #include "../utils/parallel-utils.cuh"
 #include "../utils/rendering-kernels.cuh"
+#include "../utils/stream-compaction.cuh"
 
 using namespace nrc;
 using namespace tcnn;
@@ -193,13 +193,10 @@ void NeRFRenderingController::request_render(
             );
 
             // update how many rays are still alive
-            const int n_rays_to_compact = calculate_block_counts_and_offsets(
+            const int n_rays_to_compact = count_true_elements(
                 stream,
                 n_rays_alive,
-                workspace.c_block_size,
-                workspace.ray_alive,
-                workspace.c_block_counts,
-                workspace.c_block_offsets
+                workspace.ray_alive
             );
 
             // if no rays are alive, we can skip compositing
@@ -213,9 +210,7 @@ void NeRFRenderingController::request_render(
                 generate_compaction_indices(
                     stream,
                     n_rays_alive,
-                    workspace.c_block_size,
                     workspace.ray_alive,
-                    workspace.c_block_offsets,
                     workspace.compact_idx
                 );
 

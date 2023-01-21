@@ -500,18 +500,8 @@ float NerfNetwork::calculate_loss(
 		workspace.pxdiff_buf
 	);
 	
-
-	// Zero all gradients
-	CUDA_CHECK_THROW(
-		cudaMemsetAsync(workspace.sigma_grad_buf, 0, batch_size, stream)
-	);
-
-	CUDA_CHECK_THROW(
-		cudaMemsetAsync(workspace.color_grad_buf, 0, batch_size * color_network->padded_output_width(), stream)
-	);
-
 	// Calculate gradients
-	calculate_network_output_gradient<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+	calculate_network_output_gradient<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		1.0f / (2.0f * n_raysf),
@@ -528,6 +518,26 @@ float NerfNetwork::calculate_loss(
 		LOSS_SCALE,
 		workspace.sigma_grad_buf,
 		workspace.color_grad_buf
+	);
+
+	// zero extra gradients
+	CUDA_CHECK_THROW(
+		cudaMemsetAsync(
+			workspace.color_grad_buf + n_samples,
+			0,
+			(batch_size - n_samples) * sizeof(network_precision_t),
+			stream
+		)
+	);
+
+	
+	CUDA_CHECK_THROW(
+		cudaMemsetAsync(
+			workspace.sigma_grad_buf + n_samples,
+			0,
+			(batch_size - n_samples) * sizeof(network_precision_t),
+			stream
+		)
 	);
 
 	// Add all loss values together
