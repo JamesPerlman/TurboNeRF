@@ -23,7 +23,7 @@ __global__ void apply_exp_to_density_kernel(
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i < batch_size) {
-		output[i] = (Output)__expf(fminf((float)input[i] - 1.0f, 80.f));
+		output[i] = (Output)__expf((float)input[i] - 1.0f);
 	}
 }
 
@@ -31,6 +31,7 @@ __global__ void apply_exp_to_density_kernel(
 
 /**
  * Accumulate the sample colors by ray.
+ * This is differentiable wrt inputs network_color, sample_sigma, sample_dt
  */
 
 __global__ void accumulate_ray_colors_from_samples_kernel(
@@ -40,6 +41,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	const uint32_t* __restrict__ n_samples_cum,
 
 	// these input buffers organized based on the cumulative steps
+	const tcnn::network_precision_t* __restrict__ network_sigma,
 	const tcnn::network_precision_t* __restrict__ network_color,
 	const float* __restrict__ sample_sigma,
 	const float* __restrict__ sample_dt,
@@ -60,6 +62,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 
 	// sigma
 	const float* __restrict__ s_s = sample_sigma + sample_offset;
+	const tcnn::network_precision_t* __restrict__ n_s = network_sigma + sample_offset;
 
 	// rgb
 	const tcnn::network_precision_t* __restrict__ s_r = network_color + sample_offset;
@@ -81,10 +84,9 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 
 	// Accumulate samples
 	for (int j = 0; j < n_samples; ++j) {
-		// thank you NerfAcc (render_transmittance.cu - transmittance_from_sigma_forward_kernel)
 		const float dt = s_dt[j];
 		
-		const float sigma_j = s_s[j];
+		const float sigma_j = __expf(fminf((float)n_s[j] - 1.0f, 10.0f));
 		const float sigma_j_dt = sigma_j * dt;
 
 		const float trans = __expf(-sigma_dt_sum);
@@ -119,6 +121,7 @@ __global__ void calculate_sse_loss_per_ray_kernel(
 	const uint32_t* __restrict__ n_samples_cum,
 	const float* __restrict__ ray_rgba, // this is the accumulated ray color
 	const float* __restrict__ target_rgba, // the ground-truth pixel colors for each ray
+	const float* __restrict__ sample_sigma,
     // const float loss_scale,
 	float* __restrict__ out_loss, // per ray
 	float* __restrict__ pixel_diffs // difference in ray color vs ground truth, stored per sample index
@@ -140,7 +143,7 @@ __global__ void calculate_sse_loss_per_ray_kernel(
 	const float db = ray_rgba[i_offset_2] - target_rgba[i_offset_2];
 	const float da = ray_rgba[i_offset_3] - target_rgba[i_offset_3];
 
-	// squared error sum per ray color component
+	// squared sum of errors per ray color component
 	out_loss[i] = dr * dr + dg * dg + db * db + da * da;
 	
 	// Store pixel difference values for gradient calculation
@@ -157,6 +160,8 @@ __global__ void calculate_network_output_gradient(
 	const uint32_t n_rays,
 	const uint32_t batch_size, // aka data stride
 	const float inv_2npix,
+	const float n_pix,
+	const tcnn::network_precision_t* __restrict__ network_sigma,
 	const tcnn::network_precision_t* __restrict__ network_rgb,
 	const uint32_t* __restrict__ n_samples_per_ray,
 	const uint32_t* __restrict__ n_samples_cum,
@@ -202,18 +207,14 @@ __global__ void calculate_network_output_gradient(
 	const tcnn::network_precision_t* sb = sg + batch_size;
 
 	// for gradient formula derivations, look at "/research/NeRF Loss Function Derivation.pdf"
-
-	float sum_tn_an_rn = 0.0f;
-	float sum_tn_an_gn = 0.0f;
-	float sum_tn_an_bn = 0.0f;
-	float sum_tn_an = 0.0f;
+	const tcnn::network_precision_t* net_sig = network_sigma + sample_offset;
 
 	// decrementing loop
-	for (int j = n_samples - 1; j >= 0; --j) {
+	for (int j = 0; j < n_samples; ++j) {
 		// We need a lot of variables...
 		const float T_j = trans[j];
 		// stop raymarching if transmittance is too small?
-		const float es_j = fminf(sigma[j], 1e7);
+		const float es_j = __expf(fminf((float)net_sig[j] - 1.0f, 10.0f));
 		const float dt_j = dt[j];
 		const float w_j = weight[j];
 		
@@ -229,18 +230,28 @@ __global__ void calculate_network_output_gradient(
 
 		// Sigma gradients are a bit more complicated...
 
+		// const float dLr_dsj = 4.0f * inv_2npix * dr * (dt_j * es_j) * ((T_j - w_j) * r_j - sum_wn_rn);
+		float sum_wn_rn = 0.0f;
+		float sum_wn_gn = 0.0f;
+		float sum_wn_bn = 0.0f;
+		float sum_wn = 0.0f;
+
+		for (int n = j; n < n_samples; ++n) {
+			sum_wn_rn += weight[n] * (float)sr[n];
+			sum_wn_gn += weight[n] * (float)sg[n];
+			sum_wn_bn += weight[n] * (float)sb[n];
+			sum_wn += weight[n];
+		}
+
 		const float k = T_j - w_j;
-		const float dLr_dsj = dr * (k * r_j - sum_tn_an_rn);
-		const float dLg_dsj = dg * (k * g_j - sum_tn_an_gn);
-		const float dLb_dsj = db * (k * b_j - sum_tn_an_bn);
-		const float dLa_dsj = da * (k - sum_tn_an);
 
-		grad_s[j] = (tcnn::network_precision_t)(loss_scale * inv_2npix * (dt_j * es_j) * (dLr_dsj + dLg_dsj + dLb_dsj + dLa_dsj));
+		const float dLr_dsj = 2.0f / n_pix * dr * (dt_j * es_j) * (k * r_j - sum_wn_rn);
+		const float dLg_dsj = 2.0f / n_pix * dg * (dt_j * es_j) * (k * g_j - sum_wn_gn);
+		const float dLb_dsj = 2.0f / n_pix * db * (dt_j * es_j) * (k * b_j - sum_wn_bn);
+		// const float dLa_dsj = 4.0f * inv_2npix * da * (dt_j * es_j) * ((T_j - w_j) - sum_wn);
+		const float dLa_dsj = 2.0f / n_pix * da * (dt_j * es_j) * (k - sum_wn);
 
-		sum_tn_an_rn += w_j * r_j;
-		sum_tn_an_gn += w_j * g_j;
-		sum_tn_an_bn += w_j * b_j;
-		sum_tn_an += w_j;
+		grad_s[j] = (tcnn::network_precision_t)(loss_scale * 0.25 * (dLr_dsj + dLg_dsj + dLb_dsj + dLa_dsj));
 	}
 }
 
@@ -253,7 +264,7 @@ __global__ void modify_density_dL_doutput_kernel(
 	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (i < batch_size) {
-		dL_doutput[i] = sigma_grad[i];
+		dL_doutput[i] = dL_doutput[i] * sigma_grad[i];
 	}
 }
 

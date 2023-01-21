@@ -26,27 +26,6 @@
 #include "models/cascaded-occupancy-grid.cuh"
 int main()
 {
-
-	float ray_ori_x = 1.0f;
-	float ray_ori_y = 1.0f;
-	float ray_ori_z = 1.0f;
-	float ray_dir_x = 1.0f / sqrt(3.0f);
-	float ray_dir_y = 1.0f / sqrt(3.0f);
-	float ray_dir_z = 1.0f / sqrt(3.0f);
-	float ray_idir_x = 1.0f / ray_dir_x;
-	float ray_idir_y = 1.0f / ray_dir_y;
-	float ray_idir_z = 1.0f / ray_dir_z;
-
-	nrc::CascadedOccupancyGrid grid(5);
-
-	const float dt = grid.get_dt_to_next_voxel(
-		ray_ori_x, ray_ori_y, ray_ori_z,
-		ray_dir_x, ray_dir_y, ray_dir_z,
-		ray_idir_x, ray_idir_y, ray_idir_z,
-		0.01 * sqrt(3.0f) / 1024.0f,
-		4
-	);
-
 	nrc::Dataset dataset = nrc::Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json");
 	// auto dataset = nrc::Dataset("E:\\2022\\nerf-library\\FascinatedByFungi2022\\big-white-chanterelle\\transforms.json");
 	auto nerf_manager = nrc::NeRFManager();
@@ -91,8 +70,8 @@ int main()
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
 
-		if (i > 0 && i % 100 == 0) {
-			float progress = ((float)i - 1000.f) / 100.f;//(float)(i - 77) * 6.f / 360.f;//(float)i / (30.0f * 60.0f);
+		if (i > 0 && i % 1000 == 0) {
+			float progress = 0.0f;//((float)i - 1000.f) / 100.f;//(float)(i - 77) * 6.f / 360.f;//(float)i / (30.0f * 60.0f);
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
@@ -107,7 +86,7 @@ int main()
 			auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);
 			render_request.output.clear(stream);
 			renderer.request_render(stream, render_request);
-			render_request.output.save_image(stream, fmt::format("H:\\expfix\\step-{}.png", i));
+			render_request.output.save_image(stream, fmt::format("H:\\good\\step-{}.png", i));
 		}
 	}
 

@@ -245,7 +245,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.batch_size
 	);
 
-	if (n_ray_max_idx <= 0) {
+	if (n_ray_max_idx < 0) {
 		// TODO: better error handling
 		throw std::runtime_error("Sample batch does not contain any rays!\n");
 	}
@@ -322,7 +322,6 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				workspace.network_pos
 			);
 
-			// CHECK_DATA(netpos_cpu, float, workspace.network_pos, workspace.batch_size * 3);
 			// query the density network
 			nerf->network.inference(
 				stream,
@@ -333,13 +332,6 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				workspace.network_output,
 				false
 			);
-
-			// GPUMemory<float> netout_gpu(workspace.batch_size * 1);
-			// copy_and_cast(stream, workspace.batch_size, netout_gpu.data(), workspace.network_output + 3 * workspace.batch_size);
-
-			// CHECK_DATA(netout_cpu, float, netout_gpu.data(), workspace.batch_size * 1);
-
-			// CHECK_DATA(grid_dens_cpu1, float, nerf->occupancy_grid.get_density() + grid_volume * level, grid_volume);
 
 			// update occupancy grid values
 			update_occupancy_with_density_kernel<<<n_blocks_linear(n_cells_to_update), n_threads_linear, 0, stream>>>(
