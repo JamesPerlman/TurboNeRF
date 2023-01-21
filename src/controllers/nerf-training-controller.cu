@@ -163,7 +163,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	
 	const float dt_min = NeRFConstants::min_step_size;
 	const float dt_max = dataset.bounding_box.size_x * dt_min;
-	const float cone_angle = 1.0f / 256.0f; // ???
+	const float cone_angle = NeRFConstants::cone_angle;
 
 	// Count the number of steps each ray would take.  We only need to do this for the new rays.
 	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
