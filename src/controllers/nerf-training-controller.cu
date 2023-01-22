@@ -354,7 +354,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 	// update the bits by thresholding the density values
 
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
-	const float threshold = 0.01f * NeRFConstants::min_step_size;
+	const float threshold = 1.f * NeRFConstants::min_step_size;
 
 	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
 		n_bitfield_bytes,

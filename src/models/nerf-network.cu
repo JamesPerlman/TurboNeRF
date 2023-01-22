@@ -209,59 +209,57 @@ void NerfNetwork::train(
 	);
 	printf("Loss: %f / # Rays: %lu\n", mse_loss, n_rays);
 
-// 	GPUMemory<float>colorgrad_gpu(batch_size * 3);
-// 	copy_and_cast(stream, 3 * batch_size, colorgrad_gpu.data(), workspace.color_grad_buf);
-// 	CHECK_DATA(colorgrad_cpu, float, colorgrad_gpu.data(), 3 * batch_size);
+	GPUMemory<float>colorgrad_gpu(batch_size * 3);
+	copy_and_cast(stream, 3 * batch_size, colorgrad_gpu.data(), workspace.color_grad_buf);
+	CHECK_DATA(colorgrad_cpu, float, colorgrad_gpu.data(), 3 * batch_size);
 
-// 	GPUMemory<float>outbuf1_gpu(batch_size * 4);
-// 	copy_and_cast(stream, 4 * batch_size, outbuf1_gpu.data(), output_buffer);
-// 	CHECK_DATA(outbuf1_cpu, float, outbuf1_gpu.data(), 4 * batch_size);
-
-	
-// 	// Perturb inputs
-// #define DT 1.f;
-// 	float* sbuf = workspace.sigma_buf;
-// 	tcnn::parallel_for_gpu(stream, 1, [=] __device__ (size_t batch_idx) {
-// 		concat_buffer[batch_idx] = concat_buffer[batch_idx] + (network_precision_t)DT;
-// 	});
-
-// 	apply_exp_to_density_kernel<<<1, 1, 0, stream>>>(
-// 		1,
-// 		concat_buffer,
-// 		workspace.sigma_buf
-// 	);
-
-// 	GPUMemory<float>sigmagrad_gpu(batch_size);
-// 	copy_and_cast(stream, batch_size, sigmagrad_gpu.data(), workspace.sigma_grad_buf);
-// 	CHECK_DATA(sigmagrad_cpu, float, sigmagrad_gpu.data(), batch_size);
-
-// 	float mse_loss2 = calculate_loss(
-// 		stream,
-// 		batch_size,
-// 		n_rays,
-// 		n_samples,
-// 		ray_steps,
-// 		ray_steps_cum,
-// 		dt_batch,
-// 		target_rgba,
-// 		concat_buffer,
-// 		output_buffer
-// 	);
-	
-// 	GPUMemory<float>outbuf2_gpu(batch_size * 4);
-// 	copy_and_cast(stream, 4 * batch_size, outbuf2_gpu.data(), output_buffer);
-// 	CHECK_DATA(outbuf2_cpu, float, outbuf2_gpu.data(), 4 * batch_size);
-
+	GPUMemory<float>outbuf1_gpu(batch_size * 4);
+	copy_and_cast(stream, 4 * batch_size, outbuf1_gpu.data(), output_buffer);
+	CHECK_DATA(outbuf1_cpu, float, outbuf1_gpu.data(), 4 * batch_size);
 
 	
-// 	GPUMemory<float>colorgrad2_gpu(batch_size * 3);
-// 	copy_and_cast(stream, 3 * batch_size, colorgrad2_gpu.data(), workspace.color_grad_buf);
-// 	CHECK_DATA(colorgrad2_cpu, float, colorgrad2_gpu.data(), 3 * batch_size);
+	// Perturb inputs
+#define DT 0.1f;
+	float* sbuf = workspace.sigma_buf;
+	tcnn::parallel_for_gpu(stream, 1, [=] __device__ (size_t batch_idx) {
+		concat_buffer[batch_idx] = concat_buffer[batch_idx] + (network_precision_t)DT;
+	});
 
-// 	const float f1 = mse_loss;
-// 	const float f2 = mse_loss2;
-// 	const float deriv_numeric = (f2 - f1) / DT;
-// 	const float deriv_analytic = sigmagrad_cpu[0] / LOSS_SCALE;
+	apply_exp_to_density_kernel<<<1, 1, 0, stream>>>(
+		1,
+		concat_buffer,
+		workspace.sigma_buf
+	);
+
+	GPUMemory<float>sigmagrad_gpu(batch_size);
+	copy_and_cast(stream, batch_size, sigmagrad_gpu.data(), workspace.sigma_grad_buf);
+	CHECK_DATA(sigmagrad_cpu, float, sigmagrad_gpu.data(), batch_size);
+
+	float mse_loss2 = calculate_loss(
+		stream,
+		batch_size,
+		n_rays,
+		n_samples,
+		ray_steps,
+		ray_steps_cum,
+		dt_batch,
+		target_rgba,
+		concat_buffer,
+		output_buffer
+	);
+	
+	GPUMemory<float>outbuf2_gpu(batch_size * 4);
+	copy_and_cast(stream, 4 * batch_size, outbuf2_gpu.data(), output_buffer);
+	CHECK_DATA(outbuf2_cpu, float, outbuf2_gpu.data(), 4 * batch_size);
+
+	GPUMemory<float>colorgrad2_gpu(batch_size * 3);
+	copy_and_cast(stream, 3 * batch_size, colorgrad2_gpu.data(), workspace.color_grad_buf);
+	CHECK_DATA(colorgrad2_cpu, float, colorgrad2_gpu.data(), 3 * batch_size);
+
+	const float f1 = mse_loss;
+	const float f2 = mse_loss2;
+	const float deriv_numeric = (f2 - f1) / DT;
+	const float deriv_analytic = sigmagrad_cpu[0] / LOSS_SCALE;
 
 	// Backward
 	backward(stream, fwd_ctx, batch_size, pos_batch, dir_batch, target_rgba);
