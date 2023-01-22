@@ -21,7 +21,7 @@ Extreme thank yous to these subscribers on Twitch (https://twitch.tv/jperldev) w
 madclawgonzo - Requested a haiku written by ChatGPT: "Madclawgonzo / Subscribing to your stream / Software project."  
 anonymous  - Requested to remain anonymous  
 gusround - https://github.com/candidogustavo  
-slowcon - (pending message)  
+slowcon - "uncle slowcon is here with the 4090"  
 likid_3 - <3  
 cognitrol - Supporting cool work that helps the community explore technology  
 dankmatrix - (pending message)  
