@@ -46,7 +46,7 @@ struct NeRFNetworkWorkspace : Workspace {
         sigma_buf = allocate<float>(stream, batch_size);
         pxdiff_buf = allocate<float>(stream, 4 * batch_size);
         ray_rgba = allocate<float>(stream, 4 * batch_size);
-        loss_buf = allocate<float>(stream, batch_size);
+        loss_buf = allocate<float>(stream, 4 * batch_size);
         sigma_grad_buf = allocate<tcnn::network_precision_t>(stream, batch_size);
         color_grad_buf = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);
     }

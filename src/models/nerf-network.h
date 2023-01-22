@@ -90,10 +90,16 @@ private:
 	std::unique_ptr<ForwardContext> forward(
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,
+		const uint32_t& n_rays,
+		const uint32_t& n_samples,
+		const uint32_t* ray_steps,
+		const uint32_t* ray_steps_cumulative,
+		const float* target_rgba,
 		float* pos_batch,
 		float* dir_batch,
-		tcnn::network_precision_t* concat_buffer,
-		tcnn::network_precision_t* output_buffer
+		float* dt_batch,
+		network_precision_t* concat_buffer,
+		network_precision_t* output_buffer
 	);
 
 	float calculate_loss(
