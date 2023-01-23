@@ -41,7 +41,7 @@ int main()
 
 	// set up training controller
 	auto trainer = nrc::NeRFTrainingController(dataset, nerf);
-	trainer.prepare_for_training(stream, 1<<21);
+	trainer.prepare_for_training(stream, 2<<19);
 
 	// set up rendering controller
 	auto renderer = nrc::NeRFRenderingController();
@@ -64,13 +64,13 @@ int main()
 		trainer.train_step(stream);
 		// every 16 training steps, update the occupancy grid
 
-		if (i % 16 == 0 && i > 0) {
+		if (i % 16 == 0) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
 
-		if (i > 0 && i % 1000 == 0) {
+		if (i > 0 && i % 16 == 0) {
 			float progress = 0.0f;//((float)i - 1000.f) / 100.f;//(float)(i - 77) * 6.f / 360.f;//(float)i / (30.0f * 60.0f);
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;

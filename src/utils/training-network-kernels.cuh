@@ -15,17 +15,413 @@ NRC_NAMESPACE_BEGIN
  * Apply exponential scaling to density network output
  * (log-space density!)
  */
-template <typename Output>
-__global__ void apply_exp_to_density_kernel(
-	uint32_t batch_size,
-	const tcnn::network_precision_t* __restrict__ input,
-	Output* __restrict__ output
+// exp_sigma(sigma_network_output) = exp(sigma_network_output - 1.0f)
+template <typename T>
+__global__ void density_to_sigma_forward_kernel(
+	const uint32_t batch_size,
+	const tcnn::network_precision_t* __restrict__ density,
+	T* __restrict__ sigma
 ) {
-	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-	if (i < batch_size) {
-		output[i] = (Output)__expf((float)input[i] - 1.0f);
+	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (i >= batch_size) return;
+
+	sigma[i] = (T)__expf((float)density[i]);
+}
+
+// this computes dL/ddensity = dL/dsigma * dsigma/ddensity and applies it back to the original density
+__global__ void density_to_sigma_backward_kernel(
+	uint32_t batch_size,
+	const float* __restrict__ sigma,
+	const float* __restrict__ dL_dsigma,
+	tcnn::network_precision_t* __restrict__ dL_ddensity
+) {
+	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (i >= batch_size) return;
+	
+	dL_ddensity[i] = dL_ddensity[i] + (tcnn::network_precision_t)(128.0f * dL_dsigma[i] * __expf(sigma[i]));
+}
+
+/**
+ * THESE ARE DELIBERATELY UNDER-OPTIMIZED BECAUSE I AM LEARNING HOW TO BACKPROPAGATE
+ */
+
+/**
+ * Transmittance from activated sigma
+ */
+
+// calculates transmittance from sigma
+__global__ void sigma_to_transmittance_forward_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const uint32_t* __restrict__ n_samples_per_ray,
+	const uint32_t* __restrict__ n_samples_cum,
+	const float* __restrict__ dt,
+	const float* __restrict__ sigma,
+	float* __restrict__ transmittance
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+	
+	if (idx >= n_rays) return;
+
+	// offsets
+	const uint32_t n_samples = n_samples_per_ray[idx];
+	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+
+	// local references to sample data
+	const float* __restrict__ s_dt = dt + sample_offset;
+	const float* __restrict__ s_sigma = sigma + sample_offset;
+	float* __restrict__ s_trans = transmittance + sample_offset;
+
+	for (int i = 0; i < n_samples; ++i) {
+		float sigma_cumsum = 0.0f;
+		for (int j = 0; j < i; ++j) {
+			sigma_cumsum += s_sigma[j] * s_dt[j];
+		}
+		s_trans[i] = __expf(-sigma_cumsum);
 	}
 }
+
+
+// calculates dL/dsigma = dL/dtransmittance * dtransmittance/dsigma
+__global__ void sigma_to_transmittance_backward_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const uint32_t* __restrict__ n_samples_per_ray,
+	const uint32_t* __restrict__ n_samples_cum,
+	const float* __restrict__ dt,
+	const float* __restrict__ sigma,
+	const float* __restrict__ transmittance, // forward output
+	const float* __restrict__ dL_dtransmittance,
+	float* __restrict__ dL_dsigma
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) return;
+
+	// offsets
+	const uint32_t n_samples = n_samples_per_ray[idx];
+	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+
+	// local references to sample data
+	const float* __restrict__ s_dt = dt + sample_offset;
+	const float* __restrict__ s_sigma = sigma + sample_offset;
+	const float* __restrict__ s_dL_dtrans = dL_dtransmittance + sample_offset;
+	float* __restrict__ s_dL_dsigma = dL_dsigma + sample_offset;
+
+    for (int i = 0; i < n_samples; ++i) {
+        float cumsum_outer = 0.0f;
+        for (int j = i + 1; j < n_samples; ++j) {
+            float cumsum_inner = 0.0;
+            for (int k = 0; k < j; ++k) {
+                cumsum_inner += sigma[k] * dt[k];
+            }
+            cumsum_outer += __expf(-cumsum_inner) * s_dL_dtrans[j]; //?
+        }
+        s_dL_dsigma[i] = -dt[i] * cumsum_outer;
+    }
+}
+
+// calculates weight from sigma, per sample
+__global__ void sigma_to_weight_forward_kernel(
+	uint32_t n_rays,
+	uint32_t batch_size,
+	const uint32_t* __restrict__ n_samples_per_ray,
+	const uint32_t* __restrict__ n_samples_cum,
+	const float* __restrict__ dt,
+	const float* __restrict__ sigma,
+	float* __restrict__ weight
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) return;
+
+	// offsets
+	const uint32_t n_samples = n_samples_per_ray[idx];
+	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+
+	// local references to sample data
+	const float* __restrict__ s_dt = dt + sample_offset;
+	const float* __restrict__ s_sigma = sigma + sample_offset;
+	float* __restrict__ s_weight = weight + sample_offset;
+
+	for (int i = 0; i < n_samples; ++i) {
+		float sigma_cumsum = 0.0f;
+		for (int j = 0; j < i; ++j) {
+			sigma_cumsum += s_sigma[j] * s_dt[j];
+		}
+		const float trans = __expf(-sigma_cumsum);
+		const float alpha = __expf(-s_sigma[i] * s_dt[i]);
+		s_weight[i] = trans * alpha;
+	}
+}
+
+// calculates dL/dsigma = dL/dweight * dweight/dsigma
+__global__ void sigma_to_weight_backward_kernel(
+	uint32_t n_rays,
+	uint32_t batch_size,
+	const uint32_t* __restrict__ n_samples_per_ray,
+	const uint32_t* __restrict__ n_samples_cum,
+	const float* __restrict__ dt,
+	const float* __restrict__ sigma,
+	const float* __restrict__ weight, // forward output
+	const float* __restrict__ dL_dweight,
+	float* __restrict__ dL_dsigma
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) return;
+
+	// offsets
+	const uint32_t n_samples = n_samples_per_ray[idx];
+	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+
+	// local references to sample data
+	const float* __restrict__ s_dt = dt + sample_offset;
+	const float* __restrict__ s_sigma = sigma + sample_offset;
+	const float* __restrict__ s_weight = weight + sample_offset;
+	const float* __restrict__ s_dL_dweight = dL_dweight + sample_offset;
+	float* __restrict__ s_dL_dsigma = dL_dsigma + sample_offset;
+
+	for (int i = 0; i < n_samples; ++i) {
+		float sigma_cumsum = 0.0f;
+		for (int j = 0; j < i; ++j) {
+			sigma_cumsum += s_sigma[j] * s_dt[j];
+		}
+		const float dweight_dsigma = -s_dt[i] * __expf(-sigma_cumsum);
+		s_dL_dsigma[i] = s_dL_dweight[i] * dweight_dsigma; 
+	}
+}
+
+/**
+ * Weight to color (for a single channel)
+ */
+
+// This takes in samples and weights and accumulates their values into a ray's color channel
+
+__global__ void weight_to_ray_rgba_forward_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const uint32_t* __restrict__ n_samples_per_ray,
+	const uint32_t* __restrict__ n_samples_cum,
+	const float* __restrict__ weight,
+	const tcnn::network_precision_t* __restrict__ sample_rgba,
+	float* __restrict__ ray_rgba
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) return;
+
+	// offsets
+	const uint32_t n_samples = n_samples_per_ray[idx];
+	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+
+	const float* __restrict__ s_weight = weight + sample_offset;
+
+	const tcnn::network_precision_t* __restrict__ r_sample = sample_rgba + sample_offset;
+	const tcnn::network_precision_t* __restrict__ g_sample = r_sample + batch_size;
+	const tcnn::network_precision_t* __restrict__ b_sample = g_sample + batch_size;
+	const tcnn::network_precision_t* __restrict__ a_sample = b_sample + batch_size;
+
+	float r = 0.0f;
+	float g = 0.0f;
+	float b = 0.0f;
+	float a = 0.0f;
+
+	for (int i = 0; i < n_samples; ++i) {
+		r += s_weight[i] * (float)r_sample[i];
+		g += s_weight[i] * (float)g_sample[i];
+		b += s_weight[i] * (float)b_sample[i];
+		a += s_weight[i];
+	}
+
+	ray_rgba[idx + 0 * batch_size] = r;
+	ray_rgba[idx + 1 * batch_size] = g;
+	ray_rgba[idx + 2 * batch_size] = b;
+	ray_rgba[idx + 3 * batch_size] = a;
+}
+
+// calculates dL/weight = dL/dR * dR/weight
+// calculates dL/dcolor = dL/dR * dR/dcolor
+__global__ void weight_to_ray_rgba_backward_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const uint32_t* __restrict__ n_samples_per_ray,
+	const uint32_t* __restrict__ n_samples_cum,
+	const float* __restrict__ weight,
+	const tcnn::network_precision_t* __restrict__ network_rgb,
+	const float* __restrict__ dL_dR,
+	float* __restrict__ dL_dweight,
+	tcnn::network_precision_t* __restrict__ dL_dcolor
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) return;
+
+	// offsets
+	const uint32_t n_samples = n_samples_per_ray[idx];
+	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+
+	const float* __restrict__ s_weight = weight + sample_offset;
+
+	const tcnn::network_precision_t* __restrict__ s_sample_r = network_rgb + sample_offset;
+	const tcnn::network_precision_t* __restrict__ s_sample_g = s_sample_r + batch_size;
+	const tcnn::network_precision_t* __restrict__ s_sample_b = s_sample_g + batch_size;
+
+	float* __restrict__ s_dL_dweight = dL_dweight + sample_offset;
+	float* __restrict__ s_dL_dcolor = dL_dcolor + sample_offset;
+
+	const float s_dL_dR = dL_dR[idx];
+
+	for (int i = 0; i < n_samples; ++i) {
+		const float sr = (float)s_sample_r[i];
+		const float sg = (float)s_sample_g[i];
+		const float sb = (float)s_sample_b[i];
+
+		s_dL_dweight[i] = s_dL_dR * (1.0f / 3.0f) * (sr + sg + sb);
+		s_dL_dcolor[i] = (tcnn::network_precision_t)(128.0f * s_dL_dR * s_weight[i]);
+	}
+}
+
+// RGBA to loss
+__global__ void ray_rgba_to_loss_forward_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const float* __restrict__ ray_rgba,
+	const float* __restrict__ target_rgba,
+	float* __restrict__ loss
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) {
+		return;
+	}
+
+	const uint32_t r_idx = idx;
+	const uint32_t g_idx = r_idx + batch_size;
+	const uint32_t b_idx = g_idx + batch_size;
+
+	const float dr = target_rgba[r_idx] - ray_rgba[r_idx];
+	const float dg = target_rgba[g_idx] - ray_rgba[g_idx];
+	const float db = target_rgba[b_idx] - ray_rgba[b_idx];
+	
+	loss[r_idx] = (1.0f / n_rays) * (dr * dr);
+	loss[g_idx] = (1.0f / n_rays) * (dg * dg);
+	loss[b_idx] = (1.0f / n_rays) * (db * db);
+}
+
+// dL/dR = (1/4) * (dL/dR_r + dL/dR_g + dL/dR_b + dL/dR_a)
+__global__ void ray_rgba_to_loss_backward_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const uint32_t* __restrict__ ray_steps,
+	const uint32_t* __restrict__ ray_steps_cum,
+	const float* __restrict__ dt_batch,
+	const float* __restrict__ ray_rgba,
+	const float* __restrict__ target_rgba,
+	const float* __restrict__ loss, // output from forward pass
+	float* __restrict__ dL_dR
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) {
+		return;
+	}
+
+	const uint32_t r_idx = idx;
+	const uint32_t g_idx = r_idx + batch_size;
+	const uint32_t b_idx = g_idx + batch_size;
+
+	const float dr = target_rgba[r_idx] - ray_rgba[r_idx];
+	const float dg = target_rgba[g_idx] - ray_rgba[g_idx];
+	const float db = target_rgba[b_idx] - ray_rgba[b_idx];
+	
+	const float dL_dR_r = (2.0f / n_rays) * dr;
+	const float dL_dR_g = (2.0f / n_rays) * dg;
+	const float dL_dR_b = (2.0f / n_rays) * db;
+
+	dL_dR[idx] = (1.0f / 3.0f) * (dL_dR_r + dL_dR_g + dL_dR_b);
+}
+
+// calculates dL/dR across all channels
+__global__ void ray_channel_to_loss_backward_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const float* __restrict__ predicted_channel,
+	const float* __restrict__ groundtruth_channel,
+	const float* __restrict__ loss, // result from forward pass
+	float* __restrict__ dL_dR
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) {
+		return;
+	}
+
+	float diff = groundtruth_channel[idx] - predicted_channel[idx];
+	dL_dR[idx] = (2.0f / n_rays) * diff;
+}
+
+
+__global__ void sigma_to_alpha_forward_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const uint32_t* __restrict__ n_samples_per_ray,
+	const uint32_t* __restrict__ n_samples_cum,
+	const float* __restrict__ dt,
+	const float* __restrict__ sigma,
+	float* __restrict__ alpha
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) return;
+
+	// offsets
+	const uint32_t n_samples = n_samples_per_ray[idx];
+	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+
+	// local references to sample data
+	const float* __restrict__ s_dt = dt + sample_offset;
+	const float* __restrict__ s_sigma = sigma + sample_offset;
+	float* __restrict__ s_alpha = alpha + sample_offset;
+
+	for (int i = 0; i < n_samples; ++i) {
+		s_alpha[i] = 1.0f - __expf(-s_sigma[i] * s_dt[i]);
+	}
+}
+
+__global__ void alpha_from_sigma_backward_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const uint32_t* __restrict__ n_samples_per_ray,
+	const uint32_t* __restrict__ n_samples_cum,
+	const float* __restrict__ dt,
+	const float* __restrict__ sigma,
+	const float* __restrict__ alpha,
+	const float* __restrict__ alpha_grad,
+	float* __restrict__ sigma_grad
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) return;
+
+	// offsets
+	const uint32_t n_samples = n_samples_per_ray[idx];
+	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+
+	// local references to sample data
+	const float* __restrict__ s_dt = dt + sample_offset;
+	const float* __restrict__ s_sigma = sigma + sample_offset;
+	const float* __restrict__ s_alpha = alpha + sample_offset;
+	const float* __restrict__ s_alpha_grad = alpha_grad + sample_offset;
+	float* __restrict__ s_sigma_grad = sigma_grad + sample_offset;
+
+	for (int i = 0; i < n_samples; ++i) {
+		s_sigma_grad[i] = -s_dt[i] * s_alpha[i] * s_alpha_grad[i];
+	}
+}
+
 
 // TODO: These can be rewritten with cuBLAS - check out NerfAcc
 
@@ -62,7 +458,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 
 	// sigma
 	const float* __restrict__ s_s = sample_sigma + sample_offset;
-	const tcnn::network_precision_t* __restrict__ n_s = network_sigma + sample_offset;
+	const tcnn::network_precision_t* __restrict__ net_sig = network_sigma + sample_offset;
 
 	// rgb
 	const tcnn::network_precision_t* __restrict__ s_r = network_color + sample_offset;
@@ -86,7 +482,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	for (int j = 0; j < n_samples; ++j) {
 		const float dt = s_dt[j];
 		
-		const float sigma_j = __expf(fminf((float)n_s[j] - 1.0f, 10.0f));
+		const float sigma_j = __expf(tcnn::clamp((float)net_sig[j] - 1.0f, -15.0f, 15.0f));
 		const float sigma_j_dt = sigma_j * dt;
 
 		const float trans = __expf(-sigma_dt_sum);
@@ -214,7 +610,7 @@ __global__ void calculate_network_output_gradient(
 		// We need a lot of variables...
 		const float T_j = trans[j];
 		// stop raymarching if transmittance is too small?
-		const float es_j = __expf(fminf((float)net_sig[j] - 1.0f, 10.0f));
+		const float es_j = __expf(tcnn::clamp((float)net_sig[j] - 1.0f, -15.0f, 15.0f));
 		const float dt_j = dt[j];
 		const float w_j = weight[j];
 		
@@ -236,7 +632,7 @@ __global__ void calculate_network_output_gradient(
 		float sum_wn_bn = 0.0f;
 		float sum_wn = 0.0f;
 
-		for (int n = j; n < n_samples; ++n) {
+		for (int n = j + 1; n < n_samples; ++n) {
 			sum_wn_rn += weight[n] * (float)sr[n];
 			sum_wn_gn += weight[n] * (float)sg[n];
 			sum_wn_bn += weight[n] * (float)sb[n];
@@ -245,26 +641,13 @@ __global__ void calculate_network_output_gradient(
 
 		const float k = T_j - w_j;
 
-		const float dLr_dsj = 2.0f / n_pix * dr * (dt_j * es_j) * (k * r_j - sum_wn_rn);
-		const float dLg_dsj = 2.0f / n_pix * dg * (dt_j * es_j) * (k * g_j - sum_wn_gn);
-		const float dLb_dsj = 2.0f / n_pix * db * (dt_j * es_j) * (k * b_j - sum_wn_bn);
+		const float dLr_dsj = 2.0f / n_pix * dr * (dt_j * es_j) * (r_j * (T_j - w_j) - sum_wn_rn);
+		const float dLg_dsj = 2.0f / n_pix * dg * (dt_j * es_j) * (g_j * (T_j - w_j) - sum_wn_gn);
+		const float dLb_dsj = 2.0f / n_pix * db * (dt_j * es_j) * (b_j * (T_j - w_j) - sum_wn_bn);
 		// const float dLa_dsj = 4.0f * inv_2npix * da * (dt_j * es_j) * ((T_j - w_j) - sum_wn);
-		const float dLa_dsj = 2.0f / n_pix * da * (dt_j * es_j) * (k - sum_wn);
+		const float dLa_dsj = 2.0f / n_pix * da * (dt_j * es_j) * ((T_j - w_j) - sum_wn);
 
-		grad_s[j] = (tcnn::network_precision_t)(loss_scale * 0.25 * (dLr_dsj + dLg_dsj + dLb_dsj + dLa_dsj));
-	}
-}
-
-// modify dL/doutput of the density matrix
-__global__ void modify_density_dL_doutput_kernel(
-	const uint32_t batch_size,
-	const tcnn::network_precision_t* __restrict__ sigma_grad,
-	tcnn::network_precision_t* __restrict__ dL_doutput
-) {
-	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (i < batch_size) {
-		dL_doutput[i] = dL_doutput[i] * sigma_grad[i];
+		grad_s[j] = (tcnn::network_precision_t)(loss_scale * 0.25f * (dLr_dsj + dLg_dsj + dLb_dsj));
 	}
 }
 

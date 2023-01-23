@@ -188,8 +188,14 @@ void NerfNetwork::train(
 	auto fwd_ctx = forward(
 		stream,
 		batch_size,
+		n_rays,
+		n_samples,
+		ray_steps,
+		ray_steps_cum,
+		target_rgba,
 		pos_batch,
 		dir_batch,
+		dt_batch,
 		concat_buffer,
 		output_buffer
 	);
@@ -197,74 +203,27 @@ void NerfNetwork::train(
 	// Loss
 	float mse_loss = calculate_loss(
 		stream,
-		batch_size,
-		n_rays,
-		n_samples,
-		ray_steps,
-		ray_steps_cum,
-		dt_batch,
-		target_rgba,
-		concat_buffer,
-		output_buffer
+		n_rays
 	);
+
 	printf("Loss: %f / # Rays: %lu\n", mse_loss, n_rays);
 
-// 	GPUMemory<float>colorgrad_gpu(batch_size * 3);
-// 	copy_and_cast(stream, 3 * batch_size, colorgrad_gpu.data(), workspace.color_grad_buf);
-// 	CHECK_DATA(colorgrad_cpu, float, colorgrad_gpu.data(), 3 * batch_size);
-
-// 	GPUMemory<float>outbuf1_gpu(batch_size * 4);
-// 	copy_and_cast(stream, 4 * batch_size, outbuf1_gpu.data(), output_buffer);
-// 	CHECK_DATA(outbuf1_cpu, float, outbuf1_gpu.data(), 4 * batch_size);
-
-	
-// 	// Perturb inputs
-// #define DT 1.f;
-// 	float* sbuf = workspace.sigma_buf;
-// 	tcnn::parallel_for_gpu(stream, 1, [=] __device__ (size_t batch_idx) {
-// 		concat_buffer[batch_idx] = concat_buffer[batch_idx] + (network_precision_t)DT;
-// 	});
-
-// 	apply_exp_to_density_kernel<<<1, 1, 0, stream>>>(
-// 		1,
-// 		concat_buffer,
-// 		workspace.sigma_buf
-// 	);
-
-// 	GPUMemory<float>sigmagrad_gpu(batch_size);
-// 	copy_and_cast(stream, batch_size, sigmagrad_gpu.data(), workspace.sigma_grad_buf);
-// 	CHECK_DATA(sigmagrad_cpu, float, sigmagrad_gpu.data(), batch_size);
-
-// 	float mse_loss2 = calculate_loss(
-// 		stream,
-// 		batch_size,
-// 		n_rays,
-// 		n_samples,
-// 		ray_steps,
-// 		ray_steps_cum,
-// 		dt_batch,
-// 		target_rgba,
-// 		concat_buffer,
-// 		output_buffer
-// 	);
-	
-// 	GPUMemory<float>outbuf2_gpu(batch_size * 4);
-// 	copy_and_cast(stream, 4 * batch_size, outbuf2_gpu.data(), output_buffer);
-// 	CHECK_DATA(outbuf2_cpu, float, outbuf2_gpu.data(), 4 * batch_size);
-
-
-	
-// 	GPUMemory<float>colorgrad2_gpu(batch_size * 3);
-// 	copy_and_cast(stream, 3 * batch_size, colorgrad2_gpu.data(), workspace.color_grad_buf);
-// 	CHECK_DATA(colorgrad2_cpu, float, colorgrad2_gpu.data(), 3 * batch_size);
-
-// 	const float f1 = mse_loss;
-// 	const float f2 = mse_loss2;
-// 	const float deriv_numeric = (f2 - f1) / DT;
-// 	const float deriv_analytic = sigmagrad_cpu[0] / LOSS_SCALE;
-
 	// Backward
-	backward(stream, fwd_ctx, batch_size, pos_batch, dir_batch, target_rgba);
+	backward(
+		stream,
+		fwd_ctx,
+		n_rays,
+		batch_size,
+		ray_steps,
+		ray_steps_cum,
+		concat_buffer,
+		workspace.sigma_buf,
+		output_buffer,
+		pos_batch,
+		dir_batch,
+		dt_batch,
+		target_rgba
+	);
 
 	// Optimizer
 	optimizer_step(stream);
@@ -349,7 +308,8 @@ void NerfNetwork::inference(
 		);
 	}
 
-	apply_exp_to_density_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
+	// for inference we just overwrite the color network's alpha channel with activated sigma data
+	density_to_sigma_forward_kernel<<<n_blocks_linear(batch_size), tcnn::n_threads_linear, 0, stream>>>(
 		batch_size,
 		concat_buffer,
 		output_buffer + 3 * batch_size
@@ -359,8 +319,14 @@ void NerfNetwork::inference(
 std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	const cudaStream_t& stream,
 	const uint32_t& batch_size,
+	const uint32_t& n_rays,
+	const uint32_t& n_samples,
+	const uint32_t* ray_steps,
+	const uint32_t* ray_steps_cumulative,
+	const float* target_rgba,
 	float* pos_batch,
 	float* dir_batch,
+	float* dt_batch,
 	network_precision_t* concat_buffer,
 	network_precision_t* output_buffer
 ) {
@@ -389,14 +355,6 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		&fwd_ctx->density_network_output_matrix,
 		false,
 		true // prepare_input_gradients must be `true` otherwise backward() fails (forward->dy_dx is not defined)
-	);
-
-	// copy and exponentiate density network output
-
-	apply_exp_to_density_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
-		batch_size,
-		fwd_ctx->density_network_output_matrix.data(),
-		workspace.sigma_buf
 	);
 
 	// Encode directions (dir_batch)
@@ -448,124 +406,124 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		true // prepare_input_gradients
 	);
 
+	// Continue forward with custom operators
+	density_to_sigma_forward_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
+		batch_size,
+		concat_buffer,
+		workspace.sigma_buf
+	);
+
+	sigma_to_weight_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+		n_rays,
+		batch_size,
+		ray_steps,
+		ray_steps_cumulative,
+		dt_batch,
+		workspace.sigma_buf,
+		workspace.weight_buf	
+	);
+
+	weight_to_ray_rgba_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+		n_rays,
+		batch_size,
+		ray_steps,
+		ray_steps_cumulative,
+		workspace.weight_buf,
+		output_buffer,
+		workspace.ray_rgba
+	);
+
+	ray_rgba_to_loss_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+		n_rays,
+		batch_size,
+		workspace.ray_rgba,
+		target_rgba,
+		workspace.loss_buf
+	);
+	
 	return fwd_ctx;
 }
 
 float NerfNetwork::calculate_loss(
 	const cudaStream_t& stream,
-	const uint32_t& batch_size,
-	const uint32_t& n_rays,
-	const uint32_t& n_samples,
-	const uint32_t* ray_steps,
-	const uint32_t* ray_steps_cumulative,
-	const float* sample_dt,
-	const float* target_rgba,
-	const tcnn::network_precision_t* sigma_output,
-	const tcnn::network_precision_t* color_output
+	const uint32_t& n_rays
 ) {
-
-	float n_raysf = n_rays;
-
-	/**
-	 * The density MLP maps the hash encoded position y = enc(x; 𝜃)
-	 * to 16 output values, the first of which we treat as log-space density
-	 * https://arxiv.org/abs/2201.05989 - Muller, et al. page 9
-	 * 
-	 */
-
-	accumulate_ray_colors_from_samples_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
-		n_rays,
-		batch_size,
-		ray_steps,
-		ray_steps_cumulative,
-		sigma_output,
-		color_output,
-		workspace.sigma_buf,
-		sample_dt,
-		workspace.ray_rgba,
-		workspace.trans_buf,
-		workspace.weight_buf
-	);
-	
-	// Calculate sum of squared errors loss per ray
-	calculate_sse_loss_per_ray_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
-		n_rays,
-		batch_size,
-		ray_steps,
-		ray_steps_cumulative,
-		workspace.ray_rgba,
-		target_rgba,
-		workspace.sigma_buf,
-		workspace.loss_buf,
-		workspace.pxdiff_buf
-	);
-	
-	// Calculate gradients
-	calculate_network_output_gradient<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
-		n_rays,
-		batch_size,
-		1.0f / (2.0f * n_raysf),
-		n_raysf,
-		sigma_output,
-		color_output,
-		ray_steps,
-		ray_steps_cumulative,
-		workspace.pxdiff_buf,
-		sample_dt,
-		workspace.trans_buf,
-		workspace.weight_buf,
-		workspace.sigma_buf,
-		LOSS_SCALE,
-		workspace.sigma_grad_buf,
-		workspace.color_grad_buf
-	);
-
-	// zero extra gradients
-	CUDA_CHECK_THROW(
-		cudaMemsetAsync(
-			workspace.color_grad_buf + n_samples,
-			0,
-			(batch_size - n_samples) * sizeof(network_precision_t),
-			stream
-		)
-	);
-
-	
-	CUDA_CHECK_THROW(
-		cudaMemsetAsync(
-			workspace.sigma_grad_buf + n_samples,
-			0,
-			(batch_size - n_samples) * sizeof(network_precision_t),
-			stream
-		)
-	);
-
 	// Add all loss values together
 	thrust::device_ptr<float> loss_buffer_ptr(workspace.loss_buf);
 
-	float sum_of_squared_pixel_errors = thrust::reduce(
+	return thrust::reduce(
 		thrust::cuda::par_nosync.on(stream),
 		loss_buffer_ptr,
-		loss_buffer_ptr + n_rays,
+		loss_buffer_ptr + 4 * n_rays,
 		0.0f,
 		thrust::plus<float>()
 	);
-
-	// Return mean loss
-	return sum_of_squared_pixel_errors / (4.0f * n_raysf);
 }
 
 void NerfNetwork::backward(
-	cudaStream_t stream,
-	std::unique_ptr<NerfNetwork::ForwardContext>& fwd_ctx,
-	uint32_t batch_size,
+	const cudaStream_t& stream,
+	const std::unique_ptr<NerfNetwork::ForwardContext>& fwd_ctx,
+	const uint32_t& n_rays,
+	const uint32_t& batch_size,
+	const uint32_t* ray_steps,
+	const uint32_t* ray_steps_cumulative,
+	const tcnn::network_precision_t* network_density,
+	const float* network_sigma,
+	const tcnn::network_precision_t* network_color,
 	float* pos_batch,
 	float* dir_batch,
+	float* dt_batch,
 	float* target_rgba
 ) {
+	// Backpropagate loss
+	ray_rgba_to_loss_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+		n_rays,
+		batch_size,
+		ray_steps,
+		ray_steps_cumulative,
+		dt_batch,
+		workspace.ray_rgba,
+		target_rgba,
+		workspace.loss_buf,
+		workspace.grad_dL_dR
+	);
+
+	weight_to_ray_rgba_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+		n_rays,
+		batch_size,
+		ray_steps,
+		ray_steps_cumulative,
+		workspace.weight_buf,
+		network_color,
+		workspace.grad_dL_dR,
+		workspace.grad_dL_dweight,
+		workspace.grad_dL_dcolor
+	);
+
+	sigma_to_weight_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+		n_rays,
+		batch_size,
+		ray_steps,
+		ray_steps_cumulative,
+		dt_batch,
+		workspace.sigma_buf,
+		workspace.weight_buf,
+		workspace.grad_dL_dweight,
+		workspace.grad_dL_dsigma
+	);
+
+	density_to_sigma_backward_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
+		batch_size,
+		network_sigma,
+		workspace.grad_dL_dsigma,
+		workspace.grad_dL_ddensity
+	);
+
+	// add density gradients to sigma network gradients (channel 1)
+
 	// Backpropagate through the color network
 	GPUMatrixDynamic color_network_dL_doutput_matrix(
-		workspace.color_grad_buf,
+		workspace.grad_dL_dcolor,
 		color_network->padded_output_width(),
 		batch_size,
 		MatrixLayout::RowMajor
@@ -603,13 +561,6 @@ void NerfNetwork::backward(
 		density_network->padded_output_width(),
 		batch_size,
 		MatrixLayout::RowMajor
-	);
-
-	// overwrite density_network_dL_doutput with manually calculated gradient
-	modify_density_dL_doutput_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
-		batch_size,
-		workspace.sigma_grad_buf,
-		density_network_dL_doutput_matrix.data()
 	);
 
 	density_network->backward(

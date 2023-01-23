@@ -102,8 +102,14 @@ __global__ void update_occupancy_with_density_kernel(
     }
 
     float* grid_density = grid->get_density() + level * grid->volume_i + idx;
+    float new_density = fmaxf(*grid_density, (float)network_density[idx]);
 
-    *grid_density = fmaxf(*grid_density, (float)network_density[idx]);
+    // if grid density is NaN, reset it to zero
+    // if (isnan(new_density) || isinf(new_density)) {
+    //     new_density = 0.0f;
+    // }
+    
+    *grid_density = new_density;
 }
 
 // occupancy bits are updated by thresholding each cell's density, default = 0.01 * 1024 / sqrt(3)
