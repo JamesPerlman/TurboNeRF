@@ -104,28 +104,27 @@ private:
 
 	float calculate_loss(
 		const cudaStream_t& stream,
-		const uint32_t& batch_size,
-		const uint32_t& n_rays,
-		const uint32_t& n_samples,
-		const uint32_t* ray_steps,
-		const uint32_t* ray_steps_cumulative,
-		const float* sample_dt,
-		const float* target_rgba,
-		const tcnn::network_precision_t* sigma_output,
-		const tcnn::network_precision_t* color_output
+		const uint32_t& n_rays
 	);
 
 	void optimizer_step(const cudaStream_t& stream);
 
 	void backward(
-		cudaStream_t stream,
-		std::unique_ptr<ForwardContext>& forward_ctx,
-		uint32_t batch_size,
+		const cudaStream_t& stream,
+		const std::unique_ptr<NerfNetwork::ForwardContext>& fwd_ctx,
+		const uint32_t& n_rays,
+		const uint32_t& batch_size,
+		const uint32_t* ray_steps,
+		const uint32_t* ray_steps_cumulative,
+		const tcnn::network_precision_t* network_density,
+		const float* network_sigma,
+		const tcnn::network_precision_t* network_color,
 		float* pos_batch,
 		float* dir_batch,
+		float* dt_batch,
 		float* target_rgba
 	);
-
+	
 	void enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size);
 };
 
