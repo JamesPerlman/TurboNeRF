@@ -270,7 +270,7 @@ __global__ void weight_to_ray_rgba_backward_kernel(
 	const tcnn::network_precision_t* __restrict__ s_sample_b = s_sample_g + batch_size;
 
 	float* __restrict__ s_dL_dweight = dL_dweight + sample_offset;
-	float* __restrict__ s_dL_dcolor = dL_dcolor + sample_offset;
+	tcnn::network_precision_t* __restrict__ s_dL_dcolor = dL_dcolor + sample_offset;
 
 	const float s_dL_dR = dL_dR[idx];
 

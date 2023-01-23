@@ -17,7 +17,6 @@
 #include "services/nerf-manager.cuh"
 #include "utils/linalg.cuh"
 
-#include "utils/alphatensor_mmul4x4.cuh"
 #include "utils/coordinate-transformations.cuh"
 #include "utils/linalg/transform4f.cuh"
 

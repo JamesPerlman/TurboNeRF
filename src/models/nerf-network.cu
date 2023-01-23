@@ -512,13 +512,6 @@ void NerfNetwork::backward(
 		workspace.grad_dL_dsigma
 	);
 
-	density_to_sigma_backward_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
-		batch_size,
-		network_sigma,
-		workspace.grad_dL_dsigma,
-		workspace.grad_dL_ddensity
-	);
-
 	// add density gradients to sigma network gradients (channel 1)
 
 	// Backpropagate through the color network
@@ -534,6 +527,13 @@ void NerfNetwork::backward(
 		color_network->input_width(),
 		batch_size,
 		MatrixLayout::RowMajor
+	);
+
+	density_to_sigma_backward_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
+		batch_size,
+		network_sigma,
+		workspace.grad_dL_dsigma,
+		workspace.grad_dL_ddensity
 	);
 
 	color_network->backward(
@@ -561,6 +561,16 @@ void NerfNetwork::backward(
 		density_network->padded_output_width(),
 		batch_size,
 		MatrixLayout::RowMajor
+	);
+
+	// We need to add dL/ddensity to dL/doutput before backpropagating
+	thrust::transform(
+		thrust::cuda::par_nosync.on(stream),
+		workspace.grad_dL_ddensity,
+		workspace.grad_dL_ddensity + batch_size,
+		density_network_dL_doutput_matrix.data(),
+		density_network_dL_doutput_matrix.data(),
+		thrust::plus<tcnn::network_precision_t>()
 	);
 
 	density_network->backward(

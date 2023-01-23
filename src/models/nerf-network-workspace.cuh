@@ -55,7 +55,7 @@ struct NeRFNetworkWorkspace : Workspace {
         grad_dL_dR = allocate<float>(stream, batch_size);
         grad_dL_dweight = allocate<float>(stream, batch_size);
         grad_dL_dsigma = allocate<float>(stream, batch_size);
-        grad_dL_dcolor = allocate<tcnn::network_precision_t>(stream, 3 * batch_size);
+        grad_dL_dcolor = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
         grad_dL_ddensity = allocate<tcnn::network_precision_t>(stream, batch_size);
     }
 };

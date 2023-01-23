@@ -98,8 +98,8 @@ private:
 		float* pos_batch,
 		float* dir_batch,
 		float* dt_batch,
-		network_precision_t* concat_buffer,
-		network_precision_t* output_buffer
+		tcnn::network_precision_t* concat_buffer,
+		tcnn::network_precision_t* output_buffer
 	);
 
 	float calculate_loss(
