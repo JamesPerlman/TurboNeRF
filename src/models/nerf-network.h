@@ -113,6 +113,7 @@ private:
 		const cudaStream_t& stream,
 		const std::unique_ptr<NerfNetwork::ForwardContext>& fwd_ctx,
 		const uint32_t& n_rays,
+		const uint32_t& n_samples,
 		const uint32_t& batch_size,
 		const uint32_t* ray_steps,
 		const uint32_t* ray_steps_cumulative,

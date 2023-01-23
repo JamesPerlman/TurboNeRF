@@ -20,13 +20,14 @@ struct NeRFNetworkWorkspace : Workspace {
     float* grad_dL_dR;
     float* grad_dL_dweight;
     float* grad_dL_dsigma;
-    tcnn::network_precision_t* grad_dL_dcolor;
-    tcnn::network_precision_t* grad_dL_ddensity;
+    float* grad_dL_dcolor;
+    float* grad_dL_ddensity;
 
 
-	// buffers for backpropagation
     float* density_network_dL_dinput;
+    tcnn::network_precision_t* density_network_dL_doutput;
     tcnn::network_precision_t* color_network_dL_dinput;
+    tcnn::network_precision_t* color_network_dL_doutput;
 
     void enlarge(
         const cudaStream_t& stream,
@@ -52,11 +53,14 @@ struct NeRFNetworkWorkspace : Workspace {
         ray_rgba = allocate<float>(stream, 4 * batch_size);
         loss_buf = allocate<float>(stream, 4 * batch_size);
        
-        grad_dL_dR = allocate<float>(stream, batch_size);
+        grad_dL_dR = allocate<float>(stream, 4 * batch_size);
         grad_dL_dweight = allocate<float>(stream, batch_size);
         grad_dL_dsigma = allocate<float>(stream, batch_size);
-        grad_dL_dcolor = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
-        grad_dL_ddensity = allocate<tcnn::network_precision_t>(stream, batch_size);
+        grad_dL_dcolor = allocate<float>(stream, 3 * batch_size);
+        grad_dL_ddensity = allocate<float>(stream, batch_size);
+
+        density_network_dL_doutput = allocate<tcnn::network_precision_t>(stream, density_network_output_width * batch_size);
+        color_network_dL_doutput = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
     }
 };
 

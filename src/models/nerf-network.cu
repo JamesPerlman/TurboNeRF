@@ -213,6 +213,7 @@ void NerfNetwork::train(
 		stream,
 		fwd_ctx,
 		n_rays,
+		n_samples,
 		batch_size,
 		ray_steps,
 		ray_steps_cum,
@@ -407,11 +408,13 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	);
 
 	// Continue forward with custom operators
-	density_to_sigma_forward_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
-		batch_size,
+	density_to_sigma_forward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+		n_samples,
 		concat_buffer,
 		workspace.sigma_buf
 	);
+
+	CHECK_DATA(sigm_cpu, float, workspace.sigma_buf, batch_size);
 
 	sigma_to_weight_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
@@ -423,6 +426,8 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		workspace.weight_buf	
 	);
 
+	CHECK_DATA(weight_cpu, float, workspace.weight_buf, batch_size);
+
 	weight_to_ray_rgba_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
@@ -433,6 +438,12 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		workspace.ray_rgba
 	);
 
+	CHECK_DATA(ray_rgba_cpu, float, workspace.ray_rgba, 3 * n_rays);
+
+	GPUMemory<float> out_gpu(100);
+	copy_and_cast(stream, 100, out_gpu.data(), output_buffer);
+	CHECK_DATA(out_cpu, float, out_gpu.data(), 100);
+
 	ray_rgba_to_loss_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
@@ -440,7 +451,7 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		target_rgba,
 		workspace.loss_buf
 	);
-	
+
 	return fwd_ctx;
 }
 
@@ -464,6 +475,7 @@ void NerfNetwork::backward(
 	const cudaStream_t& stream,
 	const std::unique_ptr<NerfNetwork::ForwardContext>& fwd_ctx,
 	const uint32_t& n_rays,
+	const uint32_t& n_samples,
 	const uint32_t& batch_size,
 	const uint32_t* ray_steps,
 	const uint32_t* ray_steps_cumulative,
@@ -512,14 +524,42 @@ void NerfNetwork::backward(
 		workspace.grad_dL_dsigma
 	);
 
-	// add density gradients to sigma network gradients (channel 1)
+	CHECK_DATA(grad_dL_dsigma_cpu, float, workspace.grad_dL_dsigma, batch_size);
+	CHECK_DATA(grad_dL_dweight_cpu, float, workspace.grad_dL_dweight, batch_size);
+
+	density_to_sigma_backward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+		n_samples,
+		network_density,
+		workspace.grad_dL_dsigma,
+		workspace.grad_dL_ddensity
+	);
+
+	CHECK_DATA(grad_dL_ddensity_cpu, float, workspace.grad_dL_ddensity, batch_size);
 
 	// Backpropagate through the color network
 	GPUMatrixDynamic color_network_dL_doutput_matrix(
-		workspace.grad_dL_dcolor,
+		workspace.color_network_dL_doutput,
 		color_network->padded_output_width(),
 		batch_size,
 		MatrixLayout::RowMajor
+	);
+
+	// need to clear & populate color network matrix
+	CUDA_CHECK_THROW(
+		cudaMemsetAsync(
+			color_network_dL_doutput_matrix.data(),
+			0,
+			color_network_dL_doutput_matrix.cols() * color_network_dL_doutput_matrix.rows() * sizeof(tcnn::network_precision_t),
+			stream
+		)
+	);
+
+	copy_gradients_kernel<3, false><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+		n_samples,
+		batch_size,
+		LOSS_SCALE,
+		workspace.grad_dL_dcolor,
+		color_network_dL_doutput_matrix.data()
 	);
 
 	GPUMatrixDynamic color_network_dL_dinput_matrix(
@@ -527,13 +567,6 @@ void NerfNetwork::backward(
 		color_network->input_width(),
 		batch_size,
 		MatrixLayout::RowMajor
-	);
-
-	density_to_sigma_backward_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
-		batch_size,
-		network_sigma,
-		workspace.grad_dL_dsigma,
-		workspace.grad_dL_ddensity
 	);
 
 	color_network->backward(
@@ -544,6 +577,14 @@ void NerfNetwork::backward(
 		color_network_dL_doutput_matrix,
 		&color_network_dL_dinput_matrix
 	);
+
+	GPUMemory<float> colnet_dldo(100);
+	copy_and_cast(stream, 100, colnet_dldo.data(), color_network_dL_doutput_matrix.data());
+	CHECK_DATA(colnet_dldo_cpu, float, colnet_dldo.data(), 100);
+
+	GPUMemory<float> colnet_dldi(100);
+	copy_and_cast(stream, 100, colnet_dldi.data(), color_network_dL_dinput_matrix.data());
+	CHECK_DATA(colnet_dldi_cpu, float, colnet_dldi.data(), 100);
 
 	// Backpropagate through the density network
 	GPUMatrixDynamic density_network_dL_dinput_matrix(
@@ -564,13 +605,12 @@ void NerfNetwork::backward(
 	);
 
 	// We need to add dL/ddensity to dL/doutput before backpropagating
-	thrust::transform(
-		thrust::cuda::par_nosync.on(stream),
+	copy_gradients_kernel<1,true><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+		n_samples,
+		batch_size,
+		LOSS_SCALE,
 		workspace.grad_dL_ddensity,
-		workspace.grad_dL_ddensity + batch_size,
-		density_network_dL_doutput_matrix.data(),
-		density_network_dL_doutput_matrix.data(),
-		thrust::plus<tcnn::network_precision_t>()
+		density_network_dL_doutput_matrix.data()
 	);
 
 	density_network->backward(
@@ -581,6 +621,15 @@ void NerfNetwork::backward(
 		density_network_dL_doutput_matrix,
 		&density_network_dL_dinput_matrix
 	);
+
+	GPUMemory<float> dnet_dldo(100);
+	copy_and_cast(stream, 100, dnet_dldo.data(), density_network_dL_doutput_matrix.data());
+	CHECK_DATA(dnet_dldo_cpu, float, dnet_dldo.data(), 100);
+
+	GPUMemory<float> dnet_dldi(100);
+	copy_and_cast(stream, 100, dnet_dldi.data(), density_network_dL_dinput_matrix.data());
+	CHECK_DATA(dnet_dldi_cpu, float, dnet_dldi.data(), 100);
+
 
 }
 

@@ -69,7 +69,7 @@ int main()
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
 
-		if (i > 0 && i % 16 == 0) {
+		if (i > 0 && i % 1000 == 0) {
 			float progress = 0.0f;//((float)i - 1000.f) / 100.f;//(float)(i - 77) * 6.f / 360.f;//(float)i / (30.0f * 60.0f);
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;

@@ -11,36 +11,60 @@
 
 NRC_NAMESPACE_BEGIN
 
+template <int N_CHANNELS, bool ACCUMULATE>
+__global__ void copy_gradients_kernel(
+	const uint32_t n_elements,
+	const uint32_t data_stride,
+	const float scale,
+	const float* __restrict__ input,
+	tcnn::network_precision_t* __restrict__ output
+) {
+	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_elements) return;
+
+	#pragma unroll
+	for (int j = 0; j < N_CHANNELS; ++j) {
+		if (ACCUMULATE)
+			output[idx] = (tcnn::network_precision_t)(scale * input[idx]) + output[idx];
+		else
+			output[idx] = (tcnn::network_precision_t)(scale * input[idx]);
+		
+		idx += data_stride;
+	}
+}
+
 /**
  * Apply exponential scaling to density network output
  * (log-space density!)
  */
 // exp_sigma(sigma_network_output) = exp(sigma_network_output - 1.0f)
+
 template <typename T>
 __global__ void density_to_sigma_forward_kernel(
-	const uint32_t batch_size,
+	const uint32_t n_samples,
 	const tcnn::network_precision_t* __restrict__ density,
 	T* __restrict__ sigma
 ) {
 	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (i >= batch_size) return;
+	if (i >= n_samples) return;
 
-	sigma[i] = (T)__expf((float)density[i]);
+	sigma[i] = (T)__expf(tcnn::clamp((float)density[i] - 1.0f, -10.0f, 10.0f));
 }
 
 // this computes dL/ddensity = dL/dsigma * dsigma/ddensity and applies it back to the original density
 __global__ void density_to_sigma_backward_kernel(
-	uint32_t batch_size,
-	const float* __restrict__ sigma,
+	uint32_t n_samples,
+	const tcnn::network_precision_t* __restrict__ density,
 	const float* __restrict__ dL_dsigma,
-	tcnn::network_precision_t* __restrict__ dL_ddensity
+	float* __restrict__ dL_ddensity
 ) {
 	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (i >= batch_size) return;
+	if (i >= n_samples) return;
 	
-	dL_ddensity[i] = dL_ddensity[i] + (tcnn::network_precision_t)(128.0f * dL_dsigma[i] * __expf(sigma[i]));
+	dL_ddensity[i] = dL_dsigma[i] * __expf(tcnn::clamp((float)density[i] - 1.0f, -10.0f, 10.0f));
 }
 
 /**
@@ -152,7 +176,7 @@ __global__ void sigma_to_weight_forward_kernel(
 			sigma_cumsum += s_sigma[j] * s_dt[j];
 		}
 		const float trans = __expf(-sigma_cumsum);
-		const float alpha = __expf(-s_sigma[i] * s_dt[i]);
+		const float alpha = 1.0f - __expf(-s_sigma[i] * s_dt[i]);
 		s_weight[i] = trans * alpha;
 	}
 }
@@ -189,7 +213,7 @@ __global__ void sigma_to_weight_backward_kernel(
 		for (int j = 0; j < i; ++j) {
 			sigma_cumsum += s_sigma[j] * s_dt[j];
 		}
-		const float dweight_dsigma = -s_dt[i] * __expf(-sigma_cumsum);
+		const float dweight_dsigma = s_dt[i] * __expf(-sigma_cumsum)  * __expf(-s_sigma[i] * s_dt[i]);
 		s_dL_dsigma[i] = s_dL_dweight[i] * dweight_dsigma; 
 	}
 }
@@ -206,7 +230,7 @@ __global__ void weight_to_ray_rgba_forward_kernel(
 	const uint32_t* __restrict__ n_samples_per_ray,
 	const uint32_t* __restrict__ n_samples_cum,
 	const float* __restrict__ weight,
-	const tcnn::network_precision_t* __restrict__ sample_rgba,
+	const tcnn::network_precision_t* __restrict__ sample_rgb,
 	float* __restrict__ ray_rgba
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -219,10 +243,9 @@ __global__ void weight_to_ray_rgba_forward_kernel(
 
 	const float* __restrict__ s_weight = weight + sample_offset;
 
-	const tcnn::network_precision_t* __restrict__ r_sample = sample_rgba + sample_offset;
+	const tcnn::network_precision_t* __restrict__ r_sample = sample_rgb + sample_offset;
 	const tcnn::network_precision_t* __restrict__ g_sample = r_sample + batch_size;
 	const tcnn::network_precision_t* __restrict__ b_sample = g_sample + batch_size;
-	const tcnn::network_precision_t* __restrict__ a_sample = b_sample + batch_size;
 
 	float r = 0.0f;
 	float g = 0.0f;
@@ -253,7 +276,7 @@ __global__ void weight_to_ray_rgba_backward_kernel(
 	const tcnn::network_precision_t* __restrict__ network_rgb,
 	const float* __restrict__ dL_dR,
 	float* __restrict__ dL_dweight,
-	tcnn::network_precision_t* __restrict__ dL_dcolor
+	float* __restrict__ dL_dcolor
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -270,17 +293,22 @@ __global__ void weight_to_ray_rgba_backward_kernel(
 	const tcnn::network_precision_t* __restrict__ s_sample_b = s_sample_g + batch_size;
 
 	float* __restrict__ s_dL_dweight = dL_dweight + sample_offset;
-	tcnn::network_precision_t* __restrict__ s_dL_dcolor = dL_dcolor + sample_offset;
+	float* __restrict__ s_dL_dcolor = dL_dcolor + sample_offset;
 
-	const float s_dL_dR = dL_dR[idx];
+	const float dL_dR_r = dL_dR[idx + 0 * batch_size];
+	const float dL_dR_g = dL_dR[idx + 1 * batch_size];
+	const float dL_dR_b = dL_dR[idx + 2 * batch_size];
+	const float dL_dR_a = dL_dR[idx + 3 * batch_size];
 
 	for (int i = 0; i < n_samples; ++i) {
 		const float sr = (float)s_sample_r[i];
 		const float sg = (float)s_sample_g[i];
 		const float sb = (float)s_sample_b[i];
 
-		s_dL_dweight[i] = s_dL_dR * (1.0f / 3.0f) * (sr + sg + sb);
-		s_dL_dcolor[i] = (tcnn::network_precision_t)(128.0f * s_dL_dR * s_weight[i]);
+		s_dL_dweight[i] = dL_dR_a + dL_dR_r * sr + dL_dR_g * sg + dL_dR_b * sb;
+		s_dL_dcolor[i + 0 * batch_size] = dL_dR_r * s_weight[i];
+		s_dL_dcolor[i + 1 * batch_size] = dL_dR_g * s_weight[i];
+		s_dL_dcolor[i + 2 * batch_size] = dL_dR_b * s_weight[i];
 	}
 }
 
@@ -301,14 +329,17 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 	const uint32_t r_idx = idx;
 	const uint32_t g_idx = r_idx + batch_size;
 	const uint32_t b_idx = g_idx + batch_size;
+	const uint32_t a_idx = b_idx + batch_size;
 
 	const float dr = target_rgba[r_idx] - ray_rgba[r_idx];
 	const float dg = target_rgba[g_idx] - ray_rgba[g_idx];
 	const float db = target_rgba[b_idx] - ray_rgba[b_idx];
+	const float da = target_rgba[a_idx] - ray_rgba[a_idx];
 	
-	loss[r_idx] = (1.0f / n_rays) * (dr * dr);
-	loss[g_idx] = (1.0f / n_rays) * (dg * dg);
-	loss[b_idx] = (1.0f / n_rays) * (db * db);
+	loss[r_idx] = (1.0f / (4.0f * (float)n_rays)) * (dr * dr);
+	loss[g_idx] = (1.0f / (4.0f * (float)n_rays)) * (dg * dg);
+	loss[b_idx] = (1.0f / (4.0f * (float)n_rays)) * (db * db);
+	loss[a_idx] = (1.0f / (4.0f * (float)n_rays)) * (da * da);
 }
 
 // dL/dR = (1/4) * (dL/dR_r + dL/dR_g + dL/dR_b + dL/dR_a)
@@ -332,16 +363,17 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const uint32_t r_idx = idx;
 	const uint32_t g_idx = r_idx + batch_size;
 	const uint32_t b_idx = g_idx + batch_size;
+	const uint32_t a_idx = b_idx + batch_size;
 
 	const float dr = target_rgba[r_idx] - ray_rgba[r_idx];
 	const float dg = target_rgba[g_idx] - ray_rgba[g_idx];
 	const float db = target_rgba[b_idx] - ray_rgba[b_idx];
+	const float da = target_rgba[a_idx] - ray_rgba[a_idx];
 	
-	const float dL_dR_r = (2.0f / n_rays) * dr;
-	const float dL_dR_g = (2.0f / n_rays) * dg;
-	const float dL_dR_b = (2.0f / n_rays) * db;
-
-	dL_dR[idx] = (1.0f / 3.0f) * (dL_dR_r + dL_dR_g + dL_dR_b);
+	dL_dR[r_idx] = -(2.0f / (4.0f)) * dr;
+	dL_dR[g_idx] = -(2.0f / (4.0f)) * dg;
+	dL_dR[b_idx] = -(2.0f / (4.0f)) * db;
+	dL_dR[a_idx] = -(2.0f / (4.0f)) * da;
 }
 
 // calculates dL/dR across all channels
@@ -360,7 +392,7 @@ __global__ void ray_channel_to_loss_backward_kernel(
 	}
 
 	float diff = groundtruth_channel[idx] - predicted_channel[idx];
-	dL_dR[idx] = (2.0f / n_rays) * diff;
+	dL_dR[idx] = (2.0f / (float)n_rays) * diff;
 }
 
 
