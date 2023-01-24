@@ -414,8 +414,6 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		workspace.sigma_buf
 	);
 
-	CHECK_DATA(sigm_cpu, float, workspace.sigma_buf, batch_size);
-
 	sigma_to_weight_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
@@ -426,8 +424,6 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		workspace.weight_buf	
 	);
 
-	CHECK_DATA(weight_cpu, float, workspace.weight_buf, batch_size);
-
 	weight_to_ray_rgba_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
@@ -437,12 +433,6 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		output_buffer,
 		workspace.ray_rgba
 	);
-
-	CHECK_DATA(ray_rgba_cpu, float, workspace.ray_rgba, 3 * n_rays);
-
-	GPUMemory<float> out_gpu(100);
-	copy_and_cast(stream, 100, out_gpu.data(), output_buffer);
-	CHECK_DATA(out_cpu, float, out_gpu.data(), 100);
 
 	ray_rgba_to_loss_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
@@ -524,17 +514,12 @@ void NerfNetwork::backward(
 		workspace.grad_dL_dsigma
 	);
 
-	CHECK_DATA(grad_dL_dsigma_cpu, float, workspace.grad_dL_dsigma, batch_size);
-	CHECK_DATA(grad_dL_dweight_cpu, float, workspace.grad_dL_dweight, batch_size);
-
 	density_to_sigma_backward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
 		network_density,
 		workspace.grad_dL_dsigma,
 		workspace.grad_dL_ddensity
 	);
-
-	CHECK_DATA(grad_dL_ddensity_cpu, float, workspace.grad_dL_ddensity, batch_size);
 
 	// Backpropagate through the color network
 	GPUMatrixDynamic color_network_dL_doutput_matrix(
@@ -578,14 +563,6 @@ void NerfNetwork::backward(
 		&color_network_dL_dinput_matrix
 	);
 
-	GPUMemory<float> colnet_dldo(100);
-	copy_and_cast(stream, 100, colnet_dldo.data(), color_network_dL_doutput_matrix.data());
-	CHECK_DATA(colnet_dldo_cpu, float, colnet_dldo.data(), 100);
-
-	GPUMemory<float> colnet_dldi(100);
-	copy_and_cast(stream, 100, colnet_dldi.data(), color_network_dL_dinput_matrix.data());
-	CHECK_DATA(colnet_dldi_cpu, float, colnet_dldi.data(), 100);
-
 	// Backpropagate through the density network
 	GPUMatrixDynamic density_network_dL_dinput_matrix(
 		workspace.density_network_dL_dinput,
@@ -621,15 +598,6 @@ void NerfNetwork::backward(
 		density_network_dL_doutput_matrix,
 		&density_network_dL_dinput_matrix
 	);
-
-	GPUMemory<float> dnet_dldo(100);
-	copy_and_cast(stream, 100, dnet_dldo.data(), density_network_dL_doutput_matrix.data());
-	CHECK_DATA(dnet_dldo_cpu, float, dnet_dldo.data(), 100);
-
-	GPUMemory<float> dnet_dldi(100);
-	copy_and_cast(stream, 100, dnet_dldi.data(), density_network_dL_dinput_matrix.data());
-	CHECK_DATA(dnet_dldi_cpu, float, dnet_dldi.data(), 100);
-
 
 }
 
