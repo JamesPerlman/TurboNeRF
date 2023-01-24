@@ -59,8 +59,8 @@ __global__ void generate_grid_cell_network_sample_points_kernel(
     const uint32_t i_offset_2 = i_offset_1 + batch_size;
 
     // get xyz positions of the grid cell according to the morton code index
-    uint32_t ix, iy, iz;
-    grid->get_voxel_xyz_index_from_morton_index(idx, ix, iy, iz);
+    float vx, vy, vz;
+    grid->get_voxel_xyz_from_morton_index(idx, vx, vy, vz);
 
     // origin of the grid cell (same value for all 3 axes)
     // this also centers xyz in the grid cell
@@ -68,9 +68,9 @@ __global__ void generate_grid_cell_network_sample_points_kernel(
 
     // set each dimension of sample_pos to the corner of the grid cell + a random offset
     // this x,y,z is in world coordinates
-    const float x = o + ((float)ix + random_float[i_offset_0]) * voxel_size;
-    const float y = o + ((float)iy + random_float[i_offset_1]) * voxel_size;
-    const float z = o + ((float)iz + random_float[i_offset_2]) * voxel_size;
+    const float x = o + ((float)vx + random_float[i_offset_0]) * voxel_size;
+    const float y = o + ((float)vy + random_float[i_offset_1]) * voxel_size;
+    const float z = o + ((float)vz + random_float[i_offset_2]) * voxel_size;
 
     // Normalize the sample position to the range [0, 1] (for the network)
     sample_pos[i_offset_0] = x * inv_aabb_size + 0.5f;
@@ -102,7 +102,7 @@ __global__ void update_occupancy_with_density_kernel(
     }
 
     float* grid_density = grid->get_density() + level * grid->volume_i + idx;
-    float new_density = fmaxf(*grid_density, (float)network_density[idx]);
+    float new_density = fmaxf(*grid_density, (float)network_density[i]);
 
     // if grid density is NaN, reset it to zero
     // if (isnan(new_density) || isinf(new_density)) {

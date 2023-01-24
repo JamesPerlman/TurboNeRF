@@ -25,6 +25,13 @@
 #include "models/cascaded-occupancy-grid.cuh"
 int main()
 {
+
+	auto og = nrc::CascadedOccupancyGrid(1, 16);
+
+	auto x = og.get_voxel_morton_index(1, 0.5f, -0.5f, 0.5f);
+	float ix, iy, iz;
+	og.get_voxel_xyz_from_morton_index(x, ix, iy, iz);
+
 	nrc::Dataset dataset = nrc::Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json");
 	// auto dataset = nrc::Dataset("E:\\2022\\nerf-library\\FascinatedByFungi2022\\big-white-chanterelle\\transforms.json");
 	auto nerf_manager = nrc::NeRFManager();
@@ -40,7 +47,7 @@ int main()
 
 	// set up training controller
 	auto trainer = nrc::NeRFTrainingController(dataset, nerf);
-	trainer.prepare_for_training(stream, 2<<19);
+	trainer.prepare_for_training(stream, 2<<20);
 
 	// set up rendering controller
 	auto renderer = nrc::NeRFRenderingController();
@@ -63,14 +70,14 @@ int main()
 		trainer.train_step(stream);
 		// every 16 training steps, update the occupancy grid
 
-		if (i % 16 == 0) {
+		if (i % 16 == 0 && i > 128) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
 
-		if (i > 0 && i % 1000 == 0) {
-			float progress = 0.0f;//((float)i - 1000.f) / 100.f;//(float)(i - 77) * 6.f / 360.f;//(float)i / (30.0f * 60.0f);
+		if (i > 128 && i % 128 == 0) {
+			float progress = (float)i / 360.0f;
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(

@@ -50,7 +50,7 @@ __global__ void density_to_sigma_forward_kernel(
 
 	if (i >= n_samples) return;
 
-	sigma[i] = (T)__expf(tcnn::clamp((float)density[i] - 1.0f, -10.0f, 10.0f));
+	sigma[i] = (T)__expf(fminf((float)density[i] - 1.0f, 11.0f));
 }
 
 // this computes dL/ddensity = dL/dsigma * dsigma/ddensity and applies it back to the original density
@@ -64,7 +64,7 @@ __global__ void density_to_sigma_backward_kernel(
 
 	if (i >= n_samples) return;
 	
-	dL_ddensity[i] = dL_dsigma[i] * __expf(tcnn::clamp((float)density[i] - 1.0f, -10.0f, 10.0f));
+	dL_ddensity[i] = dL_dsigma[i] * __expf(fminf((float)density[i] - 1.0f, 11.0f));
 }
 
 /**
@@ -514,7 +514,7 @@ __global__ void accumulate_ray_colors_from_samples_kernel(
 	for (int j = 0; j < n_samples; ++j) {
 		const float dt = s_dt[j];
 		
-		const float sigma_j = __expf(tcnn::clamp((float)net_sig[j] - 1.0f, -15.0f, 15.0f));
+		const float sigma_j = __expf(tcnn::clamp((float)net_sig[j] - 1.0f, -15.0f, 12.0f));
 		const float sigma_j_dt = sigma_j * dt;
 
 		const float trans = __expf(-sigma_dt_sum);
@@ -642,7 +642,7 @@ __global__ void calculate_network_output_gradient(
 		// We need a lot of variables...
 		const float T_j = trans[j];
 		// stop raymarching if transmittance is too small?
-		const float es_j = __expf(tcnn::clamp((float)net_sig[j] - 1.0f, -15.0f, 15.0f));
+		const float es_j = __expf(tcnn::clamp((float)net_sig[j] - 1.0f, -15.0f, 12.0f));
 		const float dt_j = dt[j];
 		const float w_j = weight[j];
 		

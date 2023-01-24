@@ -23,7 +23,8 @@ struct CascadedOccupancyGrid {
 	const int n_levels;
 	const float resolution_f;
 	const float inv_resolution_f;
-	const uint32_t resolution_i;
+	const int resolution_i;
+	const int half_res_i;
 	const uint32_t volume_i;
 
 	CascadedOccupancyGridWorkspace workspace;
@@ -33,6 +34,7 @@ struct CascadedOccupancyGrid {
 		, resolution_i(resolution)
 		, resolution_f(resolution)
 		, inv_resolution_f(1.0f / resolution_f)
+		, half_res_i(resolution_i / 2)
 		, volume_i(resolution * resolution * resolution)
 	{};
 
@@ -111,7 +113,7 @@ struct CascadedOccupancyGrid {
 
 	// gets the voxel size at a given level
 	inline NRC_HOST_DEVICE float get_voxel_size(const int& level) const {
-		return get_level_size(level) / resolution_f;
+		return get_level_size(level) *inv_resolution_f;
 	}
 	
 	// returns the index of the voxel containing the point
@@ -123,25 +125,28 @@ struct CascadedOccupancyGrid {
 		// scale factor for each coordinate, based on the level
 		const float s = 1.0f / get_level_size(level);
 		
-		const uint32_t x_i = (x * s + 0.5f) * resolution_f;
-		const uint32_t y_i = (y * s + 0.5f) * resolution_f;
-		const uint32_t z_i = (z * s + 0.5f) * resolution_f;
+		const uint32_t x_ui = static_cast<uint32_t>((x * s + 0.5f) * resolution_f);
+		const uint32_t y_ui = static_cast<uint32_t>((y * s + 0.5f) * resolution_f);
+		const uint32_t z_ui = static_cast<uint32_t>((z * s + 0.5f) * resolution_f);
 		
 		// using morton code (Z-order curve), from Müller, et al. 2022 (page 15, "Occupancy Grids")
-		return tcnn::morton3D(x_i, y_i, z_i);
+		return tcnn::morton3D(x_ui, y_ui, z_ui);
 	}
 
 	// assigns x, y, z from the morton index
 	// returns just the x,y,z indices from their respective axes
-	inline NRC_HOST_DEVICE uint32_t get_voxel_xyz_index_from_morton_index(
+	inline NRC_HOST_DEVICE void get_voxel_xyz_from_morton_index(
 		const uint32_t& morton_index,
-		uint32_t& x, uint32_t& y, uint32_t& z
+		float& x, float& y, float& z
 	) const {
-		// scale factor for each coordinate, based on the level
-		// converts [0, 1] -> [0, resolution] for the current level
-		x = tcnn::morton3D_invert(morton_index >> 0);
-		y = tcnn::morton3D_invert(morton_index >> 1);
-		z = tcnn::morton3D_invert(morton_index >> 2);
+
+		const int ix = static_cast<int>(tcnn::morton3D_invert(morton_index >> 0));
+		const int iy = static_cast<int>(tcnn::morton3D_invert(morton_index >> 1));
+		const int iz = static_cast<int>(tcnn::morton3D_invert(morton_index >> 2));
+
+		x = static_cast<float>(ix * 2 - resolution_i) * inv_resolution_f;
+		y = static_cast<float>(iy * 2 - resolution_i) * inv_resolution_f;
+		z = static_cast<float>(iz * 2 - resolution_i) * inv_resolution_f;
 	}
 
 	// checks if the grid is occupied at a morton index of the given level
@@ -149,7 +154,7 @@ struct CascadedOccupancyGrid {
 		const int& level,
 		const uint32_t& byte_idx
 	) const {
-		const uint8_t bitmask = (uint8_t)1 << (level % 8);
+		const uint8_t bitmask = (uint8_t)1 << level;
 		return workspace.bitfield[byte_idx] & bitmask;
 	}
 
@@ -193,7 +198,7 @@ struct CascadedOccupancyGrid {
 		const float& ray_pos_x, const float& ray_pos_y, const float& ray_pos_z,
 		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
 		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z,
-		const float& dt_min,
+		const float& dt,
 		const int& grid_level
 	) const {
 		const float level_size = get_level_size(grid_level);
@@ -205,14 +210,15 @@ struct CascadedOccupancyGrid {
 		const float z = (ray_pos_z * i_level_size + 0.5f) * resolution_f;
 		
 		// not really sure how this works, it's from NerfAcc.  It finds the t-space distance to the next voxel
-		const float tx = ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
-		const float ty = ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
-		const float tz = ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
+		const float k = inv_resolution_f * level_size;
+		const float tx = k * ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
+		const float ty = k * ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
+		const float tz = k * ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
 
-		const float t_target = fmaxf(dt_min, fminf(fminf(tx, ty), tz)) / resolution_f * level_size;
+		const float t_target = fmaxf(dt, k * fminf(fminf(tx, ty), tz));
 
-		// replace with some fast round up/divide function
-		return ceilf(t_target / dt_min) * dt_min;
+		// TODO: replace with some fast round up/divide function
+		return ceilf(t_target / dt) * dt;
 	}
 
 	// gets dt

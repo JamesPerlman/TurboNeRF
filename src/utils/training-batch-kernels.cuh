@@ -263,20 +263,19 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	// check if thread is out of bounds
 	if (i >= batch_size) return;
 
+	// TODO: check if ray is alive
+
 	// if the total number of cumulative steps is greater than the number of rays, we exit early to avoid writing outside of our sample buffers
 	const uint32_t n_total_steps_cum = n_steps_cum[i];
+	const uint32_t n_steps = n_ray_steps[i];
 
 	if (n_total_steps_cum >= batch_size) return;
 
 	// References to input buffers
-	const uint32_t batch_offset_0 = 0;
-	const uint32_t batch_offset_1 = batch_size;
-	const uint32_t batch_offset_2 = batch_size << 1; // this is presumably faster than (batch_size * 2) or (batch_offset_1 + batch_size)
-	const uint32_t batch_offset_3 = batch_offset_2 + batch_size;
 
-	const uint32_t i_offset_0 = i + batch_offset_0;
-	const uint32_t i_offset_1 = i + batch_offset_1;
-	const uint32_t i_offset_2 = i + batch_offset_2;
+	const uint32_t i_offset_0 = i;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
 
 	const float o_x = in_ori_xyz[i_offset_0];
 	const float o_y = in_ori_xyz[i_offset_1];
@@ -296,15 +295,15 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	  */
 	
 	const uint32_t sample_offset_0 = n_total_steps_cum - n_ray_steps[i];
-	const uint32_t sample_offset_1 = sample_offset_0 + batch_offset_1;
-	const uint32_t sample_offset_2 = sample_offset_0 + batch_offset_2;
+	const uint32_t sample_offset_1 = sample_offset_0 + batch_size;
+	const uint32_t sample_offset_2 = sample_offset_1 + batch_size;
 
 	// Perform raymarching
 
 	float t = in_ray_t[i];
 	uint32_t n_steps_taken = 0;
 
-	while (true) {
+	while (n_steps_taken < n_steps) {
 		const float t0 = t;
 		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 		t += dt;
@@ -408,7 +407,7 @@ __global__ void generate_network_inputs_kernel(
 
 	// Calculate sample position
 	const float dt = t1_i - t0_i;
-	const float t = t0_i + dt * k;
+	const float t = t0_i + dt * 0.5f;
 
 	out_dt[i] = dt * inv_aabb_size;
 

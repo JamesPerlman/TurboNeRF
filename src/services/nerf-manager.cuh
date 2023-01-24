@@ -33,7 +33,7 @@ public:
 	NeRF* create_trainable_nerf(const cudaStream_t& stream, const BoundingBox& bbox) {
 		nerfs.emplace_back(
 			NerfNetwork(bbox.size_x),
-			CascadedOccupancyGrid(CascadedOccupancyGrid::get_max_n_levels(bbox.size_x)),
+			CascadedOccupancyGrid(CascadedOccupancyGrid::get_max_n_levels(bbox.size_x), 16),
 			bbox
 		);
 
