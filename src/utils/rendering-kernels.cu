@@ -301,6 +301,11 @@ __global__ void composite_samples_kernel(
 	// ray transmittance
 	const float r_t = __expf(-ray_sigma[i]);
 
+	if (r_t <= 1e-4f) {
+		ray_alive[i] = false;
+		return;
+	}
+
 	// sample weight
 	const float s_w = s_a * r_t;
 
@@ -321,14 +326,6 @@ __global__ void composite_samples_kernel(
 
 	// terminate ray if alpha >= 1.0
 	const float out_a = output_rgba[idx_offset_3];
-
-	if (r_t <= 1e-4f) {
-		ray_alive[i] = false;
-		output_rgba[idx_offset_0] /= out_a;
-		output_rgba[idx_offset_1] /= out_a;
-		output_rgba[idx_offset_2] /= out_a;
-		output_rgba[idx_offset_3] = 1.0f;
-	}
 
 	if (out_a >= 1.0f) {
 		ray_alive[i] = false;

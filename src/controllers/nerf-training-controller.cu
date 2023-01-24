@@ -304,8 +304,10 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 		while (n_cells_updated < grid_volume) {
 			uint32_t n_cells_to_update = std::min(grid_volume - n_cells_updated, workspace.batch_size);
 
+			uint32_t batch_size = tcnn::next_multiple(n_cells_to_update, tcnn::batch_size_granularity);
+			
 			// generate random floats for sampling
-			curandStatus_t status = curandGenerateUniform(rng, workspace.random_float, 4 * workspace.batch_size);
+			curandStatus_t status = curandGenerateUniform(rng, workspace.random_float, 4 * batch_size);
 			if (status != CURAND_STATUS_SUCCESS) {
 				printf("Error generating random floats for occupancy grid update.\n");
 			}
@@ -313,7 +315,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 			// generate random sampling points
 			generate_grid_cell_network_sample_points_kernel<<<n_blocks_linear(n_cells_to_update), n_threads_linear, 0, stream>>>(
 				n_cells_to_update,
-				workspace.batch_size,
+				batch_size,
 				n_cells_updated,
 				workspace.occ_grid,
 				level,
@@ -325,7 +327,7 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 			// query the density network
 			nerf->network.inference(
 				stream,
-				workspace.batch_size,
+				batch_size,
 				workspace.network_pos,
 				nullptr,
 				workspace.network_concat,
@@ -333,6 +335,9 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				false
 			);
 
+			CHECK_DATA(netpos_cpu, float, workspace.network_pos, n_cells_to_update);
+			minmaxavg(netpos_cpu.data(), n_cells_to_update, "netpos");
+			
 			// update occupancy grid values
 			update_occupancy_with_density_kernel<<<n_blocks_linear(n_cells_to_update), n_threads_linear, 0, stream>>>(
 				n_cells_to_update,
@@ -340,21 +345,21 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				workspace.occ_grid,
 				level,
 				selection_threshold,
-				workspace.random_float + 3 * workspace.batch_size, // (random_float + 3 * batch_size) is so thresholding doesn't correspond to x,y,z positions
-				workspace.network_output + 3 * workspace.batch_size
+				workspace.random_float + 3 * batch_size, // (random_float + 3 * batch_size) is so thresholding doesn't correspond to x,y,z positions
+				workspace.network_output + 3 * batch_size
 			);
 
 			CHECK_DATA(grid_dens_cpu, float, nerf->occupancy_grid.get_density() + grid_volume * level, grid_volume);
 
 			minmaxavg(grid_dens_cpu.data(), grid_dens_cpu.size(), "Density Grid");
-			n_cells_updated += workspace.batch_size;
+			n_cells_updated += n_cells_to_update;
 		}
 	}
 
 	// update the bits by thresholding the density values
 
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
-	const float threshold = 0.01f * NeRFConstants::min_step_size;
+	const float threshold = 0.1f;// * NeRFConstants::min_step_size;
 
 	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
 		n_bitfield_bytes,

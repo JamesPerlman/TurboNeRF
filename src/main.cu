@@ -28,9 +28,9 @@ int main()
 
 	auto og = nrc::CascadedOccupancyGrid(1, 16);
 
-	auto x = og.get_voxel_morton_index(1, 0.5f, -0.5f, 0.5f);
+	auto x = og.get_voxel_morton_index(2, 0.5f, -0.5f, 0.5f);
 	float ix, iy, iz;
-	og.get_voxel_xyz_from_morton_index(x, ix, iy, iz);
+	og.get_voxel_xyz_from_morton_index(x, 2, ix, iy, iz);
 
 	nrc::Dataset dataset = nrc::Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json");
 	// auto dataset = nrc::Dataset("E:\\2022\\nerf-library\\FascinatedByFungi2022\\big-white-chanterelle\\transforms.json");
@@ -70,7 +70,7 @@ int main()
 		trainer.train_step(stream);
 		// every 16 training steps, update the occupancy grid
 
-		if (i % 16 == 0 && i > 128) {
+		if (i % 16 == 0 && i > 16) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);

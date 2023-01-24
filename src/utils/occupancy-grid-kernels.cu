@@ -60,22 +60,18 @@ __global__ void generate_grid_cell_network_sample_points_kernel(
 
     // get xyz positions of the grid cell according to the morton code index
     float vx, vy, vz;
-    grid->get_voxel_xyz_from_morton_index(idx, vx, vy, vz);
-
-    // origin of the grid cell (same value for all 3 axes)
-    // this also centers xyz in the grid cell
-    const float o = -0.5f * level_size;
+    grid->get_voxel_xyz_from_morton_index(idx, level, vx, vy, vz);
 
     // set each dimension of sample_pos to the corner of the grid cell + a random offset
     // this x,y,z is in world coordinates
-    const float x = o + ((float)vx + random_float[i_offset_0]) * voxel_size;
-    const float y = o + ((float)vy + random_float[i_offset_1]) * voxel_size;
-    const float z = o + ((float)vz + random_float[i_offset_2]) * voxel_size;
+    const float x = vx + random_float[i_offset_0] * voxel_size;
+    const float y = vy + random_float[i_offset_1] * voxel_size;
+    const float z = vz + random_float[i_offset_2] * voxel_size;
 
     // Normalize the sample position to the range [0, 1] (for the network)
-    sample_pos[i_offset_0] = x * inv_aabb_size + 0.5f;
-    sample_pos[i_offset_1] = y * inv_aabb_size + 0.5f;
-    sample_pos[i_offset_2] = z * inv_aabb_size + 0.5f;
+    sample_pos[i_offset_0] = (x * inv_aabb_size) + 0.5f;
+    sample_pos[i_offset_1] = (y * inv_aabb_size) + 0.5f;
+    sample_pos[i_offset_2] = (z * inv_aabb_size) + 0.5f;
 
 }
 
@@ -97,7 +93,7 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t idx = i + start_idx;
 
     // (selection_threshold * 100)% of cells are sampled randomly, and the rest are sampled based on the current occupancy
-    if (selection_threshold < random_float[idx] && !grid->is_occupied_at(level, idx)) {
+    if (selection_threshold < random_float[i] && !grid->is_occupied_at(level, idx)) {
         return;
     }
 

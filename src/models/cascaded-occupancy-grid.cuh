@@ -113,7 +113,7 @@ struct CascadedOccupancyGrid {
 
 	// gets the voxel size at a given level
 	inline NRC_HOST_DEVICE float get_voxel_size(const int& level) const {
-		return get_level_size(level) *inv_resolution_f;
+		return get_level_size(level) * inv_resolution_f;
 	}
 	
 	// returns the index of the voxel containing the point
@@ -137,6 +137,7 @@ struct CascadedOccupancyGrid {
 	// returns just the x,y,z indices from their respective axes
 	inline NRC_HOST_DEVICE void get_voxel_xyz_from_morton_index(
 		const uint32_t& morton_index,
+		const int& level,
 		float& x, float& y, float& z
 	) const {
 
@@ -144,9 +145,11 @@ struct CascadedOccupancyGrid {
 		const int iy = static_cast<int>(tcnn::morton3D_invert(morton_index >> 1));
 		const int iz = static_cast<int>(tcnn::morton3D_invert(morton_index >> 2));
 
-		x = static_cast<float>(ix * 2 - resolution_i) * inv_resolution_f;
-		y = static_cast<float>(iy * 2 - resolution_i) * inv_resolution_f;
-		z = static_cast<float>(iz * 2 - resolution_i) * inv_resolution_f;
+		const float s = get_voxel_size(level);
+
+		x = static_cast<float>(ix - half_res_i) * s;
+		y = static_cast<float>(iy - half_res_i) * s;
+		z = static_cast<float>(iz - half_res_i) * s;
 	}
 
 	// checks if the grid is occupied at a morton index of the given level

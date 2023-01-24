@@ -407,7 +407,7 @@ __global__ void generate_network_inputs_kernel(
 
 	// Calculate sample position
 	const float dt = t1_i - t0_i;
-	const float t = t0_i + dt * 0.5f;
+	const float t = t0_i + dt * k;
 
 	out_dt[i] = dt * inv_aabb_size;
 
