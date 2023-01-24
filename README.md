@@ -1,3 +1,9 @@
+## TEST DATA
+
+Until we have an extensible data loader, the test data I'm working with is here:  
+
+https://www.dropbox.com/sh/qkt4t1tk1o7pdc6/AAD218LLtAavRZykYl33mO8ia?dl=0
+
 ## THANK YOU
 
 Many thank-yous to open source projects that will allow this project to reach its full potential (in order of integration date):
