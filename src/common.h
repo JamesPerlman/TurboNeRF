@@ -5,14 +5,6 @@
 
 #define NRC_HOST_DEVICE __host__ __device__
 
-#define CUDA_CHECK_THROW(call) { \
-	cudaError_t err = call; \
-	if (err != cudaSuccess) { \
-		throw std::runtime_error(cudaGetErrorString(err)); \
-	} \
-}
-
-
 #define CHECK_DATA(varname, data_type, data_ptr, data_size) \
 	std::vector<data_type> varname(data_size); \
 	CUDA_CHECK_THROW(cudaMemcpyAsync(varname.data(), data_ptr, data_size * sizeof(data_type), cudaMemcpyDeviceToHost, stream)); \
