@@ -157,11 +157,13 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	const float cone_angle,
 	const float dt_min,
 	const float dt_max,
-	const float* __restrict__ ori_xyz,
+	// input buffers
 	const float* __restrict__ dir_xyz,
 	const float* __restrict__ idir_xyz,
-	const float* __restrict__ ray_t,
-	const bool* __restrict__ ray_alive,
+	// output/mixed use buffers
+	bool* __restrict__ ray_alive,
+	float* __restrict__ ori_xyz,
+	float* __restrict__ ray_t,
 	uint32_t* __restrict__ n_steps // one per ray
 ) {
 	// get thread index
@@ -196,14 +198,11 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	float t = ray_t[i];
 
 	while (true) {
-		const float t0 = t;
 		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-		t += dt;
-		const float tmid = 0.5f * (t0 + t);
 
-		const float x = o_x + tmid * d_x;
-		const float y = o_y + tmid * d_y;
-		const float z = o_z + tmid * d_z;
+		const float x = o_x + t * d_x;
+		const float y = o_y + t * d_y;
+		const float z = o_z + t * d_z;
 
 		if (!bbox->contains(x, y, z)) {
 			break;
@@ -212,6 +211,17 @@ __global__ void march_and_count_steps_per_ray_kernel(
 		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
+
+			if (n_steps_taken == 0) {
+				// on first hit of an occupied cell, move ray origin to this cell
+				ray_t[i] = 0.0f;
+				ori_xyz[i_offset_0] = x;
+				ori_xyz[i_offset_1] = y;
+				ori_xyz[i_offset_2] = z;
+			}
+
+			t += dt;
+
 			++n_steps_taken;
 		} else {
 			// otherwise we need to find the next occupied cell
@@ -226,6 +236,10 @@ __global__ void march_and_count_steps_per_ray_kernel(
 		}
 	}
 
+	if (n_steps_taken == 0) {
+		ray_alive[i] = false;
+	}
+
 	n_steps[i] = n_steps_taken;
 }
 
@@ -238,6 +252,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	uint32_t batch_size,
 	const BoundingBox* bbox,
+	const float inv_aabb_size,
 	const CascadedOccupancyGrid* occ_grid,
 	const float dt_min,
 	const float dt_max,
@@ -250,12 +265,12 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const float* __restrict__ in_ray_t,
 	const uint32_t* __restrict__ n_ray_steps, // one per ray
 	const uint32_t* __restrict__ n_steps_cum, // one per ray
+	const bool* __restrict__ ray_alive,
 
 	// output buffers
 	float* __restrict__ out_pos_xyz,
 	float* __restrict__ out_dir_xyz,
-	float* __restrict__ out_t0,
-	float* __restrict__ out_t1
+	float* __restrict__ out_dt
 ) {
 	// get thread index
 	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -263,7 +278,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	// check if thread is out of bounds
 	if (i >= batch_size) return;
 
-	// TODO: check if ray is alive
+	if (!ray_alive[i]) return;
 
 	// if the total number of cumulative steps is greater than the number of rays, we exit early to avoid writing outside of our sample buffers
 	const uint32_t n_total_steps_cum = n_steps_cum[i];
@@ -294,9 +309,7 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	  * we must subtract the number of steps taken by this ray.
 	  */
 	
-	const uint32_t sample_offset_0 = n_total_steps_cum - n_ray_steps[i];
-	const uint32_t sample_offset_1 = sample_offset_0 + batch_size;
-	const uint32_t sample_offset_2 = sample_offset_1 + batch_size;
+	const uint32_t sample_offset = n_total_steps_cum - n_steps;
 
 	// Perform raymarching
 
@@ -304,52 +317,41 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	uint32_t n_steps_taken = 0;
 
 	while (n_steps_taken < n_steps) {
-		const float t0 = t;
-		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-		t += dt;
-		const float t1 = t;
 
-		const float tmid = (t0 + t1) * 0.5f;
-
-		const float x = o_x + tmid * d_x;
-		const float y = o_y + tmid * d_y;
-		const float z = o_z + tmid * d_z;
+		const float x = o_x + t * d_x;
+		const float y = o_y + t * d_y;
+		const float z = o_z + t * d_z;
 
 		if (!bbox->contains(x, y, z)) {
 			break;
 		}
 
+		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
+			t += dt;
+
 			/**
 			 * Here is where we assign training data to our compacted sample buffers.
 			 * RIP coalesced memory accesses :(
 			 * Worth it tho, gg ez.
 			 */
 
-			const uint32_t step_offset_0 = sample_offset_0 + n_steps_taken;
-			const uint32_t step_offset_1 = sample_offset_1 + n_steps_taken;
-			const uint32_t step_offset_2 = sample_offset_2 + n_steps_taken;
+			const uint32_t step_offset_0 = sample_offset + n_steps_taken;
+			const uint32_t step_offset_1 = step_offset_0 + batch_size;
+			const uint32_t step_offset_2 = step_offset_1 + batch_size;
 
-			// assign start/end t-values for this sampling interval
-			out_t0[step_offset_0] = t0;
-			out_t1[step_offset_0] = t1;
+			// generate network inputs
+			out_dt[step_offset_0] = dt * inv_aabb_size;
 
-			/**
-			 * Compact the rest of the buffers.
-			 * We use the minimum number of buffers required because we prefer using coalesced memory access.
-			 * We will use another kernel to transform this data further before passing it to the neural network.
-			 * After this step we will still need to stratify the t-values and generate the sample positions.
-			 */
+			out_pos_xyz[step_offset_0] = x * inv_aabb_size + 0.5f;
+			out_pos_xyz[step_offset_1] = y * inv_aabb_size + 0.5f;
+			out_pos_xyz[step_offset_2] = z * inv_aabb_size + 0.5f;
 
-			out_pos_xyz[step_offset_0] = x;
-			out_pos_xyz[step_offset_1] = y;
-			out_pos_xyz[step_offset_2] = z;
-
-			out_dir_xyz[step_offset_0] = d_x;
-			out_dir_xyz[step_offset_1] = d_y;
-			out_dir_xyz[step_offset_2] = d_z;
+			out_dir_xyz[step_offset_0] = (d_x + 1.0f) * 0.5f;
+			out_dir_xyz[step_offset_1] = (d_y + 1.0f) * 0.5f;
+			out_dir_xyz[step_offset_2] = (d_z + 1.0f) * 0.5f;
 
 			++n_steps_taken;
 		} else {

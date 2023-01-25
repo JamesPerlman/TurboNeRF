@@ -159,6 +159,8 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_alive
 	);
 
+	CHECK_DATA(t_cpu, float, workspace.ray_t, n_rays_in_batch);
+
 	/* Begin volumetric sampling of the previous network outputs */
 	
 	const float dt_min = NeRFConstants::min_step_size;
@@ -174,13 +176,15 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		cone_angle,
 		dt_min,
 		dt_max,
-		workspace.ray_origin,
 		workspace.ray_dir,
 		workspace.ray_inv_dir,
-		workspace.ray_t,
 		workspace.ray_alive,
+		workspace.ray_origin,
+		workspace.ray_t,
 		workspace.ray_steps
 	);
+
+	CHECK_DATA(tcpu_2, float, workspace.ray_t, n_rays_in_batch);
 
 	/**
 	 * Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch.
@@ -194,6 +198,8 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	// cumsum
 	thrust::inclusive_scan(thrust::cuda::par.on(stream), n_steps_in_ptr, n_steps_in_ptr + workspace.batch_size, n_steps_cum_ptr);
 
+	CHECK_DATA(nsteps_cpu, uint32_t, workspace.ray_steps, workspace.batch_size);
+	CHECK_DATA(nsteps_cum_cpu, uint32_t, workspace.ray_steps_cum, workspace.batch_size);
 	/**
 	 * Populate the t0 and t1 buffers with the starts and ends of each ray's samples.
 	 * Also copy and compact other output buffers to help with coalesced memory access in future kernels.
@@ -203,6 +209,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	march_and_generate_samples_and_compact_buffers_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
 		workspace.batch_size,
 		workspace.bounding_box,
+		1.0f / dataset.bounding_box.size_x,
 		workspace.occ_grid,
 		dt_min, dt_max,
 		cone_angle,
@@ -214,27 +221,31 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_t,
 		workspace.ray_steps,
 		workspace.ray_steps_cum,
+		workspace.ray_alive,
 
 		// output buffers
-		workspace.sample_origin,
-		workspace.sample_dir,
-		workspace.sample_t0,
-		workspace.sample_t1
-	);
-
-	// Generate stratified sampling positions
-	generate_network_inputs_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
-		workspace.batch_size,
-		1.0f / dataset.bounding_box.size_x,
-		workspace.sample_t0,
-		workspace.sample_t1,
-		workspace.random_float,
-		workspace.sample_origin,
-		workspace.sample_dir,
 		workspace.network_pos,
 		workspace.network_dir,
 		workspace.network_dt
 	);
+
+	// Generate stratified sampling positions
+	// generate_network_inputs_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
+	// 	workspace.batch_size,
+	// 	1.0f / dataset.bounding_box.size_x,
+	// 	workspace.sample_t0,
+	// 	workspace.sample_t1,
+	// 	workspace.random_float,
+	// 	workspace.sample_origin,
+	// 	workspace.sample_dir,
+	// 	workspace.network_pos,
+	// 	workspace.network_dir,
+	// 	workspace.network_dt
+	// );
+
+	// CHECK_DATA(dt_cpu, float, workspace.network_dt, workspace.batch_size);
+	// CHECK_DATA(dir_cpu, float, workspace.network_dir, workspace.batch_size);
+	// CHECK_DATA(pos_cpu, float, workspace.network_pos, workspace.batch_size);
 
 	// Count the number of rays actually used to fill the sample batch
 
@@ -359,12 +370,13 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 	// update the bits by thresholding the density values
 
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
-	const float threshold = 0.1f;// * NeRFConstants::min_step_size;
+	const float threshold = 0.01f * NeRFConstants::min_step_size;
 
 	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
-		n_bitfield_bytes,
+		nerf->occupancy_grid.volume_i,
 		n_levels,
 		threshold,
+		workspace.occ_grid,
 		nerf->occupancy_grid.get_density(),
 		nerf->occupancy_grid.get_bitfield()
 	);

@@ -40,6 +40,7 @@ __global__ void update_occupancy_grid_bits_kernel(
     const uint32_t n_cells_per_level,
     const int n_levels,
     const float threshold,
+    CascadedOccupancyGrid* __restrict__ grid,
     const float* __restrict__ grid_density,
     uint8_t* __restrict__ grid_bits
 );

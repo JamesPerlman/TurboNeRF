@@ -176,6 +176,12 @@ __global__ void sigma_to_weight_forward_kernel(
 			sigma_cumsum += s_sigma[j] * s_dt[j];
 		}
 		const float trans = __expf(-sigma_cumsum);
+
+		if (trans <= 1e-4f) {
+			s_weight[i] = 0.0f;
+			continue;
+		}
+
 		const float alpha = 1.0f - __expf(-s_sigma[i] * s_dt[i]);
 		s_weight[i] = trans * alpha;
 	}
@@ -213,7 +219,15 @@ __global__ void sigma_to_weight_backward_kernel(
 		for (int j = 0; j < i; ++j) {
 			sigma_cumsum += s_sigma[j] * s_dt[j];
 		}
-		const float dweight_dsigma = s_dt[i] * __expf(-sigma_cumsum)  * __expf(-s_sigma[i] * s_dt[i]);
+
+		const float trans = __expf(-sigma_cumsum);
+
+		if (trans <= 1e-4f) {
+			s_dL_dsigma[i] = 0.0f;
+			continue;
+		}
+
+		const float dweight_dsigma = s_dt[i] * trans  * __expf(-s_sigma[i] * s_dt[i]);
 		s_dL_dsigma[i] = s_dL_dweight[i] * dweight_dsigma; 
 	}
 }
@@ -309,6 +323,7 @@ __global__ void weight_to_ray_rgba_backward_kernel(
 		s_dL_dcolor[i + 0 * batch_size] = dL_dR_r * s_weight[i];
 		s_dL_dcolor[i + 1 * batch_size] = dL_dR_g * s_weight[i];
 		s_dL_dcolor[i + 2 * batch_size] = dL_dR_b * s_weight[i];
+
 	}
 }
 
@@ -374,25 +389,6 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	dL_dR[g_idx] = -(2.0f / (4.0f)) * dg;
 	dL_dR[b_idx] = -(2.0f / (4.0f)) * db;
 	dL_dR[a_idx] = -(2.0f / (4.0f)) * da;
-}
-
-// calculates dL/dR across all channels
-__global__ void ray_channel_to_loss_backward_kernel(
-	const uint32_t n_rays,
-	const uint32_t batch_size,
-	const float* __restrict__ predicted_channel,
-	const float* __restrict__ groundtruth_channel,
-	const float* __restrict__ loss, // result from forward pass
-	float* __restrict__ dL_dR
-) {
-	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (idx >= n_rays) {
-		return;
-	}
-
-	float diff = groundtruth_channel[idx] - predicted_channel[idx];
-	dL_dR[idx] = (2.0f / (float)n_rays) * diff;
 }
 
 NRC_NAMESPACE_END

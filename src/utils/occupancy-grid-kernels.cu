@@ -93,10 +93,10 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t idx = i + start_idx;
 
     // (selection_threshold * 100)% of cells are sampled randomly, and the rest are sampled based on the current occupancy
-    if (selection_threshold < random_float[i] && !grid->is_occupied_at(level, idx)) {
+    /*if (selection_threshold < random_float[i] && !grid->is_occupied_at(level, idx)) {
         return;
     }
-
+*/
     float* grid_density = grid->get_density() + level * grid->volume_i + idx;
     float new_density = fmaxf(*grid_density, (float)network_density[i]);
 
@@ -113,6 +113,7 @@ __global__ void update_occupancy_grid_bits_kernel(
     const uint32_t n_cells_per_level,
     const int n_levels,
     const float threshold,
+    CascadedOccupancyGrid* __restrict__ grid,
     const float* __restrict__ grid_density,
     uint8_t* __restrict__ grid_bits
 ) {
@@ -121,18 +122,15 @@ __global__ void update_occupancy_grid_bits_kernel(
         return;
     }
 
-    uint8_t cell_bits = grid_bits[idx];
+    uint8_t cell_bits = 0b00000000;
 
     #pragma unroll
     for (int level = 0; level < n_levels; ++level) {
         const uint32_t density_idx = level * n_cells_per_level + idx;
-
+        
         // get "is threshold exceeded?" as a bit
         uint8_t b = grid_density[density_idx] > threshold ? 1 : 0;
-
-        // thank you https://stackoverflow.com/a/28360719/892990
-        // This just sets the bit at the correct position to the value of b
-        cell_bits = (cell_bits & (~((uint8_t)1 << level))) | (b << level);
+        cell_bits |= b << level;
     }
 
     grid_bits[idx] = cell_bits;

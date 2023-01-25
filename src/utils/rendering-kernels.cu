@@ -146,24 +146,20 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	float t = ray_t[i];
 
 	while (true) {
-		const float t0 = t;
-		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-		t += dt;
-		const float tmid = 0.5f * (t0 + t);
-
-		const float x = o_x + tmid * d_x;
-		const float y = o_y + tmid * d_y;
-		const float z = o_z + tmid * d_z;
+		const float x = o_x + t * d_x;
+		const float y = o_y + t * d_y;
+		const float z = o_z + t * d_z;
 
 		if (!bbox->contains(x, y, z)) {
 			ray_alive[i] = false;
 			break;
 		}
 
+		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
-			ray_t[i] = tmid;
+			ray_t[i] = t + dt;
 
 			network_pos[net_offset_0] = x * inv_aabb_size + 0.5f;
 			network_pos[net_offset_1] = y * inv_aabb_size + 0.5f;
@@ -177,8 +173,6 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 
             // for now, we only march samples once.
             break;
-			
-			// t += dt;
 
 		} else {
 			// otherwise we need to find the next occupied cell
@@ -295,16 +289,16 @@ __global__ void composite_samples_kernel(
 	// sample sigma
 	const float sigma_dt = s_s * sample_dt[i];
 
-    // sample alpha
-    const float s_a = 1.0f - __expf(-sigma_dt);
-
 	// ray transmittance
 	const float r_t = __expf(-ray_sigma[i]);
-
+/*
 	if (r_t <= 1e-4f) {
 		ray_alive[i] = false;
 		return;
 	}
+*/
+    // sample alpha
+    const float s_a = 1.0f - __expf(-sigma_dt);
 
 	// sample weight
 	const float s_w = s_a * r_t;
@@ -323,6 +317,11 @@ __global__ void composite_samples_kernel(
 	output_rgba[idx_offset_1] += s_w * s_g;
 	output_rgba[idx_offset_2] += s_w * s_b;
 	output_rgba[idx_offset_3] += s_w;
+
+	// output_rgba[idx_offset_0] += 0.001f;
+	// output_rgba[idx_offset_1] += 0.001f;
+	// output_rgba[idx_offset_2] += 0.001f;
+	// output_rgba[idx_offset_3] += 0.001f;
 
 	// terminate ray if alpha >= 1.0
 	const float out_a = output_rgba[idx_offset_3];
