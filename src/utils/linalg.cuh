@@ -94,7 +94,7 @@ struct Matrix4f
     }
 
     // efficient determinant for 4x4 transform matrix, where m30 = m31 = m32 = 0, m33 = 1
-    float Matrix4f::determinant() const
+    float determinant() const
     {
         float det = m00 * (m11 * (m22 * m33 - m23 * m32) - m12 * (m21 * m33 - m23 * m31) + m13 * (m21 * m32 - m22 * m31)) -
                     m01 * (m10 * (m22 * m33 - m23 * m32) - m12 * (m20 * m33 - m23 * m30) + m13 * (m20 * m32 - m22 * m30)) +

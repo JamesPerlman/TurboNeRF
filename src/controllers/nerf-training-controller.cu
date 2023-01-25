@@ -3,6 +3,7 @@
 #include <device_launch_parameters.h>
 #include <json/json.hpp>
 #include <thrust/device_vector.h>
+#include <tiny-cuda-nn/common.h>
 
 
 #include "nerf-training-controller.h"
@@ -10,6 +11,7 @@
 #include "../utils/occupancy-grid-kernels.cuh"
 #include "../utils/training-batch-kernels.cuh"
 #include "../utils/parallel-utils.cuh"
+#include "../common.h"
 
 #include <iostream>
 #include <fstream>
