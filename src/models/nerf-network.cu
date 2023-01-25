@@ -206,7 +206,7 @@ void NerfNetwork::train(
 		n_rays
 	);
 
-	printf("Loss: %f / # Rays: %lu\n", mse_loss, n_rays);
+	printf("Loss: %f / # Rays: %u\n", mse_loss, n_rays);
 
 	// Backward
 	backward(

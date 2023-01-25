@@ -4,7 +4,6 @@
 #include <device_launch_parameters.h>
 #include <stbi/stb_image.h>
 #include <tiny-cuda-nn/common.h>
-#include <crt/math_functions.h>
 
 #include "../common.h"
 #include "../models/bounding-box.cuh"
