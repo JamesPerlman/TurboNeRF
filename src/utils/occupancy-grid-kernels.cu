@@ -92,11 +92,17 @@ __global__ void update_occupancy_with_density_kernel(
 
     const uint32_t idx = i + start_idx;
 
-    // (selection_threshold * 100)% of cells are sampled randomly, and the rest are sampled based on the current occupancy
-    /*if (selection_threshold < random_float[i] && !grid->is_occupied_at(level, idx)) {
-        return;
+    // (selection_threshold * 100)% of cells are sampled randomly, and half of the rest are sampled based on the current occupancy
+    if (selection_threshold < random_float[i]) {
+        if (selection_threshold < 0.5f * random_float[i]) {
+            if (!grid->is_occupied_at(level, idx)) {
+                return;
+            }
+        } else {
+            return;
+        }
     }
-*/
+
     float* grid_density = grid->get_density() + level * grid->volume_i + idx;
     float new_density = fmaxf(*grid_density, (float)network_density[i]);
 
