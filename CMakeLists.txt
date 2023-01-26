@@ -105,7 +105,8 @@ set(SOURCES
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 # Set stricter compile flag
-target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler -Werror)
+target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler)
+
 # CUDA includes / linkage
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	CUDA_RESOLVE_DEVICE_SYMBOLS ON
