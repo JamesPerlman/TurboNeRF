@@ -40,7 +40,7 @@ struct NerfNetwork {
 		tcnn::network_precision_t* output_buffer
 	);
 
-	void NerfNetwork::inference(
+	void inference(
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,
 		float* pos_batch,

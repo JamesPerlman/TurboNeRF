@@ -26,8 +26,8 @@ struct BoundingBox {
         , max_x(0.5f * size), max_y(0.5f * size), max_z(0.5f * size)
 		, size_x(size), size_y(size), size_z(size)
     {};
-    
-    inline __device__ bool BoundingBox::get_ray_t_intersection(
+
+    inline __device__ bool get_ray_t_intersection(
         const float& ori_x, const float& ori_y, const float& ori_z,
         const float& dir_x, const float& dir_y, const float& dir_z,
         const float& idir_x, const float& idir_y, const float& idir_z,

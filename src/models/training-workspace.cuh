@@ -77,7 +77,7 @@ public:
 	TrainingWorkspace() {};
 
 	// member functions
-	void TrainingWorkspace::enlarge(
+	void enlarge(
 		const cudaStream_t& stream,
 		const size_t& n_images,
 		const size_t& n_pixels_per_image,

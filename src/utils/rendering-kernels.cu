@@ -1,6 +1,5 @@
 
 #include <device_launch_parameters.h>
-#include <crt/device_functions.h>
 
 #include "rendering-kernels.cuh"
 #include "../models/bounding-box.cuh"

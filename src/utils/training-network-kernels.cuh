@@ -2,7 +2,6 @@
 
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
-#include <crt/device_functions.h>
 
 #include <tiny-cuda-nn/common.h>
 
@@ -129,8 +128,6 @@ __global__ void sigma_to_transmittance_backward_kernel(
 	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
 
 	// local references to sample data
-	const float* __restrict__ s_dt = dt + sample_offset;
-	const float* __restrict__ s_sigma = sigma + sample_offset;
 	const float* __restrict__ s_dL_dtrans = dL_dtransmittance + sample_offset;
 	float* __restrict__ s_dL_dsigma = dL_dsigma + sample_offset;
 
@@ -210,7 +207,6 @@ __global__ void sigma_to_weight_backward_kernel(
 	// local references to sample data
 	const float* __restrict__ s_dt = dt + sample_offset;
 	const float* __restrict__ s_sigma = sigma + sample_offset;
-	const float* __restrict__ s_weight = weight + sample_offset;
 	const float* __restrict__ s_dL_dweight = dL_dweight + sample_offset;
 	float* __restrict__ s_dL_dsigma = dL_dsigma + sample_offset;
 

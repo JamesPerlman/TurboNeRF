@@ -75,7 +75,6 @@ void NeRFRenderingController::request_render(
 
     // calculate the number of pixels we need to fill
     uint32_t n_pixels = request.output.width * request.output.height;
-    uint32_t n_rays_total = n_pixels;
 
     // double buffer indices
     int active_buf_idx = 0;
