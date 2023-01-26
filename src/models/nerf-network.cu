@@ -414,14 +414,23 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		workspace.sigma_buf
 	);
 
-	sigma_to_weight_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+	sigma_to_alpha_and_transmittance_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		ray_steps,
 		ray_steps_cumulative,
 		dt_batch,
 		workspace.sigma_buf,
-		workspace.weight_buf	
+		workspace.alpha_buf,
+		workspace.trans_buf
+	);
+
+	alpha_and_transmittance_to_weight_forward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+		n_samples,
+		batch_size,
+		workspace.alpha_buf,
+		workspace.trans_buf,
+		workspace.weight_buf
 	);
 
 	weight_to_ray_rgba_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
@@ -502,15 +511,27 @@ void NerfNetwork::backward(
 		workspace.grad_dL_dcolor
 	);
 
-	sigma_to_weight_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+	alpha_and_transmittance_to_weight_backward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+		n_samples,
+		batch_size,
+		workspace.alpha_buf,
+		workspace.trans_buf,
+		workspace.grad_dL_dweight,
+		workspace.grad_dL_dalpha,
+		workspace.grad_dL_dtrans
+	);
+
+	sigma_to_alpha_and_transmittance_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		ray_steps,
 		ray_steps_cumulative,
 		dt_batch,
 		workspace.sigma_buf,
-		workspace.weight_buf,
-		workspace.grad_dL_dweight,
+		workspace.alpha_buf,
+		workspace.trans_buf,
+		workspace.grad_dL_dalpha,
+		workspace.grad_dL_dtrans,
 		workspace.grad_dL_dsigma
 	);
 
@@ -582,7 +603,7 @@ void NerfNetwork::backward(
 	);
 
 	// We need to add dL/ddensity to dL/doutput before backpropagating
-	copy_gradients_kernel<1,true><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+	copy_gradients_kernel<1, true><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
 		batch_size,
 		LOSS_SCALE,

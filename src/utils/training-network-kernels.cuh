@@ -75,13 +75,14 @@ __global__ void density_to_sigma_backward_kernel(
  */
 
 // calculates transmittance from sigma
-__global__ void sigma_to_transmittance_forward_kernel(
+__global__ void sigma_to_alpha_and_transmittance_forward_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
 	const uint32_t* __restrict__ n_samples_per_ray,
 	const uint32_t* __restrict__ n_samples_cum,
 	const float* __restrict__ dt,
 	const float* __restrict__ sigma,
+	float* __restrict__ alpha,
 	float* __restrict__ transmittance
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -95,6 +96,7 @@ __global__ void sigma_to_transmittance_forward_kernel(
 	// local references to sample data
 	const float* __restrict__ s_dt = dt + sample_offset;
 	const float* __restrict__ s_sigma = sigma + sample_offset;
+	float* __restrict__ s_alpha = alpha + sample_offset;
 	float* __restrict__ s_trans = transmittance + sample_offset;
 
 	for (int i = 0; i < n_samples; ++i) {
@@ -102,20 +104,23 @@ __global__ void sigma_to_transmittance_forward_kernel(
 		for (int j = 0; j < i; ++j) {
 			sigma_cumsum += s_sigma[j] * s_dt[j];
 		}
+		s_alpha[i] = 1.0f - __expf(-s_sigma[i] * s_dt[i]);
 		s_trans[i] = __expf(-sigma_cumsum);
 	}
 }
 
 
-// calculates dL/dsigma = dL/dtransmittance * dtransmittance/dsigma
-__global__ void sigma_to_transmittance_backward_kernel(
+// calculates dL/dsigma = dL/dtransmittance * dtransmittance/dsigma + dL/dalpha * dalpha/dsigma
+__global__ void sigma_to_alpha_and_transmittance_backward_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
 	const uint32_t* __restrict__ n_samples_per_ray,
 	const uint32_t* __restrict__ n_samples_cum,
 	const float* __restrict__ dt,
 	const float* __restrict__ sigma,
-	const float* __restrict__ transmittance, // forward output
+	const float* __restrict__ alpha,
+	const float* __restrict__ transmittance,
+	const float* __restrict__ dL_dalpha,
 	const float* __restrict__ dL_dtransmittance,
 	float* __restrict__ dL_dsigma
 ) {
@@ -128,104 +133,64 @@ __global__ void sigma_to_transmittance_backward_kernel(
 	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
 
 	// local references to sample data
+	const float* __restrict__ s_dt = dt + sample_offset;
+	const float* __restrict__ s_sigma = sigma + sample_offset;
+	const float* __restrict__ s_alpha = alpha + sample_offset;
+	const float* __restrict__ s_trans = transmittance + sample_offset;
+	const float* __restrict__ s_dL_dalpha = dL_dalpha + sample_offset;
 	const float* __restrict__ s_dL_dtrans = dL_dtransmittance + sample_offset;
 	float* __restrict__ s_dL_dsigma = dL_dsigma + sample_offset;
 
     for (int i = 0; i < n_samples; ++i) {
-        float cumsum_outer = 0.0f;
+        float dtrans_dsigma_sum = 0.0f;
         for (int j = i + 1; j < n_samples; ++j) {
             float cumsum_inner = 0.0;
             for (int k = 0; k < j; ++k) {
-                cumsum_inner += sigma[k] * dt[k];
+                cumsum_inner += s_sigma[k] * s_dt[k];
             }
-            cumsum_outer += __expf(-cumsum_inner) * s_dL_dtrans[j]; //?
+            dtrans_dsigma_sum += __expf(-cumsum_inner) * s_dL_dtrans[j]; //?
         }
-        s_dL_dsigma[i] = -dt[i] * cumsum_outer;
+		const float dL_dtrans_dtrans_dsigma = -s_dt[i] * dtrans_dsigma_sum;
+		const float dalpha_dsigma = s_dt[i] * (1.0f - s_alpha[i]);
+        s_dL_dsigma[i] = dL_dtrans_dtrans_dsigma + dalpha_dsigma * s_dL_dalpha[i];
     }
 }
 
-// calculates weight from sigma, per sample
-__global__ void sigma_to_weight_forward_kernel(
-	uint32_t n_rays,
-	uint32_t batch_size,
-	const uint32_t* __restrict__ n_samples_per_ray,
-	const uint32_t* __restrict__ n_samples_cum,
-	const float* __restrict__ dt,
-	const float* __restrict__ sigma,
+// calculates weight = alpha * transmittance
+__global__ void alpha_and_transmittance_to_weight_forward_kernel(
+	const uint32_t n_samples,
+	const uint32_t batch_size,
+	const float* __restrict__ alpha,
+	const float* __restrict__ transmittance,
 	float* __restrict__ weight
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (idx >= n_rays) return;
+	if (idx >= n_samples) return;
 
-	// offsets
-	const uint32_t n_samples = n_samples_per_ray[idx];
-	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
-
-	// local references to sample data
-	const float* __restrict__ s_dt = dt + sample_offset;
-	const float* __restrict__ s_sigma = sigma + sample_offset;
-	float* __restrict__ s_weight = weight + sample_offset;
-
-	for (int i = 0; i < n_samples; ++i) {
-		float sigma_cumsum = 0.0f;
-		for (int j = 0; j < i; ++j) {
-			sigma_cumsum += s_sigma[j] * s_dt[j];
-		}
-		const float trans = __expf(-sigma_cumsum);
-
-		if (trans <= 1e-4f) {
-			s_weight[i] = 0.0f;
-			continue;
-		}
-
-		const float alpha = 1.0f - __expf(-s_sigma[i] * s_dt[i]);
-		s_weight[i] = trans * alpha;
-	}
+	weight[idx] = alpha[idx] * transmittance[idx];
 }
 
-// calculates dL/dsigma = dL/dweight * dweight/dsigma
-__global__ void sigma_to_weight_backward_kernel(
-	uint32_t n_rays,
-	uint32_t batch_size,
-	const uint32_t* __restrict__ n_samples_per_ray,
-	const uint32_t* __restrict__ n_samples_cum,
-	const float* __restrict__ dt,
-	const float* __restrict__ sigma,
-	const float* __restrict__ weight, // forward output
+// calculates dL/dalpha = dL/dweight * dweight/dalpha
+// calculates dL/dtransmittance = dL/dweight * dweight/dtransmittance
+__global__ void alpha_and_transmittance_to_weight_backward_kernel(
+	const uint32_t n_samples,
+	const uint32_t batch_size,
+	const float* __restrict__ alpha,
+	const float* __restrict__ transmittance,
 	const float* __restrict__ dL_dweight,
-	float* __restrict__ dL_dsigma
+	float* __restrict__ dL_dalpha,
+	float* __restrict__ dL_dtransmittance
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (idx >= n_rays) return;
+	if (idx >= n_samples) return;
 
-	// offsets
-	const uint32_t n_samples = n_samples_per_ray[idx];
-	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+	const float dweight_dalpha = transmittance[idx];
+	dL_dalpha[idx] = dL_dweight[idx] * dweight_dalpha;
 
-	// local references to sample data
-	const float* __restrict__ s_dt = dt + sample_offset;
-	const float* __restrict__ s_sigma = sigma + sample_offset;
-	const float* __restrict__ s_dL_dweight = dL_dweight + sample_offset;
-	float* __restrict__ s_dL_dsigma = dL_dsigma + sample_offset;
-
-	for (int i = 0; i < n_samples; ++i) {
-		float sigma_cumsum = 0.0f;
-		for (int j = 0; j < i; ++j) {
-			sigma_cumsum += s_sigma[j] * s_dt[j];
-		}
-
-		const float trans = __expf(-sigma_cumsum);
-
-		if (trans <= 1e-4f) {
-			s_dL_dsigma[i] = 0.0f;
-			continue;
-		}
-
-		const float dweight_dsigma = s_dt[i] * trans  * __expf(-s_sigma[i] * s_dt[i]);
-		s_dL_dsigma[i] = s_dL_dweight[i] * dweight_dsigma; 
-	}
+	const float dweight_dtransmittance = alpha[idx];
+	dL_dtransmittance[idx] = dL_dweight[idx] * dweight_dtransmittance;
 }
 
 /**
@@ -315,11 +280,10 @@ __global__ void weight_to_ray_rgba_backward_kernel(
 		const float sg = (float)s_sample_g[i];
 		const float sb = (float)s_sample_b[i];
 
-		s_dL_dweight[i] = dL_dR_a + dL_dR_r * sr + dL_dR_g * sg + dL_dR_b * sb;
+		s_dL_dweight[i] = dL_dR_r * sr + dL_dR_g * sg + dL_dR_b * sb;
 		s_dL_dcolor[i + 0 * batch_size] = dL_dR_r * s_weight[i];
 		s_dL_dcolor[i + 1 * batch_size] = dL_dR_g * s_weight[i];
 		s_dL_dcolor[i + 2 * batch_size] = dL_dR_b * s_weight[i];
-
 	}
 }
 
@@ -347,10 +311,10 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 	const float db = target_rgba[b_idx] - ray_rgba[b_idx];
 	const float da = target_rgba[a_idx] - ray_rgba[a_idx];
 	
-	loss[r_idx] = (1.0f / (4.0f * (float)n_rays)) * (dr * dr);
-	loss[g_idx] = (1.0f / (4.0f * (float)n_rays)) * (dg * dg);
-	loss[b_idx] = (1.0f / (4.0f * (float)n_rays)) * (db * db);
-	loss[a_idx] = (1.0f / (4.0f * (float)n_rays)) * (da * da);
+	loss[r_idx] = (1.0f / (3.0f * (float)n_rays)) * (dr * dr);
+	loss[g_idx] = (1.0f / (3.0f * (float)n_rays)) * (dg * dg);
+	loss[b_idx] = (1.0f / (3.0f * (float)n_rays)) * (db * db);
+	// loss[a_idx] = (1.0f / (4.0f * (float)n_rays)) * (da * da);
 }
 
 // dL/dR = (1/4) * (dL/dR_r + dL/dR_g + dL/dR_b + dL/dR_a)
@@ -379,12 +343,12 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const float dr = target_rgba[r_idx] - ray_rgba[r_idx];
 	const float dg = target_rgba[g_idx] - ray_rgba[g_idx];
 	const float db = target_rgba[b_idx] - ray_rgba[b_idx];
-	const float da = target_rgba[a_idx] - ray_rgba[a_idx];
+	// const float da = target_rgba[a_idx] - ray_rgba[a_idx];
 	
-	dL_dR[r_idx] = -(2.0f / (4.0f)) * dr;
-	dL_dR[g_idx] = -(2.0f / (4.0f)) * dg;
-	dL_dR[b_idx] = -(2.0f / (4.0f)) * db;
-	dL_dR[a_idx] = -(2.0f / (4.0f)) * da;
+	dL_dR[r_idx] = -(2.0f / (3.0f)) * dr;
+	dL_dR[g_idx] = -(2.0f / (3.0f)) * dg;
+	dL_dR[b_idx] = -(2.0f / (3.0f)) * db;
+	// dL_dR[a_idx] = -(2.0f / (4.0f)) * da;
 }
 
 NRC_NAMESPACE_END
