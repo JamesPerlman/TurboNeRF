@@ -414,32 +414,16 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		workspace.sigma_buf
 	);
 
-	sigma_to_alpha_and_transmittance_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+	sigma_to_ray_rgba_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		ray_steps,
 		ray_steps_cumulative,
-		dt_batch,
 		workspace.sigma_buf,
-		workspace.alpha_buf,
-		workspace.trans_buf
-	);
-
-	alpha_and_transmittance_to_weight_forward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
-		n_samples,
-		batch_size,
-		workspace.alpha_buf,
-		workspace.trans_buf,
-		workspace.weight_buf
-	);
-
-	weight_to_ray_rgba_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
-		n_rays,
-		batch_size,
-		ray_steps,
-		ray_steps_cumulative,
-		workspace.weight_buf,
+		dt_batch,
 		output_buffer,
+		workspace.trans_buf,
+		workspace.alpha_buf,
 		workspace.ray_rgba
 	);
 
@@ -490,49 +474,24 @@ void NerfNetwork::backward(
 	ray_rgba_to_loss_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
-		ray_steps,
-		ray_steps_cumulative,
-		dt_batch,
 		workspace.ray_rgba,
 		target_rgba,
-		workspace.loss_buf,
 		workspace.grad_dL_dR
 	);
 
-	weight_to_ray_rgba_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+	sigma_to_ray_rgba_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		ray_steps,
 		ray_steps_cumulative,
-		workspace.weight_buf,
+		workspace.sigma_buf,
+		dt_batch,
+		workspace.trans_buf,
+		workspace.alpha_buf,
 		network_color,
 		workspace.grad_dL_dR,
-		workspace.grad_dL_dweight,
+		workspace.grad_dL_dsigma,
 		workspace.grad_dL_dcolor
-	);
-
-	alpha_and_transmittance_to_weight_backward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
-		n_samples,
-		batch_size,
-		workspace.alpha_buf,
-		workspace.trans_buf,
-		workspace.grad_dL_dweight,
-		workspace.grad_dL_dalpha,
-		workspace.grad_dL_dtrans
-	);
-
-	sigma_to_alpha_and_transmittance_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
-		n_rays,
-		batch_size,
-		ray_steps,
-		ray_steps_cumulative,
-		dt_batch,
-		workspace.sigma_buf,
-		workspace.alpha_buf,
-		workspace.trans_buf,
-		workspace.grad_dL_dalpha,
-		workspace.grad_dL_dtrans,
-		workspace.grad_dL_dsigma
 	);
 
 	density_to_sigma_backward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
