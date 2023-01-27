@@ -38,8 +38,8 @@ struct Camera {
 		
 		// sx and sy are the corresponding x and y in the sensor rect's 2D coordinate system
 		// this will put rays at pixel centers
-		float sx = sensor_size.x * (float(x) / (pixel_dims_f.x + 0.5f) - 0.5f);
-		float sy = sensor_size.y * (float(y) / (pixel_dims_f.y + 0.5f) - 0.5f);
+		float sx = sensor_size.x * ((float(x) + 0.5f) / (pixel_dims_f.x) - 0.5f);
+		float sy = sensor_size.y * ((float(y) + 0.5f) / (pixel_dims_f.y) - 0.5f);
 
 		float3 pix_pos = make_float3(sx, sy, 1.0f);
 
