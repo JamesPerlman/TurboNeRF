@@ -203,7 +203,7 @@ void NerfNetwork::train(
 	// Loss
 	float mse_loss = calculate_loss(
 		stream,
-		n_rays
+		batch_size
 	);
 
 	printf("Loss: %f / # Rays: %u\n", mse_loss, n_rays);
@@ -440,7 +440,7 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 
 float NerfNetwork::calculate_loss(
 	const cudaStream_t& stream,
-	const uint32_t& n_rays
+	const uint32_t& batch_size
 ) {
 	// Add all loss values together
 	thrust::device_ptr<float> loss_buffer_ptr(workspace.loss_buf);
@@ -448,7 +448,7 @@ float NerfNetwork::calculate_loss(
 	return thrust::reduce(
 		thrust::cuda::par_nosync.on(stream),
 		loss_buffer_ptr,
-		loss_buffer_ptr + 4 * n_rays,
+		loss_buffer_ptr + 4 * batch_size,
 		0.0f,
 		thrust::plus<float>()
 	);
