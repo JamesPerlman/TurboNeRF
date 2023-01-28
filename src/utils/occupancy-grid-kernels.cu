@@ -79,11 +79,11 @@ __global__ void generate_grid_cell_network_sample_points_kernel(
 __global__ void update_occupancy_with_density_kernel(
     const uint32_t n_samples,
     const uint32_t start_idx,
-    const CascadedOccupancyGrid* __restrict__ grid,
     const uint32_t level,
     const float selection_threshold,
     const float* __restrict__ random_float,
-    const tcnn::network_precision_t* __restrict__ network_density
+    const tcnn::network_precision_t* __restrict__ network_density,
+    CascadedOccupancyGrid* __restrict__ grid
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_samples) {

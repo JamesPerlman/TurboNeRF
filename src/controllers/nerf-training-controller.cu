@@ -355,11 +355,11 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 			update_occupancy_with_density_kernel<<<n_blocks_linear(n_cells_to_update), n_threads_linear, 0, stream>>>(
 				n_cells_to_update,
 				n_cells_updated,
-				workspace.occ_grid,
 				level,
 				selection_threshold,
 				workspace.random_float + 3 * batch_size, // (random_float + 3 * batch_size) is so thresholding doesn't correspond to x,y,z positions
-				workspace.network_output + 3 * batch_size
+				workspace.network_output + 3 * batch_size,
+				workspace.occ_grid
 			);
 
 			CHECK_DATA(grid_dens_cpu, float, nerf->occupancy_grid.get_density() + grid_volume * level, grid_volume);
