@@ -186,6 +186,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
     const float dL_dR_r = dL_dR[idx + 0 * batch_size];
 	const float dL_dR_g = dL_dR[idx + 1 * batch_size];
 	const float dL_dR_b = dL_dR[idx + 2 * batch_size];
+	const float dL_dR_a = dL_dR[idx + 3 * batch_size];
 
     float* __restrict__ s_dL_dsigma = dL_dsigma + sample_offset;
 	float* __restrict__ s_dL_dcolor = dL_dcolor + sample_offset;
@@ -194,7 +195,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
         float cumsum_r = 0.0f;
         float cumsum_g = 0.0f;
         float cumsum_b = 0.0f;
-        // cumsum_a ?
+        float cumsum_a = 0.0f;
 
         for (int j = i + 1; j < n_samples; ++j) {
             const float k = -s_dt[i] * s_trans[j] * s_alpha[j];
@@ -202,6 +203,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
             cumsum_r += k * (float)s_r[j];
             cumsum_g += k * (float)s_g[j];
             cumsum_b += k * (float)s_b[j];
+			cumsum_a += k;
         }
         
         const float c = s_trans[i] * s_dt[i] * (1.0f - s_alpha[i]);
@@ -209,8 +211,9 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
         const float dRr_dsigma = cumsum_r + c * (float)s_r[i];
         const float dRg_dsigma = cumsum_g + c * (float)s_g[i];
         const float dRb_dsigma = cumsum_b + c * (float)s_b[i];
+		const float dRa_dsigma = cumsum_a + c;
 
-        s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma;
+        s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma + dL_dR_a * dRa_dsigma;
 		
 		const float s_weight_i = s_trans[i] * s_alpha[i];
 
@@ -230,24 +233,29 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (idx >= n_rays) {
-		return;
-	}
-
 	const uint32_t r_idx = idx;
 	const uint32_t g_idx = r_idx + batch_size;
 	const uint32_t b_idx = g_idx + batch_size;
 	const uint32_t a_idx = b_idx + batch_size;
+
+	if (idx >= n_rays) {
+		loss[r_idx] = 0.0f;
+		loss[g_idx] = 0.0f;
+		loss[b_idx] = 0.0f;
+		loss[a_idx] = 0.0f;
+		return;
+	}
+
 
 	const float dr = target_rgba[r_idx] - ray_rgba[r_idx];
 	const float dg = target_rgba[g_idx] - ray_rgba[g_idx];
 	const float db = target_rgba[b_idx] - ray_rgba[b_idx];
 	const float da = target_rgba[a_idx] - ray_rgba[a_idx];
 	
-	loss[r_idx] = (1.0f / (3.0f * (float)n_rays)) * (dr * dr);
-	loss[g_idx] = (1.0f / (3.0f * (float)n_rays)) * (dg * dg);
-	loss[b_idx] = (1.0f / (3.0f * (float)n_rays)) * (db * db);
-	// loss[a_idx] = (1.0f / (4.0f * (float)n_rays)) * (da * da);
+	loss[r_idx] = (1.0f / (4.0f * (float)n_rays)) * (dr * dr);
+	loss[g_idx] = (1.0f / (4.0f * (float)n_rays)) * (dg * dg);
+	loss[b_idx] = (1.0f / (4.0f * (float)n_rays)) * (db * db);
+	loss[a_idx] = (1.0f / (4.0f * (float)n_rays)) * (da * da);
 }
 
 // dL/dR = (1/4) * (dL/dR_r + dL/dR_g + dL/dR_b + dL/dR_a)
@@ -272,12 +280,12 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const float dr = target_rgba[r_idx] - ray_rgba[r_idx];
 	const float dg = target_rgba[g_idx] - ray_rgba[g_idx];
 	const float db = target_rgba[b_idx] - ray_rgba[b_idx];
-	// const float da = target_rgba[a_idx] - ray_rgba[a_idx];
+	const float da = target_rgba[a_idx] - ray_rgba[a_idx];
 	
-	dL_dR[r_idx] = -(2.0f / (3.0f * (float)n_rays)) * dr;
-	dL_dR[g_idx] = -(2.0f / (3.0f * (float)n_rays)) * dg;
-	dL_dR[b_idx] = -(2.0f / (3.0f * (float)n_rays)) * db;
-	// dL_dR[a_idx] = -(2.0f / (4.0f)) * da;
+	dL_dR[r_idx] = -(2.0f / (4.0f * (float)n_rays)) * dr;
+	dL_dR[g_idx] = -(2.0f / (4.0f * (float)n_rays)) * dg;
+	dL_dR[b_idx] = -(2.0f / (4.0f * (float)n_rays)) * db;
+	dL_dR[a_idx] = -(2.0f / (4.0f * (float)n_rays)) * da;
 }
 
 NRC_NAMESPACE_END
