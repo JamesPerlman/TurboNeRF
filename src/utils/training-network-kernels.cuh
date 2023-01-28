@@ -197,7 +197,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
         // cumsum_a ?
 
         for (int j = i + 1; j < n_samples; ++j) {
-            const float k = -dt[i] * s_trans[j] * s_alpha[j];
+            const float k = -s_dt[i] * s_trans[j] * s_alpha[j];
 
             cumsum_r += k * (float)s_r[j];
             cumsum_g += k * (float)s_g[j];
