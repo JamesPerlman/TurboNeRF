@@ -201,12 +201,17 @@ void NerfNetwork::train(
 	);
 
 	// Loss
-	float mse_loss = calculate_loss(
+	const float loss = calculate_loss(
 		stream,
-		batch_size
+		batch_size,
+		n_rays
 	);
 
-	printf("Loss: %f / # Rays: %u\n", mse_loss, n_rays);
+	printf(
+		"Loss: %f / # Rays: %u\n",
+		loss,
+		n_rays
+	);
 
 	// Backward
 	backward(

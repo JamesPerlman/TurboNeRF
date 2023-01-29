@@ -104,6 +104,7 @@ private:
 
 	float calculate_loss(
 		const cudaStream_t& stream,
+		const uint32_t& batch_size,
 		const uint32_t& n_rays
 	);
 
