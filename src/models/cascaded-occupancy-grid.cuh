@@ -170,6 +170,23 @@ struct CascadedOccupancyGrid {
 		return is_occupied_at(level, byte_idx);
 	}
 
+	// returns the density at a morton index of the given level
+	inline __device__ float get_sigma_at(
+		const int& level,
+		const uint32_t& byte_idx
+	) const {
+		return workspace.values[level * volume_i + byte_idx];
+	}
+
+	inline __device__ float update_sigma_at(
+		const int& level,
+		const uint32_t& byte_idx,
+		const float& value
+	) const {
+		float* ptr = workspace.values + level * volume_i + byte_idx;
+		*ptr = fmaxf(*ptr, value);
+	}
+
 	/* From Müller, et al. 2022
 	 *
 	 * Which one of the K grids is queried is determined by both the
