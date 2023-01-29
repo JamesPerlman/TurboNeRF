@@ -5,6 +5,7 @@
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
 #include "../models/cascaded-occupancy-grid.cuh"
+#include "../utils/color-utils.cuh"
 
 using namespace tcnn;
 
@@ -280,9 +281,9 @@ __global__ void composite_samples_kernel(
     const uint32_t net_offset_2 = net_offset_1 + network_stride;
 	const uint32_t net_offset_3 = net_offset_2 + network_stride;
 
-	const float s_r = (float)network_output[net_offset_0];
-	const float s_g = (float)network_output[net_offset_1];
-	const float s_b = (float)network_output[net_offset_2];
+	const float s_r = linear_to_srgb((float)network_output[net_offset_0]);
+	const float s_g = linear_to_srgb((float)network_output[net_offset_1]);
+	const float s_b = linear_to_srgb((float)network_output[net_offset_2]);
 	const float s_s = (float)network_output[net_offset_3];
 
 	// sample sigma
