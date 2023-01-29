@@ -61,6 +61,7 @@ set(HEADERS
 
 	# utils
 	src/utils/bit-utils.cuh
+	src/utils/color-utils.cuh
 	src/utils/coordinate-transformations.cuh
 	src/utils/gpu-image.cuh
 	src/utils/linalg/transform4f.cuh
