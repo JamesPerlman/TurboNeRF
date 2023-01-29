@@ -291,12 +291,12 @@ __global__ void composite_samples_kernel(
 
 	// ray transmittance
 	const float r_t = __expf(-ray_sigma[i]);
-/*
+
 	if (r_t <= 1e-4f) {
 		ray_alive[i] = false;
 		return;
 	}
-*/
+
     // sample alpha
     const float s_a = 1.0f - __expf(-sigma_dt);
 
@@ -318,7 +318,7 @@ __global__ void composite_samples_kernel(
 	output_rgba[idx_offset_1] += s_w * s_g;
 	output_rgba[idx_offset_2] += s_w * s_b;
 	output_rgba[idx_offset_3] += s_w;
-
+	
 	const float out_a = output_rgba[idx_offset_3];
 
 	if (out_a >= 1.0f) {

@@ -130,6 +130,12 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
         const float trans = sigma_to_trans(s_sigma, s_dt, i);
         const float alpha = sigma_to_alpha(s_sigma, s_dt, i);
 		
+		if (trans < 1e-4f) {
+			s_trans[i] = 0.0f;
+			s_alpha[i] = 0.0f;
+			continue;
+		}
+
 		s_trans[i] = trans;
 		s_alpha[i] = alpha;
 
@@ -192,6 +198,14 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	float* __restrict__ s_dL_dcolor = dL_dcolor + sample_offset;
 
    for (int i = 0; i < n_samples; ++i) {
+		if (s_trans[i] < 1e-4f) {
+			s_dL_dsigma[i] = 0.0f;
+			s_dL_dcolor[i + 0 * batch_size] = 0.0f;
+			s_dL_dcolor[i + 1 * batch_size] = 0.0f;
+			s_dL_dcolor[i + 2 * batch_size] = 0.0f;
+			continue;
+		}
+
         float cumsum_r = 0.0f;
         float cumsum_g = 0.0f;
         float cumsum_b = 0.0f;
