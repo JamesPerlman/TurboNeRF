@@ -440,12 +440,13 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 
 float NerfNetwork::calculate_loss(
 	const cudaStream_t& stream,
-	const uint32_t& batch_size
+	const uint32_t& batch_size,
+	const uint32_t& n_rays
 ) {
 	// Add all loss values together
 	thrust::device_ptr<float> loss_buffer_ptr(workspace.loss_buf);
 
-	return thrust::reduce(
+	return (1.0f / (float)n_rays) * thrust::reduce(
 		thrust::cuda::par_nosync.on(stream),
 		loss_buffer_ptr,
 		loss_buffer_ptr + 4 * batch_size,
