@@ -35,9 +35,12 @@ Dataset::Dataset(string file_path) {
     float2 view_angle{json_data["camera_angle_x"], json_data["camera_angle_y"]};
     float2 angle_tans{tanf(view_angle.x), tanf(view_angle.y)};
     // sensor size is the size of the sensor at distance 1 from the camera's origin
-    float2 sensor_size = angle_tans;//2.0f * focal_length.cwiseProduct(0.5f * angle_tans);
+    float2 sensor_size{
+        2.0f * focal_length.x * tanf(0.5f * view_angle.x),
+        2.0f * focal_length.y * tanf(0.5f * view_angle.y)
+    };
 
-    uint32_t aabb_size = std::min(json_data.value("aabb_size", 4), 128);
+    uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
     bounding_box = BoundingBox((float)aabb_size);
 
     path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
@@ -51,7 +54,12 @@ Dataset::Dataset(string file_path) {
         Matrix4f camera_matrix = nerf_to_nrc(transform_matrix);
         
         // TODO: per-camera dimensions
-        cameras.emplace_back(near, far, focal_length, image_dimensions, sensor_size, camera_matrix);
+        float2 sens_size{
+            near / focal_length.x * sensor_size.x,
+            near / focal_length.y * sensor_size.y
+        };
+
+        cameras.emplace_back(near, far, focal_length, image_dimensions, sens_size, camera_matrix);
 
         // images
         string file_path = frame["file_path"];
