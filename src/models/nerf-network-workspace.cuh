@@ -26,7 +26,6 @@ struct NeRFNetworkWorkspace : Workspace {
     float* grad_dL_dalpha;
     float* grad_dL_dtrans;
 
-
     float* density_network_dL_dinput;
     tcnn::network_precision_t* density_network_dL_doutput;
     tcnn::network_precision_t* color_network_dL_dinput;

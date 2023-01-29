@@ -89,6 +89,7 @@ void NeRFTrainingController::load_images(const cudaStream_t& stream) {
 	// make sure images are all loaded into CPU and GPU
 	size_t n_image_elements = dataset.n_channels_per_image * dataset.n_pixels_per_image;
 	size_t image_size = n_image_elements * sizeof(stbi_uc);
+
 	dataset.load_images_in_parallel(
 		[this, &image_size, &n_image_elements, &stream](const size_t& image_index, const TrainingImage& image) {
 			CUDA_CHECK_THROW(cudaMemcpyAsync(
@@ -161,8 +162,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_alive
 	);
 
-	CHECK_DATA(t_cpu, float, workspace.ray_t, n_rays_in_batch);
-
 	/* Begin volumetric sampling of the previous network outputs */
 	
 	const float dt_min = NeRFConstants::min_step_size;
@@ -186,8 +185,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_steps
 	);
 
-	CHECK_DATA(tcpu_2, float, workspace.ray_t, n_rays_in_batch);
-
 	/**
 	 * Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch.
 	 * We need to perform this cumsum over the entire batch of rays, not just the rays that were regenerated over the used ones in the previous batch.
@@ -200,8 +197,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	// cumsum
 	thrust::inclusive_scan(thrust::cuda::par.on(stream), n_steps_in_ptr, n_steps_in_ptr + workspace.batch_size, n_steps_cum_ptr);
 
-	CHECK_DATA(nsteps_cpu, uint32_t, workspace.ray_steps, workspace.batch_size);
-	CHECK_DATA(nsteps_cum_cpu, uint32_t, workspace.ray_steps_cum, workspace.batch_size);
 	/**
 	 * Populate the t0 and t1 buffers with the starts and ends of each ray's samples.
 	 * Also copy and compact other output buffers to help with coalesced memory access in future kernels.
@@ -231,24 +226,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.network_dt
 	);
 
-	// Generate stratified sampling positions
-	// generate_network_inputs_kernel<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
-	// 	workspace.batch_size,
-	// 	1.0f / dataset.bounding_box.size_x,
-	// 	workspace.sample_t0,
-	// 	workspace.sample_t1,
-	// 	workspace.random_float,
-	// 	workspace.sample_origin,
-	// 	workspace.sample_dir,
-	// 	workspace.network_pos,
-	// 	workspace.network_dir,
-	// 	workspace.network_dt
-	// );
-
-	// CHECK_DATA(dt_cpu, float, workspace.network_dt, workspace.batch_size);
-	// CHECK_DATA(dir_cpu, float, workspace.network_dir, workspace.batch_size);
-	// CHECK_DATA(pos_cpu, float, workspace.network_pos, workspace.batch_size);
-
 	// Count the number of rays actually used to fill the sample batch
 
 	int n_ray_max_idx = find_last_lt_presorted(
@@ -265,32 +242,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 
 	n_rays_in_batch = n_ray_max_idx + 1;
 	cudaMemcpyAsync(&n_samples_in_batch, n_steps_cum_ptr.get() + n_ray_max_idx, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream);
-}
-
-// just a debug tool
-
-template <typename T>
-void minmaxavg(T* arr, int n, std::string label = "") {
-	// // loop through grid_dens_cpu1, calculate min, max, and average
-	T min = numeric_limits<T>::max();
-	T max = numeric_limits<T>::min();
-	T avg = 0.0f;
-
-	for (int i = 0; i < n; ++i) {
-		T val = arr[i];
-		if (val < min) {
-			min = val;
-		}
-		if (val > max) {
-			max = val;
-		}
-		avg += val;
-	}
-
-	avg /= n;
-	printf("%s: ", label.c_str());
-
-	printf("min: %f, max: %f, avg: %f\n", min, max, avg);
 }
 
 // update occupancy grid
@@ -348,9 +299,6 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				false
 			);
 
-			CHECK_DATA(netpos_cpu, float, workspace.network_pos, n_cells_to_update);
-			minmaxavg(netpos_cpu.data(), n_cells_to_update, "netpos");
-			
 			// update occupancy grid values
 			update_occupancy_with_density_kernel<<<n_blocks_linear(n_cells_to_update), n_threads_linear, 0, stream>>>(
 				n_cells_to_update,
@@ -362,9 +310,6 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				workspace.occ_grid
 			);
 
-			CHECK_DATA(grid_dens_cpu, float, nerf->occupancy_grid.get_density() + grid_volume * level, grid_volume);
-
-			minmaxavg(grid_dens_cpu.data(), grid_dens_cpu.size(), "Density Grid");
 			n_cells_updated += n_cells_to_update;
 		}
 	}
@@ -398,12 +343,9 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 }
 
 void NeRFTrainingController::train_step(const cudaStream_t& stream) {
-	//printf("Training step %d...\n", training_step);
-
 	// Generate training batch
 	generate_next_training_batch(stream);
 
-	//printf("Using %d rays and %d samples\n", n_rays_in_batch, n_samples_in_batch);
 	nerf->network.train(
 		stream,
 		workspace.batch_size,

@@ -312,17 +312,12 @@ __global__ void composite_samples_kernel(
     const uint32_t idx_offset_3 = idx_offset_2 + output_stride;
 
 	// composite the same way we do accumulation during training
+	
 	output_rgba[idx_offset_0] += s_w * s_r;
 	output_rgba[idx_offset_1] += s_w * s_g;
 	output_rgba[idx_offset_2] += s_w * s_b;
 	output_rgba[idx_offset_3] += s_w;
 
-	// output_rgba[idx_offset_0] += 0.001f;
-	// output_rgba[idx_offset_1] += 0.001f;
-	// output_rgba[idx_offset_2] += 0.001f;
-	// output_rgba[idx_offset_3] += 0.001f;
-
-	// terminate ray if alpha >= 1.0
 	const float out_a = output_rgba[idx_offset_3];
 
 	if (out_a >= 1.0f) {
