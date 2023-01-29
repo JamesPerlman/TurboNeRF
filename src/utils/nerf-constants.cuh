@@ -5,4 +5,6 @@ namespace NeRFConstants {
     constexpr float min_step_size = 0.00169145586f;
 
     constexpr float cone_angle = 1.0f / 256.0f;
+
+    constexpr uint32_t batch_size = 2<<20;
 }

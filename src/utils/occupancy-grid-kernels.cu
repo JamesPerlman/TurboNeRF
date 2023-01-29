@@ -101,7 +101,7 @@ __global__ void update_occupancy_with_density_kernel(
             return;
         }
     }
-
+    
     grid->update_sigma_at(level, idx, (float)network_sigma[i]);
 }
 
