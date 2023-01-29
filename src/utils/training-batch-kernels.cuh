@@ -198,8 +198,6 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	float t = ray_t[i];
 
 	while (true) {
-		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-
 		const float x = o_x + t * d_x;
 		const float y = o_y + t * d_y;
 		const float z = o_z + t * d_z;
@@ -208,9 +206,12 @@ __global__ void march_and_count_steps_per_ray_kernel(
 			break;
 		}
 
+		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
 		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
+
+			t += dt;
 
 			if (n_steps_taken == 0) {
 				// on first hit of an occupied cell, move ray origin to this cell
@@ -219,8 +220,6 @@ __global__ void march_and_count_steps_per_ray_kernel(
 				ori_xyz[i_offset_1] = y;
 				ori_xyz[i_offset_2] = z;
 			}
-
-			t += dt;
 
 			++n_steps_taken;
 		} else {
