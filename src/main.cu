@@ -21,7 +21,7 @@
 #include "utils/linalg/transform4f.cuh"
 
 #include <tiny-cuda-nn/common.h>
-
+#include "utils/nerf-constants.cuh"
 #include "models/cascaded-occupancy-grid.cuh"
 
 using namespace tcnn;
@@ -35,8 +35,6 @@ int main()
 	nrc::Dataset dataset = nrc::Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json");
 	// auto dataset = nrc::Dataset("E:\\2022\\nerf-library\\FascinatedByFungi2022\\big-white-chanterelle\\transforms.json");
 	auto nerf_manager = nrc::NeRFManager();
-	
-	// nrc::OccupancyGrid grid(1);
 
 	// printf("%lu", grid.max_index());
 	
@@ -45,7 +43,7 @@ int main()
 
 	// set up training controller
 	auto trainer = nrc::NeRFTrainingController(dataset, nerf);
-	trainer.prepare_for_training(stream, 2<<20);
+	trainer.prepare_for_training(stream, NeRFConstants::batch_size);
 
 	// set up rendering controller
 	auto renderer = nrc::NeRFRenderingController();
@@ -68,14 +66,14 @@ int main()
 		trainer.train_step(stream);
 		// every 16 training steps, update the occupancy grid
 
-		if (i % 16 == 0 && i > 256) {
+		if (i % 64 == 0 && i > 0) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
 
-		if (i > 0 && i % 256 == 0) {
-			float progress = (float)i / 360.0f;
+		if (i % 64 == 0 && i > 0) {
+			float progress = (float)i / (1080.0f);
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
@@ -90,7 +88,7 @@ int main()
 			auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);
 			render_request.output.clear(stream);
 			renderer.request_render(stream, render_request);
-			render_request.output.save_image(stream, fmt::format("H:\\maybe\\step-{}.png", i));
+			render_request.output.save_image(stream, fmt::format("H:\\img-{}.png", i));
 		}
 	}
 
