@@ -117,6 +117,8 @@ void NeRFTrainingController::load_images(const cudaStream_t& stream) {
   * 5. Run the network forward and get the predicted color and alpha for each sample
   * 6. Accumulate the colors and alphas from the color network output, along each ray
   * 7. Calculate the loss and backpropagate
+  * 
+  * Update: We are actually skipping steps 3 and 4, and directly generating dt values for the network during raymarching
  */
 
 void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
@@ -317,7 +319,8 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 	// update the bits by thresholding the density values
 
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
-	const float threshold = 0.01f * NeRFConstants::min_step_size;
+	// not sure why, but multiplying by min_step_size doesn't work as well.  sigma values are too high in this density field
+	const float threshold = 0.01f;// * NeRFConstants::min_step_size;
 
 	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
 		nerf->occupancy_grid.volume_i,
