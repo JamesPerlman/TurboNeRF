@@ -427,7 +427,7 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		workspace.ray_rgba
 	);
 
-	ray_rgba_to_loss_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+	ray_rgba_to_loss_forward_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		workspace.ray_rgba,
