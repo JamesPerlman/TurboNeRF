@@ -197,7 +197,7 @@ struct CascadedOccupancyGrid {
 
 	// Gets the t-value required to step the ray to the next voxel
 	// rewritten from NerfAcc without the while loop (see `advance_to_next_voxel`)
-	inline NRC_HOST_DEVICE float get_dt_to_next_voxel(
+	inline __device__ float get_dt_to_next_voxel(
 		const float& ray_pos_x, const float& ray_pos_y, const float& ray_pos_z,
 		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
 		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z,
@@ -205,7 +205,7 @@ struct CascadedOccupancyGrid {
 		const int& grid_level
 	) const {
 		const float level_size = get_level_size(grid_level);
-		const float i_level_size = 1.0f / level_size;
+		const float i_level_size = __fdividef(1.0f, level_size);
 
 		// normalize xyz to [0, resolution] for the current level
 		const float x = (ray_pos_x * i_level_size + 0.5f) * resolution_f;
