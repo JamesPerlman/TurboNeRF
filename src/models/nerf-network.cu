@@ -512,14 +512,7 @@ void NerfNetwork::backward(
 	);
 
 	// need to clear & populate color network matrix
-	CUDA_CHECK_THROW(
-		cudaMemsetAsync(
-			color_network_dL_doutput_matrix.data(),
-			0,
-			color_network_dL_doutput_matrix.cols() * color_network_dL_doutput_matrix.rows() * sizeof(tcnn::network_precision_t),
-			stream
-		)
-	);
+	color_network_dL_doutput_matrix.memset_async(stream, 0);
 
 	copy_gradients_kernel<3, false><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
