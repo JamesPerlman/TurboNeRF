@@ -16,14 +16,14 @@ __global__ void decay_occupancy_grid_values_kernel(
     const uint32_t n_cells_per_level,
     const uint32_t n_levels,
     const float factor,
-    float* __restrict__ grid_density
+    float* __restrict__ grid_sigma
 ) {
     const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= n_cells_per_level) {
         return;
     }
 
-    float* d = grid_density + idx;
+    float* d = grid_sigma + idx;
 
     #pragma unroll
     for (int i = 0; i < n_levels; ++i) {
@@ -72,7 +72,6 @@ __global__ void generate_grid_cell_network_sample_points_kernel(
     sample_pos[i_offset_0] = (x * inv_aabb_size) + 0.5f;
     sample_pos[i_offset_1] = (y * inv_aabb_size) + 0.5f;
     sample_pos[i_offset_2] = (z * inv_aabb_size) + 0.5f;
-
 }
 
 // occupancy cell values are updated to the maximum of the current value and a newly sampled density value
@@ -82,7 +81,7 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t level,
     const float selection_threshold,
     const float* __restrict__ random_float,
-    const tcnn::network_precision_t* __restrict__ network_density,
+    const tcnn::network_precision_t* __restrict__ network_sigma,
     CascadedOccupancyGrid* __restrict__ grid
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -112,7 +111,7 @@ __global__ void update_occupancy_grid_bits_kernel(
     const int n_levels,
     const float threshold,
     CascadedOccupancyGrid* __restrict__ grid,
-    const float* __restrict__ grid_density,
+    const float* __restrict__ grid_sigma,
     uint8_t* __restrict__ grid_bits
 ) {
     const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -127,7 +126,7 @@ __global__ void update_occupancy_grid_bits_kernel(
         const uint32_t density_idx = level * n_cells_per_level + idx;
         
         // get "is threshold exceeded?" as a bit
-        uint8_t b = grid_density[density_idx] > threshold ? 1 : 0;
+        uint8_t b = grid_sigma[density_idx] > threshold ? 1 : 0;
         cell_bits |= b << level;
     }
 

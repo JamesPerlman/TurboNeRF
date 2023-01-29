@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Most of this code is inspired by Müller, et al:
  * Instant Neural Graphics Primitives with a Multiresolution Hash Encoding, 2022:
  * https://dl.acm.org/doi/pdf/10.1145/3528223.3530127
@@ -236,7 +236,7 @@ struct CascadedOccupancyGrid {
 		const float tz = k * ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
 
 		const float t_target = fmaxf(dt, k * fminf(fminf(tx, ty), tz));
-
+	
 		return __fdiv_ru(t_target, dt) * dt;
 	}
 
