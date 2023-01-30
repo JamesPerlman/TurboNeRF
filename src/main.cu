@@ -4,6 +4,7 @@
 #include <device_launch_parameters.h>
 
 #include <json/json.hpp>
+#include <set>
 
 #include "common.h"
 #include "main.h"
@@ -61,19 +62,20 @@ int main()
 	for (auto& nerf : nerf_manager.get_nerfs()) {
 		nerf_ptrs.emplace_back(nerf);
 	}
-
-	for (int i = 0; i <= 100000; ++i) {
+	
+	for (int i = 0; i < 10000; ++i) {
 		trainer.train_step(stream);
 		// every 16 training steps, update the occupancy grid
 
-		if (i % 64 == 0 && i > 0) {
+		if (i % 16 == 0) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
+		// if indices_vector contains the number i, then render
 
-		if (i % 64 == 0 && i > 0) {
-			float progress = (float)i / (1080.0f);
+		if (i % 256 == 0) {
+			float progress = 0.0f;
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
