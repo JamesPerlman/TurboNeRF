@@ -212,7 +212,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.occ_grid,
 		dt_min, dt_max,
 		cone_angle,
-		
+
 		// input buffers
 		workspace.ray_origin,
 		workspace.ray_dir,
