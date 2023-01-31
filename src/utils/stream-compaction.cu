@@ -65,7 +65,7 @@ void generate_nonzero_compaction_indices(
     const uint32_t* values,
     int* indices
 ) {
-    thrust::device_ptr<const bool> values_ptr(values);
+    thrust::device_ptr<const uint32_t> values_ptr(values);
     thrust::device_ptr<int> indices_ptr(indices);
 
     thrust::counting_iterator<int> counting(0);
