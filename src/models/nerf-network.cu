@@ -149,6 +149,7 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
 		{"otype", "Adam"},
 		{"learning_rate", 1e-2},
 		{"epsilon", 1e-15},
+		{"l2_reg", 1e-6}
 	};
 
 	density_optimizer.reset(
