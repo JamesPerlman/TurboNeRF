@@ -505,6 +505,7 @@ void NerfNetwork::backward(
 		workspace.trans_buf,
 		workspace.alpha_buf,
 		network_color,
+		workspace.ray_rgba,
 		workspace.grad_dL_dR,
 		workspace.grad_dL_dsigma,
 		workspace.grad_dL_dcolor
