@@ -44,7 +44,6 @@ private:
 	uint32_t training_step;
 	uint32_t n_rays_in_batch;
 	uint32_t n_samples_in_batch;
-	uint32_t n_rays_used;
 
 	// workspace
 	TrainingWorkspace workspace;

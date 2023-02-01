@@ -112,7 +112,7 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
     uint32_t n_rays,
     uint32_t batch_size,
 	const uint32_t* __restrict__ n_samples_buf,
-	const uint32_t* __restrict__ n_samples_cum_buf,
+	const uint32_t* __restrict__ ray_offset_buf,
     const float* __restrict__ sigma_buf,
     const float* __restrict__ dt_buf,
     const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
@@ -125,7 +125,7 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
     
 	// offsets
 	const uint32_t n_samples = n_samples_buf[idx];
-	const uint32_t sample_offset = n_samples_cum_buf[idx] - n_samples;
+	const uint32_t sample_offset = ray_offset_buf[idx];
 
     // local references to sample data
     const float* __restrict__ s_sigma = sigma_buf + sample_offset;
@@ -175,7 +175,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
     const uint32_t n_rays,
     const uint32_t batch_size,
     const uint32_t* __restrict__ n_samples_buf,
-    const uint32_t* __restrict__ n_samples_cum_buf,
+    const uint32_t* __restrict__ ray_offset_buf,
     const float* __restrict__ sigma_buf,
     const float* __restrict__ dt_buf,
 	const float* __restrict__ alpha_buf,
@@ -191,7 +191,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 
     // offsets
     const uint32_t n_samples = n_samples_buf[idx];
-    const uint32_t sample_offset = n_samples_cum_buf[idx] - n_samples;
+    const uint32_t sample_offset = ray_offset_buf[idx];
 
 	const uint32_t idx_offset_0 = idx;
 	const uint32_t idx_offset_1 = idx_offset_0 + batch_size;

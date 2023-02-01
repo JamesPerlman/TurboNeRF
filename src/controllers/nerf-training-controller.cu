@@ -82,7 +82,6 @@ void NeRFTrainingController::prepare_for_training(
 	// Since there is no previous step here, we set the number of previous rays to the batch size
 	// so that the training batch generator will generate a full batch of rays
 	n_rays_in_batch = workspace.batch_size;
-	n_rays_used = 0;
 	training_step = 0;
 
 	// Initialize the network
@@ -187,6 +186,8 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_step[0]
 	);
 
+	CHECK_DATA(ray_dir_cpu, float, workspace.ray_dir[0], n_rays_in_batch * 3);
+
 	// Count the number of rays that will fill the batch with the maximum number of samples
 	/**
 	 * Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch.
@@ -195,35 +196,35 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 
 	// Grab some references to the n_steps arrays
 	thrust::device_ptr<uint32_t> n_steps_ptr(workspace.ray_step[0]);
-	thrust::device_ptr<uint32_t> n_steps_cum_ptr(workspace.ray_step_cum[0]);
+	thrust::device_ptr<uint32_t> ray_offset_ptr(workspace.ray_offset[0]);
 	
 	// cumulative sum the number of steps for each ray
-	thrust::inclusive_scan(
+	thrust::exclusive_scan(
 		thrust::cuda::par.on(stream),
 		n_steps_ptr,
 		n_steps_ptr + workspace.batch_size,
-		n_steps_cum_ptr
+		ray_offset_ptr
 	);
 
 	// Count the number of rays actually used to fill the sample batch
 	const int n_ray_max_idx = find_last_lt_presorted(
 		stream,
-		n_steps_cum_ptr,
+		ray_offset_ptr,
 		workspace.batch_size,
 		workspace.batch_size
-	);
+	) - 1;
 
-	if (n_ray_max_idx < 0) {
+	if (n_rays_in_batch < 0) {
 		throw std::runtime_error("No rays were generated for this training batch!\n");
 	}
 
-	n_rays_in_batch = n_ray_max_idx + 1;
+	n_rays_in_batch = static_cast<uint32_t>(n_ray_max_idx + 1);
 
 	// Count the number of samples that will be generated
 	CUDA_CHECK_THROW(
 		cudaMemcpyAsync(
 			&n_samples_in_batch,
-			n_steps_cum_ptr.get() + n_ray_max_idx,
+			ray_offset_ptr.get() + n_rays_in_batch,
 			sizeof(uint32_t),
 			cudaMemcpyDeviceToHost,
 			stream
@@ -235,8 +236,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	if (n_samples_in_batch < 1) {
 		throw std::runtime_error("No samples were generated for this training batch!\n");
 	}
-
-	n_rays_in_batch = static_cast<uint32_t>(n_ray_max_idx + 1);
 	
 	// Generate sample positions
 	march_and_generate_network_positions_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
@@ -254,7 +253,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_dir[0],
 		workspace.ray_inv_dir,
 		workspace.ray_t,
-		workspace.ray_step_cum[0],
+		workspace.ray_offset[0],
 		workspace.ray_alive,
 
 		// dual-use buffers
@@ -265,8 +264,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.sample_dir,
 		workspace.sample_dt[0]
 	);
-
-	n_rays_used += n_rays_in_batch;
 }
 
 // update occupancy grid
@@ -342,6 +339,8 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 	// update the bits by thresholding the density values
 
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
+	// For some reason, the way the paper says it does not work for this implementation.
+	// It seems to work with a threshold of 0.01
 	const float threshold = 0.01f;// * NeRFConstants::min_step_size;
 
 	update_occupancy_grid_bits_kernel<<<n_blocks_linear(n_bitfield_bytes), n_threads_linear, 0, stream>>>(
@@ -377,7 +376,7 @@ void NeRFTrainingController::train_step(const cudaStream_t& stream) {
 		n_rays_in_batch,
 		n_samples_in_batch,
 		workspace.ray_step[0],
-		workspace.ray_step_cum[0],
+		workspace.ray_offset[0],
 		workspace.sample_pos[0],
 		workspace.sample_dir,
 		workspace.sample_dt[0],

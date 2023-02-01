@@ -263,7 +263,7 @@ __global__ void march_and_generate_network_positions_kernel(
 	const float* __restrict__ in_dir_xyz,
 	const float* __restrict__ in_idir_xyz,
 	const float* __restrict__ in_ray_t,
-	const uint32_t* __restrict__ n_steps_cum,
+	const uint32_t* __restrict__ ray_offset,
 	const bool* __restrict__ ray_alive,
 
 	// dual-use buffers
@@ -281,10 +281,11 @@ __global__ void march_and_generate_network_positions_kernel(
 	if (i >= n_rays) return;
 
 	if (!ray_alive[i]) return;
-
-	// if the total number of cumulative steps is greater than the number of rays, we exit early to avoid writing outside of our sample buffers
-	const uint32_t n_total_steps_cum = n_steps_cum[i];
+	
+	// index properties for the loop
 	const uint32_t n_steps = n_ray_steps[i];
+
+	const uint32_t sample_offset = ray_offset[i];
 
 	// References to input buffers
 
@@ -303,13 +304,6 @@ __global__ void march_and_generate_network_positions_kernel(
 	const float id_x = in_idir_xyz[i_offset_0];
 	const float id_y = in_idir_xyz[i_offset_1];
 	const float id_z = in_idir_xyz[i_offset_2];
-
-	/** n_total_steps_cum is the cumulative number of steps taken by any ray up to and including ray i
-	  * to get the offset of the data buffer holding samples for this ray,
-	  * we must subtract the number of steps taken by this ray.
-	  */
-	
-	const uint32_t sample_offset = n_total_steps_cum - n_steps;
 
 	// Perform raymarching
 

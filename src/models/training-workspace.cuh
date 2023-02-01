@@ -32,7 +32,7 @@ public:
 	uint32_t* pix_index; // index of randomly selected pixel in image
 
 	uint32_t* ray_step[2];
-	uint32_t* ray_step_cum[2];
+	uint32_t* ray_offset[2];
 
 	// ground-truth pixel color components
 	float* pix_rgba[2];
@@ -114,8 +114,8 @@ public:
 
 		ray_step[0]		= allocate<uint32_t>(stream, batch_size);
 		ray_step[1]		= allocate<uint32_t>(stream, batch_size);
-		ray_step_cum[0]	= allocate<uint32_t>(stream, batch_size);
-		ray_step_cum[1]	= allocate<uint32_t>(stream, batch_size);
+		ray_offset[0]	= allocate<uint32_t>(stream, batch_size);
+		ray_offset[1]	= allocate<uint32_t>(stream, batch_size);
 		ray_origin 		= allocate<float>(stream, 3 * batch_size);
 		ray_dir[0]		= allocate<float>(stream, 3 * batch_size);
 		ray_dir[1]		= allocate<float>(stream, 3 * batch_size);
