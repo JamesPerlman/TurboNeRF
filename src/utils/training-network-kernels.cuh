@@ -60,6 +60,51 @@ inline __device__ float sigma_to_alpha(
     return 1.0f - __expf(-sigma[i] * dt[i]);
 }
 
+/**
+ * Accumulate samples and assign visibility
+ * 
+ * This kernel prepares buffers that can be used to cull samples that fall below a transmittance threshold.
+ */
+
+__global__ void accumulate_samples_and_count_steps_kernel(
+	const uint32_t n_rays,
+	const float min_transmittance,
+	
+	// input buffers
+	const uint32_t* __restrict__ n_samples_cum,
+	const tcnn::network_precision_t* __restrict__ density,
+	const float* __restrict__ dt,
+
+	// dual-use buffers
+	uint32_t* __restrict__ n_samples_per_ray
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) return;
+
+	const uint32_t n_samples = n_samples_per_ray[idx];
+	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+
+	const tcnn::network_precision_t* __restrict__ s_dens = density + sample_offset;
+	const float* __restrict__ s_dt = dt + sample_offset;
+
+	// transmittance always begins at 1
+	float trans = 1.0f;
+
+	// loop through samples
+	uint32_t i = 0;
+	while (i < n_samples && trans > min_transmittance) {
+
+		// update transmittance - this is equivalent to multiplying by (1 - alpha)
+		const float sigma = density_to_sigma(s_dens[i]);
+		trans *= __expf(-sigma * s_dt[i]);
+		
+		++i;
+	}
+
+	// save the actual number of samples
+	n_samples_per_ray[idx] = i;
+}
 
 /**
  * Apply exponential scaling to density network output
