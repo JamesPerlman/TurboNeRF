@@ -76,7 +76,7 @@ __global__ void density_to_sigma_forward_kernel(
 
 	if (i >= n_samples) return;
 
-	sigma[i] = (T)__expf(fminf((float)density[i] - 1.0f, 11.0f));
+	sigma[i] = (T)density_to_sigma(density[i]);
 }
 
 
