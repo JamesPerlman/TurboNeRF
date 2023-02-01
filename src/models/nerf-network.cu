@@ -431,7 +431,6 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		workspace.sigma_buf,
 		dt_batch,
 		output_buffer,
-		workspace.trans_buf,
 		workspace.alpha_buf,
 		workspace.ray_rgba
 	);
@@ -502,7 +501,6 @@ void NerfNetwork::backward(
 		ray_steps_cumulative,
 		workspace.sigma_buf,
 		dt_batch,
-		workspace.trans_buf,
 		workspace.alpha_buf,
 		network_color,
 		workspace.ray_rgba,

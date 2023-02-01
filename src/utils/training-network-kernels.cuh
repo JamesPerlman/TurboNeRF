@@ -102,7 +102,6 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
     const float* __restrict__ sigma_buf,
     const float* __restrict__ dt_buf,
     const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
-	float* __restrict__ trans_buf,
 	float* __restrict__ alpha_buf,
     float* __restrict__ ray_rgba_buf
 ) {
@@ -122,7 +121,6 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
     const tcnn::network_precision_t* __restrict__ s_g = s_r + batch_size;
     const tcnn::network_precision_t* __restrict__ s_b = s_g + batch_size;
 
-	float* __restrict__ s_trans = trans_buf + sample_offset;
 	float* __restrict__ s_alpha = alpha_buf + sample_offset;
 
     float r = 0.0f;
@@ -135,7 +133,6 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
     for (int i = 0; i < n_samples; ++i) {
         const float alpha = sigma_to_alpha(s_sigma, s_dt, i);
 
-		s_trans[i] = trans;
 		s_alpha[i] = alpha;
 
 		if (trans < 1e-4f) {
@@ -169,7 +166,6 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
     const uint32_t* __restrict__ n_samples_cum_buf,
     const float* __restrict__ sigma_buf,
     const float* __restrict__ dt_buf,
-	const float* __restrict__ trans_buf,
 	const float* __restrict__ alpha_buf,
     const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
 	const float* __restrict__ ray_rgba_buf,
@@ -198,7 +194,6 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
     const tcnn::network_precision_t* __restrict__ s_g = s_r + batch_size;
     const tcnn::network_precision_t* __restrict__ s_b = s_g + batch_size;
 	
-	const float* __restrict__ s_trans = trans_buf + sample_offset;
 	const float* __restrict__ s_alpha = alpha_buf + sample_offset;
 
     const float dL_dR_r = dL_dR_buf[idx_offset_0];
@@ -207,44 +202,50 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	const float dL_dR_a = dL_dR_buf[idx_offset_3];
 
     float* __restrict__ s_dL_dsigma = dL_dsigma_buf + sample_offset;
-	float* __restrict__ s_dL_dcolor = dL_dcolor_buf + sample_offset;
+
+	float* __restrict__ s_dL_dcolor_r = dL_dcolor_buf + sample_offset;
+	float* __restrict__ s_dL_dcolor_g = s_dL_dcolor_r + batch_size;
+	float* __restrict__ s_dL_dcolor_b = s_dL_dcolor_g + batch_size;
 
 	float cumsum_r = ray_rgba_buf[idx_offset_0];
 	float cumsum_g = ray_rgba_buf[idx_offset_1];
 	float cumsum_b = ray_rgba_buf[idx_offset_2];
 	float cumsum_a = ray_rgba_buf[idx_offset_3];
 
+	float trans = 1.0f;
 	for (int i = 0; i < n_samples; ++i) {
-		const float s_trans_i = s_trans[i];
+		const float r = s_r[i];
+		const float g = s_g[i];
+		const float b = s_b[i];
 
-		if (s_trans_i < 1e-4f) {
-			break;
-		}
-
-		const float s_alpha_i = s_alpha[i];
-		const float s_dt_i = s_dt[i];
-		const float s_weight_i = s_trans_i * s_alpha_i;
-        const float c = s_trans_i * s_dt_i * (1.0f - s_alpha_i);
-
+		const float dt = s_dt[i];
+		const float alpha = s_alpha[i];
 		
-		cumsum_r -= s_weight_i * (float)s_r[i];
-		cumsum_g -= s_weight_i * (float)s_g[i];
-		cumsum_b -= s_weight_i * (float)s_b[i];
-		cumsum_a -= s_weight_i;
+		const float alpha_complement = 1.0f - alpha;
+		const float weight = trans * alpha;
+        const float k = dt * (trans - weight);
 
+		trans *= alpha_complement;
 
-        const float dRr_dsigma = -s_dt_i * cumsum_r + c * (float)s_r[i];
-        const float dRg_dsigma = -s_dt_i * cumsum_g + c * (float)s_g[i];
-        const float dRb_dsigma = -s_dt_i * cumsum_b + c * (float)s_b[i];
-		const float dRa_dsigma = -s_dt_i * cumsum_a + c;
+		cumsum_r -= weight * r;
+		cumsum_g -= weight * g;
+		cumsum_b -= weight * b;
+		cumsum_a -= weight;
+
+        const float dRr_dsigma = -dt * cumsum_r + k * r;
+        const float dRg_dsigma = -dt * cumsum_g + k * g;
+        const float dRb_dsigma = -dt * cumsum_b + k * b;
+		const float dRa_dsigma = -dt * cumsum_a + k;
 
         s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma + dL_dR_a * dRa_dsigma;
 
-
-		s_dL_dcolor[i + 0 * batch_size] = dL_dR_r * s_weight_i;
-		s_dL_dcolor[i + 1 * batch_size] = dL_dR_g * s_weight_i;
-		s_dL_dcolor[i + 2 * batch_size] = dL_dR_b * s_weight_i;
-
+		s_dL_dcolor_r[i] = dL_dR_r * weight;
+		s_dL_dcolor_g[i] = dL_dR_g * weight;
+		s_dL_dcolor_b[i] = dL_dR_b * weight;
+		
+		if (trans < 1e-4f) {
+			break;
+		}
     }
 }
 
