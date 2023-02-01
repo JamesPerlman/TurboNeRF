@@ -29,11 +29,15 @@ using namespace tcnn;
 using namespace nrc;
 int main()
 {
+	// path to downloaded dataset
+	std::string DATASET_PATH = "E:\\2022\\nerf-library\\testdata\\lego\\transforms.json";
+	// path to write images to
+	std::string OUTPUT_PATH = "H:\\";
 
 	cudaStream_t stream;
 	CUDA_CHECK_THROW(cudaStreamCreate(&stream));
 
-	nrc::Dataset dataset = nrc::Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json");
+	nrc::Dataset dataset = nrc::Dataset(DATASET_PATH);
 	// auto dataset = nrc::Dataset("E:\\2022\\nerf-library\\FascinatedByFungi2022\\big-white-chanterelle\\transforms.json");
 	auto nerf_manager = nrc::NeRFManager();
 
@@ -62,19 +66,19 @@ int main()
 	for (auto& nerf : nerf_manager.get_nerfs()) {
 		nerf_ptrs.emplace_back(nerf);
 	}
-	
-	for (int i = 0; i < 10000; ++i) {
+
+	for (int i = 0; i < 1024 * 10; ++i) {
 		trainer.train_step(stream);
 		// every 16 training steps, update the occupancy grid
 
-		if (i % 16 == 0) {
+		if (i % 16 == 0 && i > 128) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
 		// if indices_vector contains the number i, then render
 
-		if (i % 256 == 0) {
+		if (i % 256 == 0 && i > 0) {
 			float progress = 0.0f;
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
@@ -90,7 +94,7 @@ int main()
 			auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);
 			render_request.output.clear(stream);
 			renderer.request_render(stream, render_request);
-			render_request.output.save_image(stream, fmt::format("H:\\img-{}.png", i));
+			render_request.output.save_image(stream, OUTPUT_PATH + fmt::format("img-{}.png", i));
 		}
 	}
 
