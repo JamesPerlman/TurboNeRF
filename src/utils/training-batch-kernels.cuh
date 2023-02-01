@@ -248,7 +248,8 @@ __global__ void march_and_count_steps_per_ray_kernel(
  * 2. Compact other training buffers to maximize coalesced memory accesses
  */
 
-__global__ void march_and_generate_samples_and_compact_buffers_kernel(
+__global__ void march_and_generate_network_positions_kernel(
+	uint32_t n_rays,
 	uint32_t batch_size,
 	const BoundingBox* bbox,
 	const float inv_aabb_size,
@@ -262,28 +263,27 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 	const float* __restrict__ in_dir_xyz,
 	const float* __restrict__ in_idir_xyz,
 	const float* __restrict__ in_ray_t,
-	const uint32_t* __restrict__ n_ray_steps, // one per ray
-	const uint32_t* __restrict__ n_steps_cum, // one per ray
+	const uint32_t* __restrict__ n_steps_cum,
 	const bool* __restrict__ ray_alive,
+
+	// dual-use buffers
+	uint32_t* __restrict__ n_ray_steps,
 
 	// output buffers
 	float* __restrict__ out_pos_xyz,
-	float* __restrict__ out_dir_xyz,
 	float* __restrict__ out_dt
 ) {
 	// get thread index
 	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
 	// check if thread is out of bounds
-	if (i >= batch_size) return;
+	if (i >= n_rays) return;
 
 	if (!ray_alive[i]) return;
 
 	// if the total number of cumulative steps is greater than the number of rays, we exit early to avoid writing outside of our sample buffers
 	const uint32_t n_total_steps_cum = n_steps_cum[i];
 	const uint32_t n_steps = n_ray_steps[i];
-
-	if (n_total_steps_cum >= batch_size) return;
 
 	// References to input buffers
 
@@ -331,26 +331,16 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
 			t += dt;
 
-			/**
-			 * Here is where we assign training data to our compacted sample buffers.
-			 * RIP coalesced memory accesses :(
-			 * Worth it tho, gg ez.
-			 */
-
 			const uint32_t step_offset_0 = sample_offset + n_steps_taken;
 			const uint32_t step_offset_1 = step_offset_0 + batch_size;
 			const uint32_t step_offset_2 = step_offset_1 + batch_size;
 
-			// generate network inputs
+			// assign normalized network inputs
 			out_dt[step_offset_0] = dt * inv_aabb_size;
 
 			out_pos_xyz[step_offset_0] = x * inv_aabb_size + 0.5f;
 			out_pos_xyz[step_offset_1] = y * inv_aabb_size + 0.5f;
 			out_pos_xyz[step_offset_2] = z * inv_aabb_size + 0.5f;
-
-			out_dir_xyz[step_offset_0] = (d_x + 1.0f) * 0.5f;
-			out_dir_xyz[step_offset_1] = (d_y + 1.0f) * 0.5f;
-			out_dir_xyz[step_offset_2] = (d_z + 1.0f) * 0.5f;
 
 			++n_steps_taken;
 		} else {
@@ -364,6 +354,9 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			);
 		}
 	}
+
+	n_ray_steps[i] = n_steps_taken;
+}
 
 __global__ void compact_ray_buffers_kernel(
 	const uint32_t n_compacted_rays,

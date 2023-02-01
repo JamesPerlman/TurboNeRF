@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Most of this code is inspired by Müller, et al:
  * Instant Neural Graphics Primitives with a Multiresolution Hash Encoding, 2022:
  * https://dl.acm.org/doi/pdf/10.1145/3528223.3530127
