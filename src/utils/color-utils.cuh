@@ -28,7 +28,7 @@ inline __device__ float __linear_to_srgb(const float& linear) {
 	if (linear <= 0.0031308f) {
 		return linear * 12.92f;
 	} else {
-		return 1.055f * __powf(linear, fdividef(1.0f, 2.4f)) - 0.055f;
+		return 1.055f * __powf(linear, __fdividef(1.0f, 2.4f)) - 0.055f;
 	}
 }
 
