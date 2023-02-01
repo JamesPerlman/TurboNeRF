@@ -6,7 +6,7 @@ namespace NeRFConstants {
 
     constexpr float cone_angle = 1.0f / 256.0f;
 
-    constexpr uint32_t batch_size = 2<<20;
+    constexpr uint32_t batch_size = 2<<21;
 
     constexpr float min_transmittance = 1e-4f;
 }
