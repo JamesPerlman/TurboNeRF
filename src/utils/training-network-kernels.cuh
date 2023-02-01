@@ -93,6 +93,20 @@ __global__ void density_to_sigma_backward_kernel(
 	dL_ddensity[i] = dL_dsigma[i] * density_to_sigma(density[i]);
 }
 
+// sigma to alpha - we don't need a backward pass for this
+__global__ void sigma_to_alpha_forward_kernel(
+	uint32_t n_samples,
+	const float* __restrict__ sigma,
+	const float* __restrict__ dt,
+	float* __restrict__ alpha
+) {
+	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (i >= n_samples) return;
+
+	alpha[i] = sigma_to_alpha(sigma, dt, i);
+}
+
 // sigma to ray color
 __global__ void sigma_to_ray_rgba_forward_kernel(
     uint32_t n_rays,
@@ -102,7 +116,7 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
     const float* __restrict__ sigma_buf,
     const float* __restrict__ dt_buf,
     const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
-	float* __restrict__ alpha_buf,
+	const float* __restrict__ alpha_buf,
     float* __restrict__ ray_rgba_buf
 ) {
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -121,7 +135,7 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
     const tcnn::network_precision_t* __restrict__ s_g = s_r + batch_size;
     const tcnn::network_precision_t* __restrict__ s_b = s_g + batch_size;
 
-	float* __restrict__ s_alpha = alpha_buf + sample_offset;
+	const float* __restrict__ s_alpha = alpha_buf + sample_offset;
 
     float r = 0.0f;
     float g = 0.0f;
@@ -131,9 +145,7 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 	float trans = 1.0f;
 
     for (int i = 0; i < n_samples; ++i) {
-        const float alpha = sigma_to_alpha(s_sigma, s_dt, i);
-
-		s_alpha[i] = alpha;
+        const float alpha = s_alpha[i];
 
 		if (trans < 1e-4f) {
 			break;

@@ -423,6 +423,13 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		workspace.sigma_buf
 	);
 
+	sigma_to_alpha_forward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+		n_samples,
+		workspace.sigma_buf,
+		dt_batch,
+		workspace.alpha_buf
+	);
+
 	sigma_to_ray_rgba_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
