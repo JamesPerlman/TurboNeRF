@@ -322,6 +322,60 @@ void NerfNetwork::inference(
 	);
 }
 
+void NerfNetwork::sample_density_and_count_steps(
+	const cudaStream_t& stream,
+	const uint32_t& n_rays,
+	const uint32_t& n_samples,
+	const uint32_t& stride,
+	const float min_transmittance,
+
+	// input buffers
+	const uint32_t* ray_steps_cumulative,
+	const float* pos_batch,
+	const float* dt_batch,
+	
+	// dual-use buffers
+	uint32_t* ray_steps,
+
+	// output buffers
+	network_precision_t* sample_density
+) {
+
+	const uint32_t n_elements = tcnn::next_multiple(n_samples, tcnn::batch_size_granularity);
+
+	GPUMatrixDynamic input(
+		const_cast<float*>(pos_batch), // const_cast is necessary because tcnn doesn't support const-typed matrices in the inference methods
+		density_network->input_width(),
+		n_elements,
+		MatrixLayout::RowMajor,
+		stride
+	);
+
+	GPUMatrixDynamic output(
+		sample_density,
+		density_network->output_width(),
+		n_elements,
+		MatrixLayout::RowMajor,
+		stride
+	);
+
+	density_network->inference_mixed_precision(
+		stream,
+		input,
+		output
+	);
+
+	// accumulate density and count steps
+	accumulate_samples_and_count_steps_kernel<<<n_blocks_linear(n_rays), tcnn::n_threads_linear, 0, stream>>>(
+		n_rays,
+		min_transmittance,
+		ray_steps_cumulative,
+		sample_density,
+		dt_batch,
+		ray_steps
+	);
+}
+
 std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	const cudaStream_t& stream,
 	const uint32_t& batch_size,
