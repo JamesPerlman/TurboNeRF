@@ -71,7 +71,7 @@ int main()
 		trainer.train_step(stream);
 		// every 16 training steps, update the occupancy grid
 
-		if (i % 16 == 0 && i > 128) {
+		if (i % 16 == 0 && i > 0) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);

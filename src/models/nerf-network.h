@@ -58,33 +58,6 @@ struct NerfNetwork {
 		return color_network->padded_output_width();
 	};
 
-	/**
-	 * This function performs a forward pass only through density network.
-	 * It then calculates each sample's transmittance and sees which samples can be left out.
-	 * 
-	 * Outputs 
-	 * n_actual_steps - number of steps that were actually used before min transmittance was reached.
-	 */
-	
-	void sample_density_and_count_steps(
-		const cudaStream_t& stream,
-		const uint32_t& n_rays,
-		const uint32_t& n_samples,
-		const uint32_t& stride,
-		const float min_transmittance,
-
-		// input buffers
-		const uint32_t* ray_steps_cumulative,
-		const float* pos_batch,
-		const float* dt_batch,
-
-		// dual-use buffers
-		uint32_t* ray_steps,
-
-		// output buffers
-		tcnn::network_precision_t* sample_density
-	);
-
 private:
 
 	float aabb_size;

@@ -101,10 +101,10 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const stbi_uc b = pixel[2];
 	const stbi_uc a = pixel[3];
 	
-	pix_rgba[i_offset_0] = srgb_to_linear((float)r / 255.0f);
-	pix_rgba[i_offset_1] = srgb_to_linear((float)g / 255.0f);
-	pix_rgba[i_offset_2] = srgb_to_linear((float)b / 255.0f);
-	pix_rgba[i_offset_3] = srgb_to_linear((float)a / 255.0f);
+	pix_rgba[i_offset_0] = __srgb_to_linear((float)r / 255.0f);
+	pix_rgba[i_offset_1] = __srgb_to_linear((float)g / 255.0f);
+	pix_rgba[i_offset_2] = __srgb_to_linear((float)b / 255.0f);
+	pix_rgba[i_offset_3] = (float)a / 255.0f;
 	
 	// TODO: optimize
 	Ray local_ray = cam.local_ray_at_pixel_xy(x, y);
@@ -271,6 +271,7 @@ __global__ void march_and_generate_network_positions_kernel(
 
 	// output buffers
 	float* __restrict__ out_pos_xyz,
+	float* __restrict__ out_dir_xyz,
 	float* __restrict__ out_dt
 ) {
 	// get thread index
@@ -342,6 +343,10 @@ __global__ void march_and_generate_network_positions_kernel(
 			out_pos_xyz[step_offset_1] = y * inv_aabb_size + 0.5f;
 			out_pos_xyz[step_offset_2] = z * inv_aabb_size + 0.5f;
 
+			out_dir_xyz[step_offset_0] = 0.5f * d_x + 0.5f;
+			out_dir_xyz[step_offset_1] = 0.5f * d_y + 0.5f;
+			out_dir_xyz[step_offset_2] = 0.5f * d_z + 0.5f;
+
 			++n_steps_taken;
 		} else {
 			// otherwise we need to find the next occupied cell
@@ -356,105 +361,6 @@ __global__ void march_and_generate_network_positions_kernel(
 	}
 
 	n_ray_steps[i] = n_steps_taken;
-}
-
-__global__ void compact_ray_buffers_kernel(
-	const uint32_t n_compacted_rays,
-	const uint32_t batch_size,
-	const int* __restrict__ ray_idx,
-	const uint32_t* __restrict__ in_ray_steps,
-	const float* __restrict__ in_pix_rgba,
-	uint32_t* __restrict__ out_ray_steps,
-	float* __restrict__ out_pix_rgba
-) {
-	// get thread index
-	const uint32_t c_idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-	// check if thread is out of bounds
-	if (c_idx >= n_compacted_rays) return;
-
-	const uint32_t e_idx = ray_idx[c_idx];
-	out_ray_steps[c_idx] = in_ray_steps[e_idx];
-
-	const uint32_t c_offset_0 = c_idx;
-	const uint32_t c_offset_1 = c_offset_0 + batch_size;
-	const uint32_t c_offset_2 = c_offset_1 + batch_size;
-	const uint32_t c_offset_3 = c_offset_2 + batch_size;
-
-	const uint32_t e_offset_0 = e_idx;
-	const uint32_t e_offset_1 = e_offset_0 + batch_size;
-	const uint32_t e_offset_2 = e_offset_1 + batch_size;
-	const uint32_t e_offset_3 = e_offset_2 + batch_size;
-	
-	// copy pixel rgba
-	out_pix_rgba[c_offset_0] = in_pix_rgba[e_offset_0];
-	out_pix_rgba[c_offset_1] = in_pix_rgba[e_offset_1];
-	out_pix_rgba[c_offset_2] = in_pix_rgba[e_offset_2];
-	out_pix_rgba[c_offset_3] = in_pix_rgba[e_offset_3];
-}
-
-__global__ void compact_sample_buffers_kernel(
-	const uint32_t n_compacted_rays,
-	const uint32_t batch_size,
-
-	// input buffers
-	const int* __restrict__ uncompacted_idx,
-	const uint32_t* __restrict__ c_ray_steps,
-	const uint32_t* __restrict__ e_ray_steps_cum, // expanded ray steps cumulative
-	const uint32_t* __restrict__ c_ray_steps_cum, // compacted ray steps cumulative
-	const float* __restrict__ in_ray_dir,
-	const float* __restrict__ in_sample_pos,
-	const float* __restrict__ in_sample_dt,
-
-	// output buffers
-	float* __restrict__ out_sample_dir,
-	float* __restrict__ out_sample_pos,
-	float* __restrict__ out_sample_dt
-) {
-	const uint32_t c_idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-	// check if thread is out of bounds
-	if (c_idx >= n_compacted_rays) return;
-
-	// local references to data indices
-	
-	const int e_idx = uncompacted_idx[c_idx];
-
-	const uint32_t n_samples = c_ray_steps[c_idx];
-
-	const uint32_t e_offset_0 = e_idx;
-	const uint32_t e_offset_1 = e_offset_0 + batch_size;
-	const uint32_t e_offset_2 = e_offset_1 + batch_size;
-
-	const uint32_t e_sample_offset_0 = e_ray_steps_cum[e_idx] - n_samples;
-	const uint32_t e_sample_offset_1 = e_sample_offset_0 + batch_size;
-	const uint32_t e_sample_offset_2 = e_sample_offset_1 + batch_size;
-	
-	const uint32_t c_sample_offset_0 = c_ray_steps_cum[c_idx] - n_samples;
-	const uint32_t c_sample_offset_1 = c_sample_offset_0 + batch_size;
-	const uint32_t c_sample_offset_2 = c_sample_offset_1 + batch_size;
-
-	// we broadcast ray directions to all samples in this ray, also normalize them for the network
-	const float ray_dir_x = 0.5f * (1.0f + in_ray_dir[e_offset_0]);
-	const float ray_dir_y = 0.5f * (1.0f + in_ray_dir[e_offset_1]);
-	const float ray_dir_z = 0.5f * (1.0f + in_ray_dir[e_offset_2]);
-
-	// copy and compact buffers
-	for (int i = 0; i < n_samples; ++i) {
-		// broadcast directions
-		out_sample_dir[c_sample_offset_0 + i] = ray_dir_x;
-		out_sample_dir[c_sample_offset_1 + i] = ray_dir_y;
-		out_sample_dir[c_sample_offset_2 + i] = ray_dir_z;
-
-		// copy sample positions
-		out_sample_pos[c_sample_offset_0 + i] = in_sample_pos[e_sample_offset_0 + i];
-		out_sample_pos[c_sample_offset_1 + i] = in_sample_pos[e_sample_offset_1 + i];
-		out_sample_pos[c_sample_offset_2 + i] = in_sample_pos[e_sample_offset_2 + i];
-
-		// copy sample dt
-		out_sample_dt[c_sample_offset_0 + i] = in_sample_dt[e_sample_offset_0 + i];
-	}
-
 }
 
 NRC_NAMESPACE_END

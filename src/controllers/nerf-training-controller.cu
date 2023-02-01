@@ -82,6 +82,7 @@ void NeRFTrainingController::prepare_for_training(
 	// Since there is no previous step here, we set the number of previous rays to the batch size
 	// so that the training batch generator will generate a full batch of rays
 	n_rays_in_batch = workspace.batch_size;
+	n_rays_used = 0;
 	training_step = 0;
 
 	// Initialize the network
@@ -186,250 +187,86 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_step[0]
 	);
 
-
-	/*
-	 * Now we loop through the rays, generate samples for the density network, filter out the invisible ones, and compact the batch.
-	 * We do this until the sample batch is full enough.
+	// Count the number of rays that will fill the batch with the maximum number of samples
+	/**
+	 * Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch.
+	 * We need to perform this cumsum over the entire batch of rays, not just the rays that were regenerated over the used ones in the previous batch.
 	 */
-	uint32_t n_batch_samples = 0; // This is the number of samples we have generated for the batch so far
-	uint32_t min_sample_batch = 0; //1024; // This is the smallest minibatch of samples that is worth running on the GPU.
-	uint32_t n_batch_rays = 0; // this is used as an offset to where new ray step counts should be written to in the ray_step buffer
-	uint32_t n_rays_used = 0; // this is the number of rays we have used from the buffers created above
 
-	/*
-	 * There are two main terminating conditions for this loop:
-	 * 1. The batch is full enough
-	 * 2. We've used up all the rays in the batch
-	 * 
-	 * In the second case, there simply aren't enough samples to fill the whole batch.  I guess that is ok.
-	 * 
-	 * And one condition that would cause us to break out of the loop early:
-	 * 3. If the number of steps for a single ray exceeds the batch size, we break.
-	 * 
-	 * There are two continue-conditions inside the loop that we should be aware of:
-	 * 1. If no samples were generated for the entire batch of rays, we skip the rest of the loop.
-	 * 2. If samples were generated but it was discovered they are not visible, we also continue.
-	 * 
-	 * In the second case, it's not clear if this can actually happen.
-	 * 
-	 */
-	int n_iters = 0;
-	while (n_batch_samples < workspace.batch_size - min_sample_batch && n_rays_used < workspace.batch_size) {
-		const uint32_t current_ray_offset = n_rays_used;
+	// Grab some references to the n_steps arrays
+	thrust::device_ptr<uint32_t> n_steps_ptr(workspace.ray_step[0]);
+	thrust::device_ptr<uint32_t> n_steps_cum_ptr(workspace.ray_step_cum[0]);
+	
+	// cumulative sum the number of steps for each ray
+	thrust::inclusive_scan(
+		thrust::cuda::par.on(stream),
+		n_steps_ptr,
+		n_steps_ptr + workspace.batch_size,
+		n_steps_cum_ptr
+	);
 
-		/**
-		 * Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch.
-		 * We need to perform this cumsum over the entire batch of rays, not just the rays that were regenerated over the used ones in the previous batch.
-		 */
+	// Count the number of rays actually used to fill the sample batch
+	const int n_ray_max_idx = find_last_lt_presorted(
+		stream,
+		n_steps_cum_ptr,
+		workspace.batch_size,
+		workspace.batch_size
+	);
 
-		// Grab some references to the n_steps arrays
-		thrust::device_ptr<uint32_t> n_uncompacted_steps_ptr(workspace.ray_step[0]);
-		thrust::device_ptr<uint32_t> n_uncompacted_steps_cum_ptr(workspace.ray_step_cum[0]);
-		
-		// cumulative sum the number of steps for each ray
-		thrust::inclusive_scan(
-			thrust::cuda::par.on(stream),
-			n_uncompacted_steps_ptr + current_ray_offset,
-			n_uncompacted_steps_ptr + workspace.batch_size,
-			n_uncompacted_steps_cum_ptr
-		);
-
-		CHECK_DATA(n_steps_cpu, uint32_t, workspace.ray_step[0], workspace.batch_size);
-		CHECK_DATA(n_steps_cum_cpu, uint32_t, workspace.ray_step_cum[0], workspace.batch_size);
-		// Count the number of rays actually used to fill the sample batch
-		const int n_ray_max_idx = find_last_lt_presorted(
-			stream,
-			n_uncompacted_steps_cum_ptr,
-			workspace.batch_size - current_ray_offset,
-			workspace.batch_size - n_batch_samples
-		);
-
-		// This condition breaks out of the loop if the number of steps for a single ray exceeds the remaining batch slots available
-		if (n_ray_max_idx < 0) {
-			break;
-		}
-
-		const uint32_t n_uncompacted_rays = static_cast<uint32_t>(n_ray_max_idx + 1);
-		n_rays_used += n_uncompacted_rays;
-
-		// Copy the number of samples that will be generated for all rays until the last ray, to the host
-		uint32_t n_uncompacted_samples = 0;
-
-		CUDA_CHECK_THROW(
-			cudaMemcpyAsync(
-				&n_uncompacted_samples,
-				n_uncompacted_steps_cum_ptr.get() + n_ray_max_idx,
-				sizeof(uint32_t),
-				cudaMemcpyDeviceToHost,
-				stream
-			)
-		);
-
-		CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
-
-		// early continue if no samples will be generated
-		if (n_uncompacted_samples == 0) {
-			continue;
-		}
-
-		// March (again), this time generating position samples for the density network 
-		march_and_generate_network_positions_kernel<<<n_blocks_linear(n_uncompacted_rays), n_threads_linear, 0, stream>>>(
-			n_uncompacted_rays,
-			workspace.batch_size,
-			workspace.bounding_box,
-			1.0f / dataset.bounding_box.size_x,
-			workspace.occ_grid,
-			dt_min,
-			dt_max,
-			cone_angle,
-
-			// input buffers
-			workspace.ray_origin	+ current_ray_offset,
-			workspace.ray_dir[0]	+ current_ray_offset,
-			workspace.ray_inv_dir	+ current_ray_offset,
-			workspace.ray_t			+ current_ray_offset,
-			workspace.ray_step_cum[0],
-			workspace.ray_alive		+ current_ray_offset,
-
-			// dual-use buffers
-			workspace.ray_step[0]	+ current_ray_offset,
-
-			// output buffers
-			workspace.sample_pos[0],
-			workspace.sample_dt[0]
-		);
-
-		// run these samples through the density network and determine their visibility
-		nerf->network.sample_density_and_count_steps(
-			stream,
-			n_uncompacted_rays,
-			n_uncompacted_samples,
-			workspace.batch_size,
-			NeRFConstants::min_transmittance,
-
-			// input buffers
-			workspace.ray_step_cum[0],
-			workspace.sample_pos[0],
-			workspace.sample_dt[0],
-
-			// dual-use buffers
-			workspace.ray_step[0] + current_ray_offset,
-
-			// output buffers
-			workspace.network_concat // just use network_concat as a temporary buffer.  nobody else is using it right now.
-		);
-		
-		// compact ray steps by excluding the rays that have no visible samples
-		uint32_t n_visible_rays = count_nonzero_elements(
-			stream,
-			n_uncompacted_rays,
-			workspace.ray_step[0] + current_ray_offset
-		);
-
-		if (n_visible_rays == 0) {
-			continue;
-		}
-
-		generate_nonzero_compaction_indices(
-			stream,
-			n_uncompacted_rays,
-			workspace.ray_step[0] + current_ray_offset,
-			workspace.ray_index
-		);
-
-		compact_ray_buffers_kernel<<<n_blocks_linear(n_visible_rays), n_threads_linear, 0, stream>>>(
-			n_visible_rays,
-			workspace.batch_size,
-			workspace.ray_index,
-			workspace.ray_step[0]	+ current_ray_offset,
-			workspace.pix_rgba[0]	+ current_ray_offset,
-			workspace.ray_step[1]	+ n_batch_rays,
-			workspace.pix_rgba[1]	+ n_batch_rays
-		);
-
-		// cumulative sum compacted ray steps to get the compaction offsets for the samples
-		// TODO: if we can give this an initial value of the element at index current_ray_offset in the previous cumsum we can avoid recalculating the whole cumsum
-		thrust::device_ptr<uint32_t> n_compacted_steps_ptr(workspace.ray_step[1]);
-		thrust::device_ptr<uint32_t> n_compacted_steps_cum_ptr(workspace.ray_step_cum[1]);
-
-		thrust::inclusive_scan(
-			thrust::cuda::par.on(stream),
-			n_compacted_steps_ptr + n_batch_rays,
-			n_compacted_steps_ptr + n_batch_rays + n_visible_rays,
-			n_compacted_steps_cum_ptr
-		);
-
-		// find the number of compacted samples
-		const int n_compacted_ray_max_idx = find_last_lt_presorted(
-			stream,
-			n_compacted_steps_cum_ptr,
-			n_visible_rays,
-			workspace.batch_size - n_batch_samples
-		);
-
-		// we don't need to break check the n_compacted_ray_max_idx because we know there is enough space from the uncompacted ray check earlier
-		uint32_t n_visible_samples = 0;
-
-		CUDA_CHECK_THROW(
-			cudaMemcpyAsync(
-				&n_visible_samples,
-				n_compacted_steps_cum_ptr.get() + n_compacted_ray_max_idx,
-				sizeof(uint32_t),
-				cudaMemcpyDeviceToHost,
-				stream
-			)
-		);
-
-		CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
-
-		// we do need to check if any compacted samples will be generated
-		if (n_visible_samples == 0) {
-			continue;
-		}
-
-		// compact buffers
-		compact_sample_buffers_kernel<<<n_blocks_linear(n_visible_rays), n_threads_linear, 0, stream>>>(
-			n_visible_rays,
-			workspace.batch_size,
-
-			// input buffers
-			workspace.ray_index,
-			workspace.ray_step[1]	+ n_batch_rays,
-			workspace.ray_step_cum[0],
-			workspace.ray_step_cum[1],
-			workspace.ray_dir[0]	+ current_ray_offset,
-			workspace.sample_pos[0],
-			workspace.sample_dt[0],
-
-			// output buffers
-			workspace.sample_dir	+ n_batch_samples,
-			workspace.sample_pos[1]	+ n_batch_samples,
-			workspace.sample_dt[1]	+ n_batch_samples
-		);
-
-		n_batch_samples += n_visible_samples;
-		n_batch_rays += n_visible_rays;
-		++n_iters;
+	if (n_ray_max_idx < 0) {
+		throw std::runtime_error("No rays were generated for this training batch!\n");
 	}
 
-	printf("n_iters: %d\n", n_iters);
+	n_rays_in_batch = n_ray_max_idx + 1;
 
-	if (n_batch_samples == 0) {
+	// Count the number of samples that will be generated
+	CUDA_CHECK_THROW(
+		cudaMemcpyAsync(
+			&n_samples_in_batch,
+			n_steps_cum_ptr.get() + n_ray_max_idx,
+			sizeof(uint32_t),
+			cudaMemcpyDeviceToHost,
+			stream
+		)
+	);
+
+	CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
+
+	if (n_samples_in_batch < 1) {
 		throw std::runtime_error("No samples were generated for this training batch!\n");
 	}
 
-	// one final time, we need to count the steps in all rays and get a cumulative sum
-	thrust::device_ptr<uint32_t> n_steps_in_ptr(workspace.ray_step[1]);
+	n_rays_in_batch = static_cast<uint32_t>(n_ray_max_idx + 1);
+	
+	// Generate sample positions
+	march_and_generate_network_positions_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
+		n_rays_in_batch,
+		workspace.batch_size,
+		workspace.bounding_box,
+		1.0f / dataset.bounding_box.size_x,
+		workspace.occ_grid,
+		dt_min,
+		dt_max,
+		cone_angle,
 
-	thrust::inclusive_scan(
-		thrust::cuda::par.on(stream),
-		n_steps_in_ptr,
-		n_steps_in_ptr + n_batch_rays,
-		thrust::device_ptr<uint32_t>(workspace.ray_step_cum[1])
+		// input buffers
+		workspace.ray_origin,
+		workspace.ray_dir[0],
+		workspace.ray_inv_dir,
+		workspace.ray_t,
+		workspace.ray_step_cum[0],
+		workspace.ray_alive,
+
+		// dual-use buffers
+		workspace.ray_step[0],
+
+		// output buffers
+		workspace.sample_pos[0],
+		workspace.sample_dir,
+		workspace.sample_dt[0]
 	);
 
-	n_rays_in_batch = n_batch_rays;
-	n_samples_in_batch = n_batch_samples;
+	n_rays_used += n_rays_in_batch;
 }
 
 // update occupancy grid
@@ -539,12 +376,12 @@ void NeRFTrainingController::train_step(const cudaStream_t& stream) {
 		workspace.batch_size,
 		n_rays_in_batch,
 		n_samples_in_batch,
-		workspace.ray_step[1],
-		workspace.ray_step_cum[1],
-		workspace.sample_pos[1],
+		workspace.ray_step[0],
+		workspace.ray_step_cum[0],
+		workspace.sample_pos[0],
 		workspace.sample_dir,
-		workspace.sample_dt[1],
-		workspace.pix_rgba[1],
+		workspace.sample_dt[0],
+		workspace.pix_rgba[0],
 		workspace.network_concat,
 		workspace.network_output
 	);

@@ -37,7 +37,7 @@ __global__ void copy_gradients_kernel(
 
 template <typename T>
 inline __device__ float density_to_sigma(const T& density) {
-	return __expf((float)density - 1.0f);
+	return __expf((float)density);
 }
 
 inline __device__ float sigma_to_trans(
@@ -61,52 +61,6 @@ inline __device__ float sigma_to_alpha(
 }
 
 /**
- * Accumulate samples and assign visibility
- * 
- * This kernel prepares buffers that can be used to cull samples that fall below a transmittance threshold.
- */
-
-__global__ void accumulate_samples_and_count_steps_kernel(
-	const uint32_t n_rays,
-	const float min_transmittance,
-	
-	// input buffers
-	const uint32_t* __restrict__ n_samples_cum,
-	const tcnn::network_precision_t* __restrict__ density,
-	const float* __restrict__ dt,
-
-	// dual-use buffers
-	uint32_t* __restrict__ n_samples_per_ray
-) {
-	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (idx >= n_rays) return;
-
-	const uint32_t n_samples = n_samples_per_ray[idx];
-	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
-
-	const tcnn::network_precision_t* __restrict__ s_dens = density + sample_offset;
-	const float* __restrict__ s_dt = dt + sample_offset;
-
-	// transmittance always begins at 1
-	float trans = 1.0f;
-
-	// loop through samples
-	uint32_t i = 0;
-	while (i < n_samples && trans > min_transmittance) {
-
-		// update transmittance - this is equivalent to multiplying by (1 - alpha)
-		const float sigma = density_to_sigma(s_dens[i]);
-		trans *= __expf(-sigma * s_dt[i]);
-		
-		++i;
-	}
-
-	// save the actual number of samples
-	n_samples_per_ray[idx] = i;
-}
-
-/**
  * Apply exponential scaling to density network output
  * (log-space density!)
  */
@@ -125,7 +79,6 @@ __global__ void density_to_sigma_forward_kernel(
 	sigma[i] = (T)density_to_sigma(density[i]);
 }
 
-
 // this computes dL/ddensity = dL/dsigma * dsigma/ddensity and applies it back to the original density
 __global__ void density_to_sigma_backward_kernel(
 	uint32_t n_samples,
@@ -137,7 +90,7 @@ __global__ void density_to_sigma_backward_kernel(
 
 	if (i >= n_samples) return;
 	
-	dL_ddensity[i] = dL_dsigma[i] * __expf(fminf((float)density[i] - 1.0f, 15.0f));
+	dL_ddensity[i] = dL_dsigma[i] * density_to_sigma(density[i]);
 }
 
 // sigma to ray color
@@ -182,9 +135,13 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
     for (int i = 0; i < n_samples; ++i) {
         const float alpha = sigma_to_alpha(s_sigma, s_dt, i);
 
-		s_alpha[i] = alpha;
 		s_trans[i] = trans;
+		s_alpha[i] = alpha;
 
+		if (trans < 1e-4f) {
+			break;
+		}
+		
         const float weight = trans * alpha;
 
         r += weight * (float)s_r[i];
@@ -193,6 +150,7 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
         a += weight;
 
 		trans *= (1.0f - alpha);
+
     }
 
     ray_rgba_buf[idx + 0 * batch_size] = r;
@@ -246,6 +204,11 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	float* __restrict__ s_dL_dcolor = dL_dcolor_buf + sample_offset;
 
 	for (int i = 0; i < n_samples; ++i) {
+		const float s_trans_i = s_trans[i];
+
+		if (s_trans_i < 1e-4f) {
+			break;
+		}
 
         float cumsum_r = 0.0f;
         float cumsum_g = 0.0f;
@@ -253,6 +216,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
         float cumsum_a = 0.0f;
 
         for (int j = i + 1; j < n_samples; ++j) {
+			if (s_trans[j] < 1e-4f) break;
             const float k = s_trans[j] * s_alpha[j];
 
             cumsum_r += k * (float)s_r[j];
@@ -261,9 +225,8 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 			cumsum_a += k;
         }
 
-		const float s_dt_i = s_dt[i];
-		const float s_trans_i = s_trans[i];
 		const float s_alpha_i = s_alpha[i];
+		const float s_dt_i = s_dt[i];
 
         const float c = s_trans_i * s_dt_i * (1.0f - s_alpha_i);
 
