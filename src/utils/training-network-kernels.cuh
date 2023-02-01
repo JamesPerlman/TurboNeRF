@@ -30,6 +30,7 @@ __global__ void copy_gradients_kernel(
 		idx += data_stride;
 	}
 }
+
 /**
  * All of this code is deliberately under-optimized for readability.  Will fuse kernels and optimize later.
  */
@@ -259,12 +260,11 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 		return;
 	}
 
-
 	const float dr = ray_rgba[r_idx] - target_rgba[r_idx];
 	const float dg = ray_rgba[g_idx] - target_rgba[g_idx];
 	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
 	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
-	
+
 	sse_loss[r_idx] = (dr * dr);
 	sse_loss[g_idx] = (dg * dg);
 	sse_loss[b_idx] = (db * db);
@@ -295,7 +295,7 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const float dg = ray_rgba[g_idx] - target_rgba[g_idx];
 	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
 	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
-	
+
 	dL_dR[r_idx] = inv_2nrays * dr;
 	dL_dR[g_idx] = inv_2nrays * dg;
 	dL_dR[b_idx] = inv_2nrays * db;
