@@ -98,51 +98,46 @@ __global__ void density_to_sigma_backward_kernel(
 __global__ void sigma_to_ray_rgba_forward_kernel(
     uint32_t n_rays,
     uint32_t batch_size,
-	const uint32_t* __restrict__ n_samples_per_ray,
-	const uint32_t* __restrict__ n_samples_cum,
-    const float* __restrict__ sigma,
-    const float* __restrict__ dt,
-    const tcnn::network_precision_t* __restrict__ sample_color,
-	float* __restrict__ trans,
-	float* __restrict__ alpha,
-    float* __restrict__ ray_rgba
+	const uint32_t* __restrict__ n_samples_buf,
+	const uint32_t* __restrict__ n_samples_cum_buf,
+    const float* __restrict__ sigma_buf,
+    const float* __restrict__ dt_buf,
+    const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
+	float* __restrict__ trans_buf,
+	float* __restrict__ alpha_buf,
+    float* __restrict__ ray_rgba_buf
 ) {
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (idx >= n_rays) return;
     
 	// offsets
-	const uint32_t n_samples = n_samples_per_ray[idx];
-	const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+	const uint32_t n_samples = n_samples_buf[idx];
+	const uint32_t sample_offset = n_samples_cum_buf[idx] - n_samples;
 
     // local references to sample data
-    const float* __restrict__ s_sigma = sigma + sample_offset;
-    const float* __restrict__ s_dt = dt + sample_offset;
+    const float* __restrict__ s_sigma = sigma_buf + sample_offset;
+    const float* __restrict__ s_dt = dt_buf + sample_offset;
     
-    const tcnn::network_precision_t* __restrict__ s_r = sample_color + sample_offset;
+    const tcnn::network_precision_t* __restrict__ s_r = sample_rgb_buf + sample_offset;
     const tcnn::network_precision_t* __restrict__ s_g = s_r + batch_size;
     const tcnn::network_precision_t* __restrict__ s_b = s_g + batch_size;
 
-	float* __restrict__ s_trans = trans + sample_offset;
-	float* __restrict__ s_alpha = alpha + sample_offset;
+	float* __restrict__ s_trans = trans_buf + sample_offset;
+	float* __restrict__ s_alpha = alpha_buf + sample_offset;
 
     float r = 0.0f;
     float g = 0.0f;
     float b = 0.0f;
     float a = 0.0f;
 
-    for (int i = 0; i < n_samples; ++i) {
-        const float trans = sigma_to_trans(s_sigma, s_dt, i);
-        const float alpha = sigma_to_alpha(s_sigma, s_dt, i);
-		
-		if (trans < 1e-4f) {
-			s_trans[i] = 0.0f;
-			s_alpha[i] = 0.0f;
-			continue;
-		}
+	float trans = 1.0f;
 
-		s_trans[i] = trans;
+    for (int i = 0; i < n_samples; ++i) {
+        const float alpha = sigma_to_alpha(s_sigma, s_dt, i);
+
 		s_alpha[i] = alpha;
+		s_trans[i] = trans;
 
         const float weight = trans * alpha;
 
@@ -150,12 +145,14 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
         g += weight * (float)s_g[i];
         b += weight * (float)s_b[i];
         a += weight;
+
+		trans *= (1.0f - alpha);
     }
 
-    ray_rgba[idx + 0 * batch_size] = r;
-    ray_rgba[idx + 1 * batch_size] = g;
-    ray_rgba[idx + 2 * batch_size] = b;
-    ray_rgba[idx + 3 * batch_size] = a;
+    ray_rgba_buf[idx + 0 * batch_size] = r;
+    ray_rgba_buf[idx + 1 * batch_size] = g;
+    ray_rgba_buf[idx + 2 * batch_size] = b;
+    ray_rgba_buf[idx + 3 * batch_size] = a;
 }
 
 // sigma to ray color backward
@@ -164,52 +161,45 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 __global__ void sigma_to_ray_rgba_backward_kernel(
     const uint32_t n_rays,
     const uint32_t batch_size,
-    const uint32_t* __restrict__ n_samples_per_ray,
-    const uint32_t* __restrict__ n_samples_cum,
-    const float* __restrict__ sigma,
-    const float* __restrict__ dt,
-	const float* __restrict__ trans,
-	const float* __restrict__ alpha,
-    const tcnn::network_precision_t* __restrict__ sample_color,
-    const float* __restrict__ dL_dR,
-    float* __restrict__ dL_dsigma,
-	float* __restrict__ dL_dcolor
+    const uint32_t* __restrict__ n_samples_buf,
+    const uint32_t* __restrict__ n_samples_cum_buf,
+    const float* __restrict__ sigma_buf,
+    const float* __restrict__ dt_buf,
+	const float* __restrict__ trans_buf,
+	const float* __restrict__ alpha_buf,
+    const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
+    const float* __restrict__ dL_dR_buf,
+    float* __restrict__ dL_dsigma_buf,
+	float* __restrict__ dL_dcolor_buf
 ) {
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (idx >= n_rays) return;
 
     // offsets
-    const uint32_t n_samples = n_samples_per_ray[idx];
-    const uint32_t sample_offset = n_samples_cum[idx] - n_samples;
+    const uint32_t n_samples = n_samples_buf[idx];
+    const uint32_t sample_offset = n_samples_cum_buf[idx] - n_samples;
 
     // local references to sample data
-    const float* __restrict__ s_sigma = sigma + sample_offset;
-    const float* __restrict__ s_dt = dt + sample_offset;
+    const float* __restrict__ s_sigma = sigma_buf + sample_offset;
+    const float* __restrict__ s_dt = dt_buf + sample_offset;
 
-    const tcnn::network_precision_t* __restrict__ s_r = sample_color + sample_offset;
+    const tcnn::network_precision_t* __restrict__ s_r = sample_rgb_buf + sample_offset;
     const tcnn::network_precision_t* __restrict__ s_g = s_r + batch_size;
     const tcnn::network_precision_t* __restrict__ s_b = s_g + batch_size;
 	
-	const float* __restrict__ s_trans = trans + sample_offset;
-	const float* __restrict__ s_alpha = alpha + sample_offset;
+	const float* __restrict__ s_trans = trans_buf + sample_offset;
+	const float* __restrict__ s_alpha = alpha_buf + sample_offset;
 
-    const float dL_dR_r = dL_dR[idx + 0 * batch_size];
-	const float dL_dR_g = dL_dR[idx + 1 * batch_size];
-	const float dL_dR_b = dL_dR[idx + 2 * batch_size];
-	const float dL_dR_a = dL_dR[idx + 3 * batch_size];
+    const float dL_dR_r = dL_dR_buf[idx + 0 * batch_size];
+	const float dL_dR_g = dL_dR_buf[idx + 1 * batch_size];
+	const float dL_dR_b = dL_dR_buf[idx + 2 * batch_size];
+	const float dL_dR_a = dL_dR_buf[idx + 3 * batch_size];
 
-    float* __restrict__ s_dL_dsigma = dL_dsigma + sample_offset;
-	float* __restrict__ s_dL_dcolor = dL_dcolor + sample_offset;
+    float* __restrict__ s_dL_dsigma = dL_dsigma_buf + sample_offset;
+	float* __restrict__ s_dL_dcolor = dL_dcolor_buf + sample_offset;
 
-   for (int i = 0; i < n_samples; ++i) {
-		if (s_trans[i] < 1e-4f) {
-			s_dL_dsigma[i] = 0.0f;
-			s_dL_dcolor[i + 0 * batch_size] = 0.0f;
-			s_dL_dcolor[i + 1 * batch_size] = 0.0f;
-			s_dL_dcolor[i + 2 * batch_size] = 0.0f;
-			continue;
-		}
+	for (int i = 0; i < n_samples; ++i) {
 
         float cumsum_r = 0.0f;
         float cumsum_g = 0.0f;
@@ -217,24 +207,28 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
         float cumsum_a = 0.0f;
 
         for (int j = i + 1; j < n_samples; ++j) {
-            const float k = -s_dt[i] * s_trans[j] * s_alpha[j];
+            const float k = s_trans[j] * s_alpha[j];
 
             cumsum_r += k * (float)s_r[j];
             cumsum_g += k * (float)s_g[j];
             cumsum_b += k * (float)s_b[j];
 			cumsum_a += k;
         }
-        
-        const float c = s_trans[i] * s_dt[i] * (1.0f - s_alpha[i]);
 
-        const float dRr_dsigma = cumsum_r + c * (float)s_r[i];
-        const float dRg_dsigma = cumsum_g + c * (float)s_g[i];
-        const float dRb_dsigma = cumsum_b + c * (float)s_b[i];
-		const float dRa_dsigma = cumsum_a + c;
+		const float s_dt_i = s_dt[i];
+		const float s_trans_i = s_trans[i];
+		const float s_alpha_i = s_alpha[i];
+
+        const float c = s_trans_i * s_dt_i * (1.0f - s_alpha_i);
+
+        const float dRr_dsigma = -s_dt_i * cumsum_r + c * (float)s_r[i];
+        const float dRg_dsigma = -s_dt_i * cumsum_g + c * (float)s_g[i];
+        const float dRb_dsigma = -s_dt_i * cumsum_b + c * (float)s_b[i];
+		const float dRa_dsigma = -s_dt_i * cumsum_a + c;
 
         s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma + dL_dR_a * dRa_dsigma;
-		
-		const float s_weight_i = s_trans[i] * s_alpha[i];
+
+		const float s_weight_i = s_trans_i * s_alpha_i;
 
 		s_dL_dcolor[i + 0 * batch_size] = dL_dR_r * s_weight_i;
 		s_dL_dcolor[i + 1 * batch_size] = dL_dR_g * s_weight_i;
