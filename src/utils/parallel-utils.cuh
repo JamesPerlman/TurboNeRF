@@ -14,6 +14,8 @@ NRC_NAMESPACE_BEGIN
 /**
  * @brief Find the index of the last item in a buffer of presorted ascending elements whose value is less than a given `max_value`
  * 
+ * Created with the help of ChatGPT!
+ * 
  * @param stream A cudaStream_t to run all operations on
  * @param data_begin_ptr A thrust::device_ptr that points to the first element in the buffer
  * @param n_elements The number of elements stored in the buffer
