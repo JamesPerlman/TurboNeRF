@@ -51,7 +51,6 @@ set(HEADERS
 	src/models/nerf-network.h
 	src/models/nerf.cuh
 	src/models/ray.h
-	src/models/rays.h
 	src/models/render-buffer.cuh
 	src/models/render-request.cuh
 	src/models/rendering-workspace.cuh
