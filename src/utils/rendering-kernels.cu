@@ -189,7 +189,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 
 // ray compaction
 __global__ void compact_rays_kernel(
-    const int n_compacted_elements,
+    const int n_compacted_rays,
 	const int batch_size,
     const int* __restrict__ indices,
 
@@ -214,7 +214,7 @@ __global__ void compact_rays_kernel(
     // compacted index is the index to write to
     const int c_idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (c_idx >= n_compacted_elements) return;
+    if (c_idx >= n_compacted_rays) return;
 
 	// expanded index is the index to read from
 	const int e_idx = indices[c_idx];
@@ -238,7 +238,7 @@ __global__ void compact_rays_kernel(
 	out_origin[c_offset_0] = in_origin[e_offset_0];
 	out_origin[c_offset_1] = in_origin[e_offset_1];
 	out_origin[c_offset_2] = in_origin[e_offset_2];
-	
+
 	out_dir[c_offset_0] = in_dir[e_offset_0];
 	out_dir[c_offset_1] = in_dir[e_offset_1];
 	out_dir[c_offset_2] = in_dir[e_offset_2];
@@ -318,7 +318,7 @@ __global__ void composite_samples_kernel(
 	output_rgba[idx_offset_1] += s_w * s_g;
 	output_rgba[idx_offset_2] += s_w * s_b;
 	output_rgba[idx_offset_3] += s_w;
-	
+
 	const float out_a = output_rgba[idx_offset_3];
 
 	if (out_a >= 1.0f) {
