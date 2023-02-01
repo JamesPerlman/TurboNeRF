@@ -184,7 +184,7 @@ struct CascadedOccupancyGrid {
 		const float& value
 	) const {
 		float* ptr = workspace.values + level * volume_i + byte_idx;
-		*ptr = fmaxf(*ptr, value);
+		*ptr = 0.5f * (*ptr + value);
 	}
 
 	/* From Müller, et al. 2022
