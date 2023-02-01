@@ -155,9 +155,9 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.image_data,
 		workspace.img_index,
 		workspace.pix_index,
-		workspace.pix_rgba[0],
+		workspace.pix_rgba,
 		workspace.ray_origin,
-		workspace.ray_dir[0],
+		workspace.ray_dir,
 		workspace.ray_inv_dir,
 		workspace.ray_t,
 		workspace.ray_alive
@@ -178,15 +178,13 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		cone_angle,
 		dt_min,
 		dt_max,
-		workspace.ray_dir[0],
+		workspace.ray_dir,
 		workspace.ray_inv_dir,
 		workspace.ray_alive,
 		workspace.ray_origin,
 		workspace.ray_t,
-		workspace.ray_step[0]
+		workspace.ray_step
 	);
-
-	CHECK_DATA(ray_dir_cpu, float, workspace.ray_dir[0], n_rays_in_batch * 3);
 
 	// Count the number of rays that will fill the batch with the maximum number of samples
 	/**
@@ -195,8 +193,8 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 	 */
 
 	// Grab some references to the n_steps arrays
-	thrust::device_ptr<uint32_t> n_steps_ptr(workspace.ray_step[0]);
-	thrust::device_ptr<uint32_t> ray_offset_ptr(workspace.ray_offset[0]);
+	thrust::device_ptr<uint32_t> n_steps_ptr(workspace.ray_step);
+	thrust::device_ptr<uint32_t> ray_offset_ptr(workspace.ray_offset);
 	
 	// cumulative sum the number of steps for each ray
 	thrust::exclusive_scan(
@@ -250,19 +248,19 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 
 		// input buffers
 		workspace.ray_origin,
-		workspace.ray_dir[0],
+		workspace.ray_dir,
 		workspace.ray_inv_dir,
 		workspace.ray_t,
-		workspace.ray_offset[0],
+		workspace.ray_offset,
 		workspace.ray_alive,
 
 		// dual-use buffers
-		workspace.ray_step[0],
+		workspace.ray_step,
 
 		// output buffers
-		workspace.sample_pos[0],
+		workspace.sample_pos,
 		workspace.sample_dir,
-		workspace.sample_dt[0]
+		workspace.sample_dt
 	);
 }
 
@@ -307,14 +305,14 @@ void NeRFTrainingController::update_occupancy_grid(const cudaStream_t& stream, c
 				level,
 				inv_aabb_size,
 				workspace.random_float,
-				workspace.sample_pos[0]
+				workspace.sample_pos
 			);
 
 			// query the density network
 			nerf->network.inference(
 				stream,
 				batch_size,
-				workspace.sample_pos[0],
+				workspace.sample_pos,
 				nullptr,
 				workspace.network_concat,
 				workspace.network_output,
@@ -375,12 +373,12 @@ void NeRFTrainingController::train_step(const cudaStream_t& stream) {
 		workspace.batch_size,
 		n_rays_in_batch,
 		n_samples_in_batch,
-		workspace.ray_step[0],
-		workspace.ray_offset[0],
-		workspace.sample_pos[0],
+		workspace.ray_step,
+		workspace.ray_offset,
+		workspace.sample_pos,
 		workspace.sample_dir,
-		workspace.sample_dt[0],
-		workspace.pix_rgba[0],
+		workspace.sample_dt,
+		workspace.pix_rgba,
 		workspace.network_concat,
 		workspace.network_output
 	);
