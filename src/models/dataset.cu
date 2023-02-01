@@ -40,7 +40,7 @@ Dataset::Dataset(string file_path) {
         2.0f * focal_length.y * tanf(0.5f * view_angle.y)
     };
 
-    uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
+    uint32_t aabb_size = std::min(json_data.value("aabb_size", 4), 128);
     bounding_box = BoundingBox((float)aabb_size);
 
     path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
