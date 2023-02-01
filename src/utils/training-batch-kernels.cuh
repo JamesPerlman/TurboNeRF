@@ -364,6 +364,104 @@ __global__ void march_and_generate_samples_and_compact_buffers_kernel(
 			);
 		}
 	}
+
+__global__ void compact_ray_buffers_kernel(
+	const uint32_t n_compacted_rays,
+	const uint32_t batch_size,
+	const int* __restrict__ ray_idx,
+	const uint32_t* __restrict__ in_ray_steps,
+	const float* __restrict__ in_pix_rgba,
+	uint32_t* __restrict__ out_ray_steps,
+	float* __restrict__ out_pix_rgba
+) {
+	// get thread index
+	const uint32_t c_idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	// check if thread is out of bounds
+	if (c_idx >= n_compacted_rays) return;
+
+	const uint32_t e_idx = ray_idx[c_idx];
+	out_ray_steps[c_idx] = in_ray_steps[e_idx];
+
+	const uint32_t c_offset_0 = c_idx;
+	const uint32_t c_offset_1 = c_offset_0 + batch_size;
+	const uint32_t c_offset_2 = c_offset_1 + batch_size;
+	const uint32_t c_offset_3 = c_offset_2 + batch_size;
+
+	const uint32_t e_offset_0 = e_idx;
+	const uint32_t e_offset_1 = e_offset_0 + batch_size;
+	const uint32_t e_offset_2 = e_offset_1 + batch_size;
+	const uint32_t e_offset_3 = e_offset_2 + batch_size;
+	
+	// copy pixel rgba
+	out_pix_rgba[c_offset_0] = in_pix_rgba[e_offset_0];
+	out_pix_rgba[c_offset_1] = in_pix_rgba[e_offset_1];
+	out_pix_rgba[c_offset_2] = in_pix_rgba[e_offset_2];
+	out_pix_rgba[c_offset_3] = in_pix_rgba[e_offset_3];
+}
+
+__global__ void compact_sample_buffers_kernel(
+	const uint32_t n_compacted_rays,
+	const uint32_t batch_size,
+
+	// input buffers
+	const int* __restrict__ uncompacted_idx,
+	const uint32_t* __restrict__ c_ray_steps,
+	const uint32_t* __restrict__ e_ray_steps_cum, // expanded ray steps cumulative
+	const uint32_t* __restrict__ c_ray_steps_cum, // compacted ray steps cumulative
+	const float* __restrict__ in_ray_dir,
+	const float* __restrict__ in_sample_pos,
+	const float* __restrict__ in_sample_dt,
+
+	// output buffers
+	float* __restrict__ out_sample_dir,
+	float* __restrict__ out_sample_pos,
+	float* __restrict__ out_sample_dt
+) {
+	const uint32_t c_idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	// check if thread is out of bounds
+	if (c_idx >= n_compacted_rays) return;
+
+	// local references to data indices
+	
+	const int e_idx = uncompacted_idx[c_idx];
+
+	const uint32_t n_samples = c_ray_steps[c_idx];
+
+	const uint32_t e_offset_0 = e_idx;
+	const uint32_t e_offset_1 = e_offset_0 + batch_size;
+	const uint32_t e_offset_2 = e_offset_1 + batch_size;
+
+	const uint32_t e_sample_offset_0 = e_ray_steps_cum[e_idx] - n_samples;
+	const uint32_t e_sample_offset_1 = e_sample_offset_0 + batch_size;
+	const uint32_t e_sample_offset_2 = e_sample_offset_1 + batch_size;
+	
+	const uint32_t c_sample_offset_0 = c_ray_steps_cum[c_idx] - n_samples;
+	const uint32_t c_sample_offset_1 = c_sample_offset_0 + batch_size;
+	const uint32_t c_sample_offset_2 = c_sample_offset_1 + batch_size;
+
+	// we broadcast ray directions to all samples in this ray, also normalize them for the network
+	const float ray_dir_x = 0.5f * (1.0f + in_ray_dir[e_offset_0]);
+	const float ray_dir_y = 0.5f * (1.0f + in_ray_dir[e_offset_1]);
+	const float ray_dir_z = 0.5f * (1.0f + in_ray_dir[e_offset_2]);
+
+	// copy and compact buffers
+	for (int i = 0; i < n_samples; ++i) {
+		// broadcast directions
+		out_sample_dir[c_sample_offset_0 + i] = ray_dir_x;
+		out_sample_dir[c_sample_offset_1 + i] = ray_dir_y;
+		out_sample_dir[c_sample_offset_2 + i] = ray_dir_z;
+
+		// copy sample positions
+		out_sample_pos[c_sample_offset_0 + i] = in_sample_pos[e_sample_offset_0 + i];
+		out_sample_pos[c_sample_offset_1 + i] = in_sample_pos[e_sample_offset_1 + i];
+		out_sample_pos[c_sample_offset_2 + i] = in_sample_pos[e_sample_offset_2 + i];
+
+		// copy sample dt
+		out_sample_dt[c_sample_offset_0 + i] = in_sample_dt[e_sample_offset_0 + i];
+	}
+
 }
 
 NRC_NAMESPACE_END
