@@ -165,9 +165,9 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			network_pos[net_offset_1] = y * inv_aabb_size + 0.5f;
 			network_pos[net_offset_2] = z * inv_aabb_size + 0.5f;
 			
-			network_dir[net_offset_0] = (d_x + 1.0f) * 0.5f;
-			network_dir[net_offset_1] = (d_y + 1.0f) * 0.5f;
-			network_dir[net_offset_2] = (d_z + 1.0f) * 0.5f;
+			network_dir[net_offset_0] = 0.5f * d_x + 0.5f;
+			network_dir[net_offset_1] = 0.5f * d_y + 0.5f;
+			network_dir[net_offset_2] = 0.5f * d_z + 0.5f;
 
 			network_dt[i] = dt * inv_aabb_size;
 
