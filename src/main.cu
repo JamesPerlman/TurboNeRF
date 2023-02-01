@@ -100,5 +100,7 @@ int main()
 
 	// Wait for the kernel to finish executing
 	cudaDeviceSynchronize();
+
+	cudaStreamDestroy(stream);
 	return 0;
 }
