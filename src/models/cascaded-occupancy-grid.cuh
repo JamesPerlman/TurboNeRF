@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Most of this code is inspired by Müller, et al:
  * Instant Neural Graphics Primitives with a Multiresolution Hash Encoding, 2022:
  * https://dl.acm.org/doi/pdf/10.1145/3528223.3530127
@@ -202,7 +202,6 @@ struct CascadedOccupancyGrid {
 			const float level_half_size = 0.5f * level_size;
 			const float cell_size = level_size * inv_resolution_f;
 			
-			// might be able to eliminate the = in <= here
 			const bool grid_k_covers_xyz = fabsf(x) < level_half_size && fabsf(y) < level_half_size && fabsf(z) < level_half_size;
 			if (grid_k_covers_xyz && cell_size > dt) {
 				return k;
