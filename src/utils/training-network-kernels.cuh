@@ -91,7 +91,7 @@ __global__ void density_to_sigma_backward_kernel(
 
 	if (i >= n_samples) return;
 	
-	dL_ddensity[i] = dL_dsigma[i] * __expf(fminf((float)density[i] - 1.0f, 11.0f));
+	dL_ddensity[i] = dL_dsigma[i] * __expf(fminf((float)density[i] - 1.0f, 15.0f));
 }
 
 // sigma to ray color
