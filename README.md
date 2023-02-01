@@ -16,6 +16,7 @@ https://github.com/nothings/stb [[LICENSE](https://github.com/nothings/stb/blob/
 https://github.com/bmild/nerf [[LICENSE](https://github.com/bmild/nerf/blob/master/LICENSE)]  
 https://github.com/nerfstudio-project/nerfstudio [[LICENSE](https://github.com/nerfstudio-project/nerfstudio/blob/main/LICENSE)]  
 https://github.com/KAIR-BAIR/nerfacc [[LICENSE](https://github.com/KAIR-BAIR/nerfacc/blob/master/LICENSE)]  
+https://github.com/ashawkey/torch-ngp [[LICENSE]](https://github.com/ashawkey/torch-ngp/blob/main/LICENSE)
 
 LICENSES TO BE ADDED TO CODEBASE SOON.  CHECK LICENSES/ DIRECTORY
 
