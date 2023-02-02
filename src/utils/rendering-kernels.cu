@@ -6,6 +6,7 @@
 #include "../models/camera.cuh"
 #include "../models/cascaded-occupancy-grid.cuh"
 #include "../utils/color-utils.cuh"
+#include "../utils/nerf-constants.cuh"
 
 using namespace tcnn;
 
@@ -328,7 +329,7 @@ __global__ void composite_samples_kernel(
 		// update and threshold transmittance
 		trans *= 1.0f - alpha;
 
-		if (trans <= 1e-4f) {
+		if (trans <= NeRFConstants::min_transmittance) {
 			ray_alive[idx] = false;
 			break;
 		}

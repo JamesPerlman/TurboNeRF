@@ -5,6 +5,7 @@
 
 #include "../common.h"
 #include "../models/bounding-box.cuh"
+#include "../utils/nerf-constants.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -147,7 +148,7 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
     for (int i = 0; i < n_samples; ++i) {
         const float alpha = s_alpha[i];
 
-		if (trans < 1e-4f) {
+		if (trans < NeRFConstants::min_transmittance) {
 			break;
 		}
 		
@@ -255,7 +256,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 		s_dL_dcolor_g[i] = dL_dR_g * weight;
 		s_dL_dcolor_b[i] = dL_dR_b * weight;
 		
-		if (trans < 1e-4f) {
+		if (trans < NeRFConstants::min_transmittance) {
 			break;
 		}
     }
