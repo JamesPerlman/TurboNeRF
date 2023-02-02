@@ -92,6 +92,94 @@ __global__ void generate_rays_pinhole_kernel(
 	ray_trans[i] = 1.0f;
 }
 
+
+__global__ void march_rays_to_first_occupied_cell_kernel(
+    const uint32_t n_rays,
+	const uint32_t batch_size,
+	const CascadedOccupancyGrid* occ_grid,
+	const BoundingBox* bbox,
+	const float dt_min,
+	const float dt_max,
+	const float cone_angle,
+	
+	// input buffers (read-only)
+	const float* __restrict__ ray_dir,
+	const float* __restrict__ ray_idir,
+
+    // dual-use buffers (read/write)
+    bool* __restrict__ ray_alive,
+	float* __restrict__ ray_ori,
+    float* __restrict__ ray_t,
+
+	// output buffers (write-only)
+	float* __restrict__ network_pos,
+	float* __restrict__ network_dir,
+	float* __restrict__ network_dt
+) {
+	// get thread index
+	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+
+	// check if thread is out of bounds
+	if (i >= n_rays) return;
+
+    // check if ray has terminated or is currently inactive
+    if (!ray_alive[i]) return;
+
+	// References to input buffers
+	const uint32_t i_offset_0 = i;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
+
+	const float o_x = ray_ori[i_offset_0];
+	const float o_y = ray_ori[i_offset_1];
+	const float o_z = ray_ori[i_offset_2];
+
+	const float d_x = ray_dir[i_offset_0];
+	const float d_y = ray_dir[i_offset_1];
+	const float d_z = ray_dir[i_offset_2];
+	
+	const float id_x = ray_idir[i_offset_0];
+	const float id_y = ray_idir[i_offset_1];
+	const float id_z = ray_idir[i_offset_2];
+
+	// Perform raymarching
+	
+	float t = ray_t[i];
+
+	while (true) {
+		const float x = o_x + t * d_x;
+		const float y = o_y + t * d_y;
+		const float z = o_z + t * d_z;
+
+		if (!bbox->contains(x, y, z)) {
+			ray_alive[i] = false;
+
+			return;
+		}
+
+		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
+		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
+
+		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
+			ray_ori[i_offset_0] = x;
+			ray_ori[i_offset_1] = y;
+			ray_ori[i_offset_2] = z;
+			ray_t[i] = 0.0f;
+
+			return;
+		} else {
+			// otherwise we need to find the next occupied cell
+			t += occ_grid->get_dt_to_next_voxel(
+				x, y, z,
+				d_x, d_y, d_z,
+				id_x, id_y, id_z,
+				dt_min,
+				grid_level
+			);
+		}
+	}
+}
+
 __global__ void march_rays_and_generate_network_inputs_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
@@ -157,7 +245,8 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 		const float z = o_z + t * d_z;
 
 		if (!bbox->contains(x, y, z)) {
-			ray_alive[i] = false;
+			// if the ray is outside the bounding box on the first step, we terminate it
+			ray_alive[i] = n_steps > 0;
 			break;
 		}
 

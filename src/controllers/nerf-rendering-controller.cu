@@ -112,11 +112,34 @@ void NeRFRenderingController::request_render(
             workspace.ray_active[active_buf_idx],
             pixel_start
         );
-
         
         const float dt_min = NeRFConstants::min_step_size;
         const float dt_max = nerf->bounding_box.size_x * dt_min;
         const float cone_angle = NeRFConstants::cone_angle;
+
+        march_rays_to_first_occupied_cell_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+            n_rays,
+            batch_size,
+            workspace.occupancy_grid,
+            workspace.bounding_box,
+            dt_min,
+            dt_max,
+            cone_angle,
+
+            // input buffers
+            workspace.ray_dir[active_buf_idx],
+            workspace.ray_idir[active_buf_idx],
+            
+            // dual-use buffers
+            workspace.ray_alive,
+            workspace.ray_origin[active_buf_idx],
+            workspace.ray_t[active_buf_idx],
+
+            // output buffers
+            workspace.network_pos,
+            workspace.network_dir,
+            workspace.network_dt
+        );
 
         // ray marching loop
         uint32_t n_rays_alive = n_rays;
@@ -130,7 +153,6 @@ void NeRFRenderingController::request_render(
             const uint32_t n_steps_per_ray = std::max(batch_size / n_rays_alive, (uint32_t)1);
             const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_rays_alive, tcnn::batch_size_granularity);
 
-            // march each ray one step
             march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
                 batch_size,

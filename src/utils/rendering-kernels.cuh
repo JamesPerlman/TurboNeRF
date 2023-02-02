@@ -27,6 +27,30 @@ __global__ void generate_rays_pinhole_kernel(
 	const uint32_t start_idx
 );
 
+__global__ void march_rays_to_first_occupied_cell_kernel(
+    const uint32_t n_rays,
+	const uint32_t batch_size,
+	const CascadedOccupancyGrid* occ_grid,
+	const BoundingBox* bbox,
+	const float dt_min,
+	const float dt_max,
+	const float cone_angle,
+	
+	// input buffers (read-only)
+	const float* __restrict__ ray_dir,
+	const float* __restrict__ ray_idir,
+
+    // dual-use buffers (read/write)
+    bool* __restrict__ ray_alive,
+	float* __restrict__ ray_ori,
+    float* __restrict__ ray_t,
+
+	// output buffers (write-only)
+	float* __restrict__ network_pos,
+	float* __restrict__ network_dir,
+	float* __restrict__ network_dt
+);
+
 __global__ void march_rays_and_generate_network_inputs_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
