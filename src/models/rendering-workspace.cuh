@@ -33,7 +33,8 @@ struct RenderingWorkspace: Workspace {
 	float* ray_dir[2];
 	float* ray_idir[2];
 	float* ray_t[2];
-	float* ray_sigma[2]; // accumulated sigma
+	float* ray_trans[2]; // accumulated sigma
+	uint32_t* ray_steps[2];
 
 	// 2D ray index (x + y * width)
 	uint32_t* ray_idx[2]; 
@@ -82,26 +83,29 @@ struct RenderingWorkspace: Workspace {
 		ray_alive		= allocate<bool>(stream, batch_size); // no need to double buffer
 
 		// double buffers
-		ray_active[0]	= allocate<bool>(stream, 2 * batch_size);
-		ray_active[1]	= ray_active[0] + batch_size;
+		ray_active[0]	= allocate<bool>(stream, batch_size);
+		ray_active[1]	= allocate<bool>(stream, batch_size);
 
-		ray_origin[0]	= allocate<float>(stream, 2 * 3 * batch_size);
-		ray_origin[1]	= ray_origin[0] + 3 * batch_size;
+		ray_origin[0]	= allocate<float>(stream, 3 * batch_size);
+		ray_origin[1]	= allocate<float>(stream, 3 * batch_size);
 		
-		ray_dir[0]		= allocate<float>(stream, 2 * 3 * batch_size);
-		ray_dir[1]		= ray_dir[0] + 3 * batch_size;
+		ray_dir[0]		= allocate<float>(stream, 3 * batch_size);
+		ray_dir[1]		= allocate<float>(stream, 3 * batch_size);
 
-		ray_idir[0]		= allocate<float>(stream, 2 * 3 * batch_size);
-		ray_idir[1]		= ray_idir[0] + 3 * batch_size;
+		ray_idir[0]		= allocate<float>(stream, 3 * batch_size);
+		ray_idir[1]		= allocate<float>(stream, 3 * batch_size);
 
-		ray_t[0]		= allocate<float>(stream, 2 * batch_size);
-		ray_t[1]		= ray_t[0] + batch_size;
+		ray_t[0]		= allocate<float>(stream, batch_size);
+		ray_t[1]		= allocate<float>(stream, batch_size);
 
-		ray_idx[0]		= allocate<uint32_t>(stream, 2 * batch_size);
-		ray_idx[1]		= ray_idx[0] + batch_size;
+		ray_idx[0]		= allocate<uint32_t>(stream, batch_size);
+		ray_idx[1]		= allocate<uint32_t>(stream, batch_size);
 
-		ray_sigma[0]	= allocate<float>(stream, 2 * batch_size);
-		ray_sigma[1]	= ray_sigma[0] + batch_size;
+		ray_trans[0]	= allocate<float>(stream, batch_size);
+		ray_trans[1]	= allocate<float>(stream, batch_size);
+
+		ray_steps[0]	= allocate<uint32_t>(stream, batch_size);
+		ray_steps[1]	= allocate<uint32_t>(stream, batch_size);
 
 		// samples
 		network_pos		= allocate<float>(stream, 3 * batch_size);

@@ -20,18 +20,21 @@ __global__ void generate_rays_pinhole_kernel(
 	float* __restrict__ ray_dir,
 	float* __restrict__ ray_idir,
 	float* __restrict__ ray_t,
+	float* __restrict__ ray_trans,
     uint32_t* __restrict__ ray_idx,
 	bool* __restrict__ ray_alive,
+	bool* __restrict__ ray_active,
 	const uint32_t start_idx
 );
 
 __global__ void march_rays_and_generate_network_inputs_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
+	const uint32_t n_steps_max,
 	const uint32_t network_stride,
 	const CascadedOccupancyGrid* occ_grid,
 	const BoundingBox* bbox,
-	const float inv_aabb_size, // TODO: get rid of this arg
+	const float inv_aabb_size,
 	const float dt_min,
 	const float dt_max,
 	const float cone_angle,
@@ -47,13 +50,14 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
     float* __restrict__ ray_t,
 
 	// output buffers (write-only)
+	uint32_t* __restrict__ n_ray_steps,
 	float* __restrict__ network_pos,
 	float* __restrict__ network_dir,
 	float* __restrict__ network_dt
 );
 
 __global__ void compact_rays_kernel(
-    const int n_compacted_elements,
+    const int n_compacted_rays,
 	const int batch_size,
     const int* __restrict__ indices,
 
@@ -64,7 +68,7 @@ __global__ void compact_rays_kernel(
 	const float* __restrict__ in_origin,
 	const float* __restrict__ in_dir,
 	const float* __restrict__ in_idir,
-	const float* __restrict__ in_sigma,
+	const float* __restrict__ in_trans,
 
 	// compacted output buffers (write-only)
 	uint32_t* __restrict__ out_idx,
@@ -73,23 +77,24 @@ __global__ void compact_rays_kernel(
 	float* __restrict__ out_origin,
 	float* __restrict__ out_dir,
 	float* __restrict__ out_idir,
-	float* __restrict__ out_sigma
+	float* __restrict__ out_trans
 );
 
 __global__ void composite_samples_kernel(
-    const uint32_t n_samples,
+	const uint32_t n_rays,
 	const uint32_t network_stride,
 	const uint32_t output_stride,
-    
+
     // read-only
-    const tcnn::network_precision_t* __restrict__ network_output,
-    const float* __restrict__ sample_dt,
-    const uint32_t* __restrict__ sample_idx,
 	const bool* __restrict__ ray_active,
+	const uint32_t* __restrict__ n_ray_steps,
+    const uint32_t* __restrict__ ray_idx,
+    const float* __restrict__ sample_dt,
+    const tcnn::network_precision_t* __restrict__ network_output,
 
     // read/write
     bool* __restrict__ ray_alive,
-	float* __restrict__ ray_sigma,
+	float* __restrict__ ray_trans,
     float* __restrict__ output_rgba
 );
 

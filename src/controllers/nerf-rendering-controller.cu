@@ -106,22 +106,16 @@ void NeRFRenderingController::request_render(
             workspace.ray_dir[active_buf_idx],
             workspace.ray_idir[active_buf_idx],
             workspace.ray_t[active_buf_idx],
+            workspace.ray_trans[active_buf_idx],
             workspace.ray_idx[active_buf_idx],
             workspace.ray_alive,
+            workspace.ray_active[active_buf_idx],
             pixel_start
         );
 
-        // initialize other ray properties
-
-        // ray_sigma = 0
-        CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_sigma[active_buf_idx], 0, batch_size * sizeof(float), stream));
-
-        // ray_active = true
-        CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_active[active_buf_idx], true, batch_size * sizeof(bool), stream));
-
         
-        float dt_min = NeRFConstants::min_step_size;
-        float dt_max = nerf->bounding_box.size_x * dt_min;
+        const float dt_min = NeRFConstants::min_step_size;
+        const float dt_max = nerf->bounding_box.size_x * dt_min;
         const float cone_angle = NeRFConstants::cone_angle;
 
         // ray marching loop
@@ -129,13 +123,16 @@ void NeRFRenderingController::request_render(
 
         // TODO: march rays to bounding box first
         while (n_rays_alive > 0) {
-            uint32_t network_batch = tcnn::next_multiple(n_rays_alive, tcnn::batch_size_granularity);
+
+            // need to figure out how many rays can fit in this batch
+            const uint32_t n_steps_per_ray = std::max((uint32_t)1, batch_size / n_rays_alive);
+            const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_rays_alive, tcnn::batch_size_granularity);
 
             // march each ray one step
-            // TODO: should we march potentially multiple steps to maximize occupancy?
             march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
                 batch_size,
+                n_steps_per_ray,
                 network_batch,
                 workspace.occupancy_grid,
                 workspace.bounding_box,
@@ -143,12 +140,17 @@ void NeRFRenderingController::request_render(
                 dt_min,
                 dt_max,
                 cone_angle,
+
+                // input buffers
                 workspace.ray_origin[active_buf_idx],
                 workspace.ray_dir[active_buf_idx],
                 workspace.ray_idir[active_buf_idx],
                 workspace.ray_alive,
                 workspace.ray_active[active_buf_idx],
                 workspace.ray_t[active_buf_idx],
+                workspace.ray_steps[active_buf_idx],
+
+                // output buffers
                 workspace.network_pos,
                 workspace.network_dir,
                 workspace.network_dt
@@ -164,17 +166,24 @@ void NeRFRenderingController::request_render(
                 workspace.network_output
             );
 
+            CHECK_DATA(steps_cpu_1, uint32_t, workspace.ray_steps[active_buf_idx], n_rays_alive);
+
             // accumulate these samples into the pixel colors
             composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
                 network_batch,
                 request.output.stride,
-                workspace.network_output,
-                workspace.network_dt,
-                workspace.ray_idx[active_buf_idx],
+
+                // input buffers
                 workspace.ray_active[active_buf_idx],
+                workspace.ray_steps[active_buf_idx],
+                workspace.ray_idx[active_buf_idx],
+                workspace.network_dt,
+                workspace.network_output,
+                
+                // output buffers
                 workspace.ray_alive,
-                workspace.ray_sigma[active_buf_idx],
+                workspace.ray_trans[active_buf_idx],
                 request.output.rgba
             );
 
@@ -213,7 +222,7 @@ void NeRFRenderingController::request_render(
                     workspace.ray_origin[active_buf_idx],
                     workspace.ray_dir[active_buf_idx],
                     workspace.ray_idir[active_buf_idx],
-                    workspace.ray_sigma[active_buf_idx],
+                    workspace.ray_trans[active_buf_idx],
 
                     // output
                     workspace.ray_idx[compact_buf_idx],
@@ -222,10 +231,8 @@ void NeRFRenderingController::request_render(
                     workspace.ray_origin[compact_buf_idx],
                     workspace.ray_dir[compact_buf_idx],
                     workspace.ray_idir[compact_buf_idx],
-                    workspace.ray_sigma[compact_buf_idx]
+                    workspace.ray_trans[compact_buf_idx]
                 );
-
-                
 
                 // all compacted rays are alive
                 CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_compact * sizeof(bool), stream));

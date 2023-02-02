@@ -92,15 +92,15 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t idx = i + start_idx;
 
     // (selection_threshold * 100)% of cells are sampled randomly, and half of the rest are sampled based on the current occupancy
-    if (selection_threshold < random_float[i]) {
-        if (selection_threshold < 0.5f * random_float[i]) {
-            if (!grid->is_occupied_at(level, idx)) {
-                return;
-            }
-        } else {
-            return;
-        }
-    }
+    // if (selection_threshold < random_float[i]) {
+    //     if (selection_threshold < 0.5f * random_float[i]) {
+    //         if (!grid->is_occupied_at(level, idx)) {
+    //             return;
+    //         }
+    //     } else {
+    //         return;
+    //     }
+    // }
     
     grid->update_sigma_at(level, idx, (float)network_sigma[i]);
 }

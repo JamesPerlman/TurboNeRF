@@ -22,8 +22,10 @@ __global__ void generate_rays_pinhole_kernel(
 	float* __restrict__ ray_dir,
 	float* __restrict__ ray_idir,
 	float* __restrict__ ray_t,
+	float* __restrict__ ray_trans,
     uint32_t* __restrict__ ray_idx,
 	bool* __restrict__ ray_alive,
+	bool* __restrict__ ray_active,
 	const uint32_t start_idx
 ) {
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -83,11 +85,16 @@ __global__ void generate_rays_pinhole_kernel(
 	ray_alive[i] = intersects_bbox;
 
     ray_idx[i] = idx;
+
+	ray_active[i] = true;
+
+	ray_trans[i] = 1.0f;
 }
 
 __global__ void march_rays_and_generate_network_inputs_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
+	const uint32_t n_steps_max,
 	const uint32_t network_stride,
 	const CascadedOccupancyGrid* occ_grid,
 	const BoundingBox* bbox,
@@ -107,6 +114,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
     float* __restrict__ ray_t,
 
 	// output buffers (write-only)
+	uint32_t* __restrict__ n_ray_steps,
 	float* __restrict__ network_pos,
 	float* __restrict__ network_dir,
 	float* __restrict__ network_dt
@@ -125,10 +133,6 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const uint32_t i_offset_1 = i_offset_0 + batch_size;
 	const uint32_t i_offset_2 = i_offset_1 + batch_size;
 
-	const uint32_t net_offset_0 = i;
-	const uint32_t net_offset_1 = net_offset_0 + network_stride;
-	const uint32_t net_offset_2 = net_offset_1 + network_stride;
-
 	const float o_x = ray_ori[i_offset_0];
 	const float o_y = ray_ori[i_offset_1];
 	const float o_z = ray_ori[i_offset_2];
@@ -142,10 +146,11 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const float id_z = ray_idir[i_offset_2];
 
 	// Perform raymarching
-
+	
 	float t = ray_t[i];
+	uint32_t n_steps = 0;
 
-	while (true) {
+	while (n_steps < n_steps_max) {
 		const float x = o_x + t * d_x;
 		const float y = o_y + t * d_y;
 		const float z = o_z + t * d_z;
@@ -159,21 +164,24 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
 
 		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
-			ray_t[i] = t + dt;
 
-			network_pos[net_offset_0] = x * inv_aabb_size + 0.5f;
-			network_pos[net_offset_1] = y * inv_aabb_size + 0.5f;
-			network_pos[net_offset_2] = z * inv_aabb_size + 0.5f;
-			
-			network_dir[net_offset_0] = 0.5f * d_x + 0.5f;
-			network_dir[net_offset_1] = 0.5f * d_y + 0.5f;
-			network_dir[net_offset_2] = 0.5f * d_z + 0.5f;
+			const uint32_t step_offset_0 = n_steps * n_rays + i; // coalesced!
+			const uint32_t step_offset_1 = step_offset_0 + network_stride;
+			const uint32_t step_offset_2 = step_offset_1 + network_stride;
 
-			network_dt[i] = dt * inv_aabb_size;
+			network_pos[step_offset_0] = x * inv_aabb_size + 0.5f;
+			network_pos[step_offset_1] = y * inv_aabb_size + 0.5f;
+			network_pos[step_offset_2] = z * inv_aabb_size + 0.5f;
 
-            // for now, we only march samples once.
-            break;
+			network_dir[step_offset_0] = 0.5f * d_x + 0.5f;
+			network_dir[step_offset_1] = 0.5f * d_y + 0.5f;
+			network_dir[step_offset_2] = 0.5f * d_z + 0.5f;
 
+			network_dt[step_offset_0] = dt * inv_aabb_size;
+
+			t += dt;
+
+			++n_steps;
 		} else {
 			// otherwise we need to find the next occupied cell
 			t += occ_grid->get_dt_to_next_voxel(
@@ -185,6 +193,9 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			);
 		}
 	}
+
+	ray_t[i] = t;
+	n_ray_steps[i] = n_steps;
 }
 
 // ray compaction
@@ -200,7 +211,7 @@ __global__ void compact_rays_kernel(
 	const float* __restrict__ in_origin,
 	const float* __restrict__ in_dir,
 	const float* __restrict__ in_idir,
-	const float* __restrict__ in_sigma,
+	const float* __restrict__ in_trans,
 
 	// compacted output buffers (write-only)
 	uint32_t* __restrict__ out_idx,
@@ -209,7 +220,7 @@ __global__ void compact_rays_kernel(
 	float* __restrict__ out_origin,
 	float* __restrict__ out_dir,
 	float* __restrict__ out_idir,
-	float* __restrict__ out_sigma
+	float* __restrict__ out_trans
 ) {
     // compacted index is the index to write to
     const int c_idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -223,7 +234,7 @@ __global__ void compact_rays_kernel(
 	out_idx[c_idx]		= in_idx[e_idx];
 	out_active[c_idx]	= in_active[e_idx];
 	out_t[c_idx]		= in_t[e_idx];
-	out_sigma[c_idx]	= in_sigma[e_idx];
+	out_trans[c_idx]	= in_trans[e_idx];
 
 	// local references to pointer offsets
 	const int c_offset_0 = c_idx;
@@ -251,84 +262,95 @@ __global__ void compact_rays_kernel(
 
 // alpha compositing kernel, composites the latest samples into the output image
 __global__ void composite_samples_kernel(
-    const uint32_t n_samples,
+	const uint32_t n_rays,
 	const uint32_t network_stride,
 	const uint32_t output_stride,
-    
+
     // read-only
-    const network_precision_t* __restrict__ network_output,
-    const float* __restrict__ sample_dt,
-    const uint32_t* __restrict__ sample_idx,
 	const bool* __restrict__ ray_active,
+	const uint32_t* __restrict__ n_ray_steps,
+    const uint32_t* __restrict__ ray_idx,
+    const float* __restrict__ sample_dt,
+    const network_precision_t* __restrict__ network_output,
 
     // read/write
     bool* __restrict__ ray_alive,
-	float* __restrict__ ray_sigma,
+	float* __restrict__ ray_trans,
     float* __restrict__ output_rgba
 ) {
-    const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (i >= n_samples) return;
+    if (idx >= n_rays) return;
 
     // check if ray has terminated or is currently inactive
-    if (!ray_alive[i] || !ray_active[i]) return;
+    if (!ray_alive[idx] || !ray_active[idx]) return;
 
-    // grab local references to global memory
+	// pixel indices
+	const uint32_t idx_offset_0 = ray_idx[idx];
+	const uint32_t idx_offset_1 = idx_offset_0 + output_stride;
+	const uint32_t idx_offset_2 = idx_offset_1 + output_stride;
+	const uint32_t idx_offset_3 = idx_offset_2 + output_stride;
 
-    // sample colors
-    const uint32_t net_offset_0 = i;
-    const uint32_t net_offset_1 = net_offset_0 + network_stride;
-    const uint32_t net_offset_2 = net_offset_1 + network_stride;
-	const uint32_t net_offset_3 = net_offset_2 + network_stride;
+	// accumulated pixel colors
+	float out_r = output_rgba[idx_offset_0];
+	float out_g = output_rgba[idx_offset_1];
+	float out_b = output_rgba[idx_offset_2];
+	float out_a = output_rgba[idx_offset_3];
 
-	const float s_r = __linear_to_srgb((float)network_output[net_offset_0]);
-	const float s_g = __linear_to_srgb((float)network_output[net_offset_1]);
-	const float s_b = __linear_to_srgb((float)network_output[net_offset_2]);
-	const float s_s = (float)network_output[net_offset_3];
+	// iterate through steps
+	const uint32_t n_steps = n_ray_steps[idx];
 
-	// sample sigma
-	const float sigma_dt = s_s * sample_dt[i];
+	float trans = ray_trans[idx];
 
-	// ray transmittance
-	const float r_t = __expf(-ray_sigma[i]);
+	for (int i = 0; i < n_steps; ++i) {
+		
+		const uint32_t step_offset_0 = i * n_rays + idx;
+		const uint32_t step_offset_1 = step_offset_0 + network_stride;
+		const uint32_t step_offset_2 = step_offset_1 + network_stride;
+		const uint32_t step_offset_3 = step_offset_2 + network_stride;
 
-	if (r_t <= 1e-4f) {
-		ray_alive[i] = false;
-		return;
+		// sample properties
+		const float dt = sample_dt[step_offset_0];
+		const float sigma = (float)network_output[step_offset_3];
+		const float alpha = 1.0f - __expf(-sigma * dt);
+		const float weight = alpha * trans;
+
+		// composite the same way we do accumulation during training
+		const float s_r = __linear_to_srgb((float)network_output[step_offset_0]);
+		const float s_g = __linear_to_srgb((float)network_output[step_offset_1]);
+		const float s_b = __linear_to_srgb((float)network_output[step_offset_2]);
+
+		out_r += weight * s_r;
+		out_g += weight * s_g;
+		out_b += weight * s_b;
+		out_a += weight;
+
+		// update and threshold transmittance
+		trans *= 1.0f - alpha;
+
+		if (trans <= 1e-4f) {
+			ray_alive[idx] = false;
+			break;
+		}
 	}
 
-    // sample alpha
-    const float s_a = 1.0f - __expf(-sigma_dt);
-
-	// sample weight
-	const float s_w = s_a * r_t;
-
-	// sigma cumulative sum
-	ray_sigma[i] += sigma_dt;
-
-    // pixel colors
-    const uint32_t idx_offset_0 = sample_idx[i];
-    const uint32_t idx_offset_1 = idx_offset_0 + output_stride;
-    const uint32_t idx_offset_2 = idx_offset_1 + output_stride;
-    const uint32_t idx_offset_3 = idx_offset_2 + output_stride;
-
-	// composite the same way we do accumulation during training
+	// maxed out alpha = normalize color components and terminate ray
+	// if (out_a >= 1.0f) {
+	// 	ray_alive[idx] = false;
 	
-	output_rgba[idx_offset_0] += s_w * s_r;
-	output_rgba[idx_offset_1] += s_w * s_g;
-	output_rgba[idx_offset_2] += s_w * s_b;
-	output_rgba[idx_offset_3] += s_w;
+	// 	out_r /= out_a;
+	// 	out_g /= out_a;
+	// 	out_b /= out_a;
+	// 	out_a = 1.0f;
+	// }
 
-	const float out_a = output_rgba[idx_offset_3];
+	output_rgba[idx_offset_0] = out_r;
+	output_rgba[idx_offset_1] = out_g;
+	output_rgba[idx_offset_2] = out_b;
+	output_rgba[idx_offset_3] = out_a;
 
-	if (out_a >= 1.0f) {
-		ray_alive[i] = false;
-	
-		output_rgba[idx_offset_0] /= out_a;
-		output_rgba[idx_offset_1] /= out_a;
-		output_rgba[idx_offset_2] /= out_a;
-		output_rgba[idx_offset_3] = 1.0f;
-	}
+	ray_trans[idx] = trans;
+
 }
 
 NRC_NAMESPACE_END
