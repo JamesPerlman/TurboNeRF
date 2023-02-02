@@ -43,6 +43,7 @@ struct RenderingWorkspace: Workspace {
 	float* network_pos;
 	float* network_dir;
 	float* network_dt;
+	float* sample_alpha;
 
 	// network buffers
 	tcnn::network_precision_t* network_concat;
@@ -111,6 +112,7 @@ struct RenderingWorkspace: Workspace {
 		network_pos		= allocate<float>(stream, 3 * batch_size);
 		network_dir		= allocate<float>(stream, 3 * batch_size);
 		network_dt		= allocate<float>(stream, batch_size);
+		sample_alpha	= allocate<float>(stream, batch_size);
 
 		// network
 		network_concat	= allocate<tcnn::network_precision_t>(stream, n_network_concat_elements * batch_size);

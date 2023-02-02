@@ -360,8 +360,8 @@ __global__ void composite_samples_kernel(
 	const bool* __restrict__ ray_active,
 	const uint32_t* __restrict__ n_ray_steps,
     const uint32_t* __restrict__ ray_idx,
-    const float* __restrict__ sample_dt,
-    const network_precision_t* __restrict__ network_output,
+	const network_precision_t* __restrict__ network_output,
+    const float* __restrict__ sample_alpha,
 
     // read/write
     bool* __restrict__ ray_alive,
@@ -400,9 +400,7 @@ __global__ void composite_samples_kernel(
 		const uint32_t step_offset_3 = step_offset_2 + network_stride;
 
 		// sample properties
-		const float dt = sample_dt[step_offset_0];
-		const float sigma = (float)network_output[step_offset_3];
-		const float alpha = 1.0f - __expf(-sigma * dt);
+		const float alpha = sample_alpha[step_offset_0];
 		const float weight = alpha * trans;
 
 		// composite the same way we do accumulation during training

@@ -6,6 +6,7 @@
 #include "../common.h"
 #include "../models/bounding-box.cuh"
 #include "../utils/nerf-constants.cuh"
+#include "common-network-kernels.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -53,14 +54,6 @@ inline __device__ float sigma_to_trans(
     return __expf(-sigma_dt);
 }
 
-inline __device__ float sigma_to_alpha(
-    const float* __restrict__ sigma,
-    const float* __restrict__ dt,
-    const int& i
-) {
-    return 1.0f - __expf(-sigma[i] * dt[i]);
-}
-
 /**
  * Apply exponential scaling to density network output
  * (log-space density!)
@@ -92,20 +85,6 @@ __global__ void density_to_sigma_backward_kernel(
 	if (i >= n_samples) return;
 	
 	dL_ddensity[i] = dL_dsigma[i] * density_to_sigma(density[i]);
-}
-
-// sigma to alpha - we don't need a backward pass for this
-__global__ void sigma_to_alpha_forward_kernel(
-	uint32_t n_samples,
-	const float* __restrict__ sigma,
-	const float* __restrict__ dt,
-	float* __restrict__ alpha
-) {
-	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (i >= n_samples) return;
-
-	alpha[i] = sigma_to_alpha(sigma, dt, i);
 }
 
 // sigma to ray color

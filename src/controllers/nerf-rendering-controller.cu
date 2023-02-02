@@ -190,6 +190,14 @@ void NeRFRenderingController::request_render(
                 workspace.network_output
             );
 
+            // save alpha in an buffer
+            sigma_to_alpha_forward_kernel<<<n_blocks_linear(network_batch), n_threads_linear, 0, stream>>>(
+                network_batch,
+                workspace.network_output + 3 * network_batch,
+                workspace.network_dt,
+                workspace.sample_alpha
+            );
+
             // accumulate these samples into the pixel colors
             composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
@@ -200,8 +208,8 @@ void NeRFRenderingController::request_render(
                 workspace.ray_active[active_buf_idx],
                 workspace.ray_steps[active_buf_idx],
                 workspace.ray_idx[active_buf_idx],
-                workspace.network_dt,
                 workspace.network_output,
+                workspace.sample_alpha,
                 
                 // output buffers
                 workspace.ray_alive,
@@ -273,7 +281,7 @@ void NeRFRenderingController::request_render(
                 n_rays_alive = n_rays_to_compact;
 
                 n_steps = 0;
-            }
+            }                                                                                                                                                                                                                                                                                                              
         }
         // increment the number of pixels filled
         n_pixels_filled += n_pixels_to_fill;

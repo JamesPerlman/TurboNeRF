@@ -8,6 +8,7 @@
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
 #include "../models/cascaded-occupancy-grid.cuh"
+#include "common-network-kernels.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -113,8 +114,8 @@ __global__ void composite_samples_kernel(
 	const bool* __restrict__ ray_active,
 	const uint32_t* __restrict__ n_ray_steps,
     const uint32_t* __restrict__ ray_idx,
-    const float* __restrict__ sample_dt,
-    const tcnn::network_precision_t* __restrict__ network_output,
+	const tcnn::network_precision_t* __restrict__ network_output,
+	const float* __restrict__ sample_alpha,
 
     // read/write
     bool* __restrict__ ray_alive,
