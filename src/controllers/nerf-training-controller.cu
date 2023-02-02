@@ -122,7 +122,9 @@ void NeRFTrainingController::load_images(const cudaStream_t& stream) {
   * 6. Repeat steps 0-5 until the batch is full enough
  */
 
-void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
+void NeRFTrainingController::generate_next_training_batch(
+	const cudaStream_t& stream
+) {
 
 	// Generate random floats for use in training
 
@@ -163,8 +165,6 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		workspace.ray_alive
 	);
 
-	// Count the number of steps each ray will take
-	
 	const float dt_min = NeRFConstants::min_step_size;
 	const float dt_max = dataset.bounding_box.size_x * dt_min;
 	const float cone_angle = NeRFConstants::cone_angle;
@@ -247,6 +247,7 @@ void NeRFTrainingController::generate_next_training_batch(cudaStream_t stream) {
 		cone_angle,
 
 		// input buffers
+		workspace.random_float,
 		workspace.ray_origin,
 		workspace.ray_dir,
 		workspace.ray_inv_dir,

@@ -50,7 +50,7 @@ private:
 	curandGenerator_t rng;
 	
 	// private methods
-	void generate_next_training_batch(cudaStream_t stream);
+	void generate_next_training_batch(const cudaStream_t& stream);
 };
 
 NRC_NAMESPACE_END
