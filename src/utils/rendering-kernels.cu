@@ -335,23 +335,12 @@ __global__ void composite_samples_kernel(
 		}
 	}
 
-	// maxed out alpha = normalize color components and terminate ray
-	// if (out_a >= 1.0f) {
-	// 	ray_alive[idx] = false;
-	
-	// 	out_r /= out_a;
-	// 	out_g /= out_a;
-	// 	out_b /= out_a;
-	// 	out_a = 1.0f;
-	// }
-
 	output_rgba[idx_offset_0] = out_r;
 	output_rgba[idx_offset_1] = out_g;
 	output_rgba[idx_offset_2] = out_b;
 	output_rgba[idx_offset_3] = out_a;
 
 	ray_trans[idx] = trans;
-
 }
 
 NRC_NAMESPACE_END

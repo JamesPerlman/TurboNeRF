@@ -120,12 +120,14 @@ void NeRFRenderingController::request_render(
 
         // ray marching loop
         uint32_t n_rays_alive = n_rays;
+        
+        int n_steps = 0;
 
         // TODO: march rays to bounding box first
         while (n_rays_alive > 0) {
 
             // need to figure out how many rays can fit in this batch
-            const uint32_t n_steps_per_ray = std::max((uint32_t)1, batch_size / n_rays_alive);
+            const uint32_t n_steps_per_ray = std::max(batch_size / n_rays_alive, (uint32_t)1);
             const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_rays_alive, tcnn::batch_size_granularity);
 
             // march each ray one step
@@ -148,9 +150,9 @@ void NeRFRenderingController::request_render(
                 workspace.ray_alive,
                 workspace.ray_active[active_buf_idx],
                 workspace.ray_t[active_buf_idx],
-                workspace.ray_steps[active_buf_idx],
 
                 // output buffers
+                workspace.ray_steps[active_buf_idx],
                 workspace.network_pos,
                 workspace.network_dir,
                 workspace.network_dt
@@ -165,8 +167,6 @@ void NeRFRenderingController::request_render(
                 workspace.network_concat,
                 workspace.network_output
             );
-
-            CHECK_DATA(steps_cpu_1, uint32_t, workspace.ray_steps[active_buf_idx], n_rays_alive);
 
             // accumulate these samples into the pixel colors
             composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
@@ -186,6 +186,11 @@ void NeRFRenderingController::request_render(
                 workspace.ray_trans[active_buf_idx],
                 request.output.rgba
             );
+
+            n_steps += n_steps_per_ray;
+            if (n_steps < NeRFConstants::n_steps_per_render_compaction) {
+                continue;
+            }
 
             // update how many rays are still alive
             const int n_rays_to_compact = count_true_elements(
@@ -240,8 +245,12 @@ void NeRFRenderingController::request_render(
                 // swap the active and compact buffer indices
                 std::swap(active_buf_idx, compact_buf_idx);
 
+                printf("compacted %d rays to %d rays\n", n_rays_alive, n_rays_to_compact);
+
                 // update n_rays_alive
                 n_rays_alive = n_rays_to_compact;
+
+                n_steps = 0;
             }
         }
         // increment the number of pixels filled
