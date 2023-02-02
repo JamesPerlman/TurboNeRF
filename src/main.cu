@@ -76,9 +76,8 @@ int main()
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
 			trainer.update_occupancy_grid(stream, cell_selection_threshold);
 		}
-		// if indices_vector contains the number i, then render
 
-		if (i % 256 == 0 && i > 0) {
+		if (i % 16 == 0 && i > 0) {
 			float progress = 0.0f;
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
@@ -94,6 +93,7 @@ int main()
 			auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);
 			render_request.output.clear(stream);
 			renderer.request_render(stream, render_request);
+			printf("Done!\n");
 			render_request.output.save_image(stream, OUTPUT_PATH + fmt::format("img-{}.png", i));
 		}
 	}
