@@ -4,3 +4,6 @@
 [submodule "includes/glfw"]
 	path = includes/glfw
 	url = https://github.com/glfw/glfw.git
+[submodule "includes/pybind"]
+	path = includes/pybind
+	url = git@github.com:pybind/pybind11.git

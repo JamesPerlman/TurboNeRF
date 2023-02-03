@@ -1,4 +1,4 @@
-﻿# CMakeList.txt : Top-level CMake project file, do global configuration
+# CMakeList.txt : Top-level CMake project file, do global configuration
 # and include sub-projects here.
 #
 cmake_minimum_required (VERSION 3.24)
@@ -28,7 +28,7 @@ include_directories(${CUDA_INCLUDE_DIRS})
 
 # glfw
 add_subdirectory(includes/glfw)
-include_directories(${GLFW_INCLUDE_DIRS})
+include_directories(includes/glfw/include)
 
 # Include sub-projects.
 
