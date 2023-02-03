@@ -80,7 +80,7 @@ void NeRFTrainingController::prepare_for_training(
 	// Load all images into GPU memory!
 	load_images(stream);
 
-	// create the undistort map for camera 0 - assumption: all cameras have identical distortion params
+	// create the undistort map for camera 0 - assumption: all cameras have identical dist_params params
 	create_pixel_undistort_map(stream, dataset.cameras[0]);
 
 	// Since there is no previous step here, we set the number of previous rays to the batch size
@@ -124,7 +124,7 @@ void NeRFTrainingController::create_pixel_undistort_map(
 	const dim3 block(16, 16);
 	const dim3 grid((w + block.x - 1) / block.x, (h + block.y - 1) / block.y);
 
-	// create the undistort map for camera 0 - assumption: all cameras have identical distortion params
+	// create the undistort map for camera 0 - assumption: all cameras have identical dist_params params
 	generate_undistorted_pixel_map_kernel<<<next_multiple(n_pixels, batch_size_granularity), n_threads_linear, 0, stream>>>(
 		n_pixels,
 		camera,

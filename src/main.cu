@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -25,10 +25,13 @@
 #include "utils/nerf-constants.cuh"
 #include "models/cascaded-occupancy-grid.cuh"
 
+#include "integrations/blender.cuh"
+
 using namespace tcnn;
 using namespace nrc;
 int main()
 {
+	test();
 	// path to downloaded dataset
 	std::string DATASET_PATH = "E:\\2022\\nerf-library\\testdata\\lego\\transforms.json";
 	// path to write images to
@@ -78,7 +81,7 @@ int main()
 		}
 
 		if (i % 16 == 0 && i > 0) {
-			float progress = 0.0f;
+			float progress = (float)i / (360.f * 16.0f);
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
@@ -88,7 +91,7 @@ int main()
 				make_int2(1024, 1024),
 				cam0.sensor_size,
 				tform,
-				cam0.distortion
+				cam0.dist_params
 			);
 
 			auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);

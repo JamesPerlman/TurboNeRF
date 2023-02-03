@@ -33,7 +33,7 @@ struct Camera {
 	float2 resolution_f;
 	float2 sensor_size;
 	Matrix4f transform;
-	DistortionParams distortion;
+	DistortionParams dist_params;
 
 	// constructor
 	Camera(
@@ -43,7 +43,7 @@ struct Camera {
 		int2 resolution,
 		float2 sensor_size,
 		Matrix4f transform,
-		DistortionParams distortion = DistortionParams()
+		DistortionParams dist_params = DistortionParams()
 	)
 		: near(near)
 		, far(far)
@@ -52,7 +52,7 @@ struct Camera {
 		, resolution_f(make_float2(float(resolution.x), float(resolution.y)))
 		, sensor_size(sensor_size)
 		, transform(transform)
-		, distortion(distortion)
+		, dist_params(dist_params)
 	{ }
 
 	// member functions

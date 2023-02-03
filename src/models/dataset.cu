@@ -43,7 +43,7 @@ Dataset::Dataset(string file_path) {
     uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
     bounding_box = BoundingBox((float)aabb_size);
 
-    DistortionParams distortion_params(
+    DistortionParams dist_params(
         json_data.value("k1", 0.0f),
         json_data.value("k2", 0.0f),
         json_data.value("k3", 0.0f),
@@ -68,7 +68,7 @@ Dataset::Dataset(string file_path) {
             near / focal_length.y * sensor_size.y
         };
 
-        cameras.emplace_back(near, far, focal_length, image_dimensions, sens_size, camera_matrix, distortion_params);
+        cameras.emplace_back(near, far, focal_length, image_dimensions, sens_size, camera_matrix, dist_params);
 
         // images
         string file_path = frame["file_path"];

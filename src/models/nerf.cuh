@@ -23,7 +23,7 @@ struct NeRF {
     // transform
     // bounding box (training, rendering)
     // masks
-    // distortions
+    // dist_paramss
 };
 
 NRC_NAMESPACE_END
