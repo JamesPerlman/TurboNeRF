@@ -19,6 +19,7 @@ https://github.com/KAIR-BAIR/nerfacc [[LICENSE](https://github.com/KAIR-BAIR/ner
 https://github.com/ashawkey/torch-ngp [[LICENSE](https://github.com/ashawkey/torch-ngp/blob/main/LICENSE)]  
 https://github.com/google/nerfies [[LICENSE](https://github.com/google/nerfies/blob/main/LICENSE)]  
 https://github.com/glfw/glfw [[LICENSE](https://github.com/glfw/glfw/blob/master/LICENSE.md)]  
+https://github.com/pybind/pybind11 [[LICENSE](https://github.com/pybind/pybind11/blob/master/LICENSE)]  
 
 LICENSES TO BE ADDED TO CODEBASE SOON.  CHECK LICENSES/ DIRECTORY
 
@@ -28,7 +29,7 @@ LICENSES TO BE ADDED TO CODEBASE SOON.  CHECK LICENSES/ DIRECTORY
 Extreme thank yous to these subscribers on Twitch (https://twitch.tv/jperldev) who support this project's development!
 
 madclawgonzo - Requested a haiku written by ChatGPT: "Madclawgonzo / Subscribing to your stream / Software project."  
-anonymous  - Requested to remain anonymous  
+anonymous - Requested to remain anonymous  
 gusround - https://github.com/candidogustavo  
 slowcon - "uncle slowcon is here with the 4090"  
 likid_3 - <3  
@@ -38,6 +39,7 @@ seferidis - (pending message)
 memepp - (pending message)  
 Dakren12 - (pending message)  
 Relakin - (Confused)  
+flouwr - (pending message)  
 
 ## CITATIONS
 

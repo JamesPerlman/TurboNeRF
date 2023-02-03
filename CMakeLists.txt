@@ -1,4 +1,4 @@
-# CMakeList.txt : Top-level CMake project file, do global configuration
+﻿# CMakeList.txt : Top-level CMake project file, do global configuration
 # and include sub-projects here.
 #
 cmake_minimum_required (VERSION 3.24)
@@ -29,6 +29,12 @@ include_directories(${CUDA_INCLUDE_DIRS})
 # glfw
 add_subdirectory(includes/glfw)
 include_directories(includes/glfw/include)
+
+# pybind11
+add_subdirectory(includes/pybind11)
+include_directories(pybind11_INCLUDE_DIRS)
+set (PYBIND11_PYTHON_VERSION "3.10")
+pybind11_add_module(PyNeRFRenderCore src/api/python_bindings.cpp)
 
 # Include sub-projects.
 
@@ -90,6 +96,9 @@ set(HEADERS
 )
 
 set(SOURCES
+	# api
+	src/api/python_bindings.cpp
+
 	# controllers
 	src/controllers/nerf-rendering-controller.cu
 	src/controllers/nerf-training-controller.cu
@@ -126,6 +135,7 @@ target_link_libraries(${PROJECT_NAME}
 	${CUDA_LIBRARIES}
 	curand
 	cublas
-	tiny-cuda-nn
 	glfw
+	pybind11::module
+	tiny-cuda-nn
 )
