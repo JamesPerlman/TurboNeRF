@@ -26,12 +26,15 @@ SET(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_LIST})
 find_package(CUDA 12.0 REQUIRED)
 include_directories(${CUDA_INCLUDE_DIRS})
 
+# glfw
+add_subdirectory(includes/glfw)
+include_directories(${GLFW_INCLUDE_DIRS})
+
 # Include sub-projects.
 
 set(TCNN_BUILD_EXAMPLES OFF)
 set(TCNN_BUILD_BENCHMARK OFF)
 add_subdirectory(includes/tiny-cuda-nn)
-
 
 # src project
 
@@ -39,6 +42,9 @@ set(HEADERS
 	# controllers
 	src/controllers/nerf-rendering-controller.h
 	src/controllers/nerf-training-controller.h
+
+	# integrations
+	src/integrations/blender.cuh
 
 	# models
 	src/models/bounding-box.cuh
@@ -121,4 +127,5 @@ target_link_libraries(${PROJECT_NAME}
 	curand
 	cublas
 	tiny-cuda-nn
+	glfw
 )
