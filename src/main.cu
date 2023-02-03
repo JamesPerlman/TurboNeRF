@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -87,7 +87,8 @@ int main()
 				cam0.focal_length,
 				make_int2(1024, 1024),
 				cam0.sensor_size,
-				tform
+				tform,
+				cam0.distortion
 			);
 
 			auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);
