@@ -18,6 +18,7 @@ https://github.com/nerfstudio-project/nerfstudio [[LICENSE](https://github.com/n
 https://github.com/KAIR-BAIR/nerfacc [[LICENSE](https://github.com/KAIR-BAIR/nerfacc/blob/master/LICENSE)]  
 https://github.com/ashawkey/torch-ngp [[LICENSE](https://github.com/ashawkey/torch-ngp/blob/main/LICENSE)]  
 https://github.com/google/nerfies [[LICENSE](https://github.com/google/nerfies/blob/main/LICENSE)]  
+https://github.com/glfw/glfw [[LICENSE](https://github.com/glfw/glfw/blob/master/LICENSE.md)]  
 
 LICENSES TO BE ADDED TO CODEBASE SOON.  CHECK LICENSES/ DIRECTORY
 
