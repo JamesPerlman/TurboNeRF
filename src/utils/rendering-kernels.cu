@@ -40,7 +40,7 @@ __global__ void generate_rays_pinhole_kernel(
 	uint32_t x = idx % cam->pixel_dims.x;
 	uint32_t y = idx / cam->pixel_dims.x;
 
-	Ray local_ray = cam->local_ray_at_pixel_xy(x, y);
+	Ray local_ray = cam->local_ray_at_pixel_xy_index(x, y);
 
     float3 global_origin = cam->transform * local_ray.o;
 	float3 global_direction = cam->transform * local_ray.d - cam->transform.get_translation();

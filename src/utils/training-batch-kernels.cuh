@@ -60,10 +60,12 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
 	const uint32_t n_images,
+	const uint32_t n_pixels_per_image,
 	const uint32_t image_data_stride,
 	const int2 image_dimensions,
 	const BoundingBox* __restrict__ bbox,
 	const Camera* __restrict__ cameras,
+	const float* __restrict__ undistort_map,
 	const stbi_uc* __restrict__ image_data,
 	const uint32_t* __restrict__ img_index,
 	const uint32_t* __restrict__ pix_index,
@@ -87,10 +89,14 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t image_idx = img_index[i];
 	const uint32_t pixel_idx = pix_index[i];
 	
-	const uint32_t pixel_x = pixel_idx % image_dimensions.x;
-	const uint32_t pixel_y = pixel_idx / image_dimensions.x;
-	const uint32_t x = pixel_x;
-	const uint32_t y = pixel_y;
+
+	const float x = undistort_map[pixel_idx + 0 * n_pixels_per_image];
+	const float y = undistort_map[pixel_idx + 1 * n_pixels_per_image];
+
+	// const uint32_t pixel_x = pixel_idx % image_dimensions.x;
+	// const uint32_t pixel_y = pixel_idx / image_dimensions.x;
+	// const uint32_t x = pixel_x;
+	// const uint32_t y = pixel_y;
 	const Camera cam = cameras[image_idx];
 	
 	const uint32_t img_offset = image_idx * image_data_stride;
@@ -107,7 +113,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	pix_rgba[i_offset_3] = (float)a / 255.0f;
 	
 	// TODO: optimize
-	Ray local_ray = cam.local_ray_at_pixel_xy(x, y);
+	Ray local_ray = cam.local_ray_at_pixel_xy_normalized(x, y);
 
 	float3 global_origin = cam.transform * local_ray.o;
 	float3 global_direction = cam.transform.mmul_ul3x3(local_ray.d);

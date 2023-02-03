@@ -28,7 +28,6 @@ struct NeRFTrainingController {
 
 	// public methods
 	void prepare_for_training(const cudaStream_t& stream, const uint32_t& batch_size);
-	void load_images(const cudaStream_t& stream);
 	void train_step(const cudaStream_t& stream);
 	void update_occupancy_grid(const cudaStream_t& stream, const float& selection_threshold);
 
@@ -51,6 +50,8 @@ private:
 	
 	// private methods
 	void generate_next_training_batch(const cudaStream_t& stream);
+	void load_images(const cudaStream_t& stream);
+	void create_pixel_undistort_map(const cudaStream_t& stream, const Camera& camera);
 };
 
 NRC_NAMESPACE_END

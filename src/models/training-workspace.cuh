@@ -27,6 +27,9 @@ public:
 
 	stbi_uc* image_data;
 
+	// the data in this buffer maps pixel centers to their undistorted positions
+	float* undistort_map;
+
 	float* random_float;
 	uint32_t* img_index;
 	uint32_t* pix_index; // index of randomly selected pixel in image
@@ -102,6 +105,8 @@ public:
 		occ_grid 		= allocate<CascadedOccupancyGrid>(stream, 1);
 		bounding_box 	= allocate<BoundingBox>(stream, 1);
 		image_data 		= allocate<stbi_uc>(stream, n_pixel_elements);
+
+		undistort_map	= allocate<float>(stream, 2 * n_pixels_per_image);
 
 		random_float 	= allocate<float>(stream, 4 * batch_size);
 

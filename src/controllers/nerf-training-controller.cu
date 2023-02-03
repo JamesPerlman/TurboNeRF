@@ -8,10 +8,11 @@
 
 #include "nerf-training-controller.h"
 
-#include "../utils/stream-compaction.cuh"
+#include "../utils/camera-kernels.cuh"
 #include "../utils/nerf-constants.cuh"
 #include "../utils/occupancy-grid-kernels.cuh"
 #include "../utils/parallel-utils.cuh"
+#include "../utils/stream-compaction.cuh"
 #include "../utils/training-batch-kernels.cuh"
 
 #include "../common.h"
@@ -79,6 +80,9 @@ void NeRFTrainingController::prepare_for_training(
 	// Load all images into GPU memory!
 	load_images(stream);
 
+	// create the undistort map for camera 0 - assumption: all cameras have identical distortion params
+	create_pixel_undistort_map(stream, dataset.cameras[0]);
+
 	// Since there is no previous step here, we set the number of previous rays to the batch size
 	// so that the training batch generator will generate a full batch of rays
 	n_rays_in_batch = workspace.batch_size;
@@ -106,6 +110,28 @@ void NeRFTrainingController::load_images(const cudaStream_t& stream) {
 	);
 
 	printf("All images loaded to GPU.\n");
+}
+
+void NeRFTrainingController::create_pixel_undistort_map(
+	const cudaStream_t& stream,
+	const Camera& camera
+) {
+	const uint32_t w = camera.pixel_dims.x;
+	const uint32_t h = camera.pixel_dims.y;
+
+	const uint32_t n_pixels = w * h;
+
+	const dim3 block(16, 16);
+	const dim3 grid((w + block.x - 1) / block.x, (h + block.y - 1) / block.y);
+
+	// create the undistort map for camera 0 - assumption: all cameras have identical distortion params
+	generate_undistorted_pixel_map_kernel<<<next_multiple(n_pixels, batch_size_granularity), n_threads_linear, 0, stream>>>(
+		n_pixels,
+		camera,
+		workspace.undistort_map
+	);
+
+	CHECK_DATA(undist_cpu, float, workspace.undistort_map, 2 * n_pixels);
 }
 
 /**
@@ -150,10 +176,12 @@ void NeRFTrainingController::generate_next_training_batch(
 		n_rays_in_batch,
 		workspace.batch_size,
 		dataset.images.size(),
+		dataset.n_pixels_per_image,
 		dataset.n_pixels_per_image * dataset.n_channels_per_image,
 		dataset.image_dimensions,
 		workspace.bounding_box,
 		workspace.cameras.data(),
+		workspace.undistort_map,
 		workspace.image_data,
 		workspace.img_index,
 		workspace.pix_index,
