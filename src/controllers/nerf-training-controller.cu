@@ -116,8 +116,8 @@ void NeRFTrainingController::create_pixel_undistort_map(
 	const cudaStream_t& stream,
 	const Camera& camera
 ) {
-	const uint32_t w = camera.pixel_dims.x;
-	const uint32_t h = camera.pixel_dims.y;
+	const uint32_t w = camera.resolution.x;
+	const uint32_t h = camera.resolution.y;
 
 	const uint32_t n_pixels = w * h;
 

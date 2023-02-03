@@ -112,8 +112,8 @@ __global__ void generate_undistorted_pixel_map_kernel(
         return;
     }
     
-    const uint32_t w = camera.pixel_dims.x;
-    const uint32_t h = camera.pixel_dims.y;
+    const uint32_t w = camera.resolution.x;
+    const uint32_t h = camera.resolution.y;
 
     const float k1 = camera.distortion.k1;
     const float k2 = camera.distortion.k2;

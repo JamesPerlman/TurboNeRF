@@ -37,8 +37,8 @@ __global__ void generate_rays_pinhole_kernel(
 
 	uint32_t idx = start_idx + i;
 	
-	uint32_t x = idx % cam->pixel_dims.x;
-	uint32_t y = idx / cam->pixel_dims.x;
+	uint32_t x = idx % cam->resolution.x;
+	uint32_t y = idx / cam->resolution.x;
 
 	Ray local_ray = cam->local_ray_at_pixel_xy_index(x, y);
 

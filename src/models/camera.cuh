@@ -29,23 +29,31 @@ struct Camera {
 	float near;
 	float far;
 	float2 focal_length;
-	int2 pixel_dims;
-	float2 pixel_dims_f;
+	int2 resolution;
+	float2 resolution_f;
 	float2 sensor_size;
 	Matrix4f transform;
 	DistortionParams distortion;
 
 	// constructor
-	Camera(float near, float far, float2 focal_length, int2 pixel_dims, float2 sensor_size, Matrix4f transform, DistortionParams distortion) {
-		this->near = near;
-		this->far = far;
-		this->focal_length = focal_length;
-		this->pixel_dims = pixel_dims;
-		this->pixel_dims_f = make_float2(float(pixel_dims.x), float(pixel_dims.y));
-		this->sensor_size = sensor_size;
-		this->transform = transform;
-		this->distortion = distortion;
-	}
+	Camera(
+		float near,
+		float far,
+		float2 focal_length,
+		int2 resolution,
+		float2 sensor_size,
+		Matrix4f transform,
+		DistortionParams distortion = DistortionParams()
+	)
+		: near(near)
+		, far(far)
+		, focal_length(focal_length)
+		, resolution(resolution)
+		, resolution_f(make_float2(float(resolution.x), float(resolution.y)))
+		, sensor_size(sensor_size)
+		, transform(transform)
+		, distortion(distortion)
+	{ }
 
 	// member functions
 
@@ -55,8 +63,8 @@ struct Camera {
 		
 		// sx and sy are the corresponding x and y in the sensor rect's 2D coordinate system
 		// this will put rays at pixel centers
-		const float sx = sensor_size.x * ((float(x) + 0.5f) / (pixel_dims_f.x) - 0.5f);
-		const float sy = sensor_size.y * ((float(y) + 0.5f) / (pixel_dims_f.y) - 0.5f);
+		const float sx = sensor_size.x * ((float(x) + 0.5f) / (resolution_f.x) - 0.5f);
+		const float sy = sensor_size.y * ((float(y) + 0.5f) / (resolution_f.y) - 0.5f);
 
 		float3 pix_pos = make_float3(sx, sy, near);
 

@@ -61,7 +61,7 @@ Dataset::Dataset(string file_path) {
         Matrix4f transform_matrix(frame["transform_matrix"]);
 
         Matrix4f camera_matrix = nerf_to_nrc(transform_matrix);
-        
+
         // TODO: per-camera dimensions
         float2 sens_size{
             near / focal_length.x * sensor_size.x,
