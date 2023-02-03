@@ -60,6 +60,7 @@ set(HEADERS
 
 	# utils
 	src/utils/bit-utils.cuh
+	src/utils/camera-kernels.cuh
 	src/utils/color-utils.cuh
 	src/utils/common-network-kernels.cuh
 	src/utils/coordinate-transformations.cuh
