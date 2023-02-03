@@ -34,7 +34,6 @@ include_directories(includes/glfw/include)
 add_subdirectory(includes/pybind11)
 include_directories(pybind11_INCLUDE_DIRS)
 set (PYBIND11_PYTHON_VERSION "3.10")
-pybind11_add_module(PyNeRFRenderCore src/api/python_bindings.cpp)
 
 # Include sub-projects.
 
@@ -96,9 +95,6 @@ set(HEADERS
 )
 
 set(SOURCES
-	# api
-	src/api/python_bindings.cpp
-
 	# controllers
 	src/controllers/nerf-rendering-controller.cu
 	src/controllers/nerf-training-controller.cu
@@ -119,7 +115,9 @@ set(SOURCES
 	src/main.cu	
 )
 
+# Build results
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+pybind11_add_module(PyNeRFRenderCore src/api/python_bindings.cu)
 
 # Set stricter compile flag
 target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler)
@@ -128,14 +126,26 @@ target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler)
 set_target_properties(${PROJECT_NAME} PROPERTIES
 	CUDA_RESOLVE_DEVICE_SYMBOLS ON
 	CUDA_SEPARABLE_COMPILATION ON
+	INTERPROCEDURAL_OPTIMIZATION TRUE
 )
 
-target_link_libraries(${PROJECT_NAME}
-	PUBLIC
+set(NeRFRenderCore_LIBRARIES
+	PRIVATE
 	${CUDA_LIBRARIES}
 	curand
 	cublas
 	glfw
-	pybind11::module
 	tiny-cuda-nn
+)
+
+target_link_libraries(${PROJECT_NAME}
+	PRIVATE
+	${NeRFRenderCore_LIBRARIES}
+	pybind11::module
+)
+
+target_link_libraries(PyNeRFRenderCore
+	PRIVATE
+	${NeRFRenderCore_LIBRARIES}
+	pybind11::module
 )
