@@ -1,5 +1,6 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <string>
 
 #include "../utils/linalg/transform4f.cuh"
 #include "../models/camera.cuh"
@@ -76,6 +77,12 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
             py::arg("sensor_size"),
             py::arg("transform"),
             py::arg("dist_params") = DistortionParams()
+        );
+
+    py::class_<Dataset>(m, "Dataset")
+        .def(
+            py::init<const string&>(),
+            py::arg("file_path")
         );
 
     /**
