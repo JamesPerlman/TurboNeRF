@@ -15,11 +15,11 @@
 
 #include "../common.h"
 #include "../utils/bit-utils.cuh"
-#include "cascaded-occupancy-grid-workspace.cuh"
+#include "../workspaces/occupancy-grid-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 
-struct CascadedOccupancyGrid {
+struct OccupancyGrid {
 	const int n_levels;
 	const float resolution_f;
 	const float inv_resolution_f;
@@ -27,9 +27,9 @@ struct CascadedOccupancyGrid {
 	const int half_res_i;
 	const uint32_t volume_i;
 
-	CascadedOccupancyGridWorkspace workspace;
+	OccupancyGridWorkspace workspace;
 
-	CascadedOccupancyGrid(const int& n_levels, const int& resolution = 128)
+	OccupancyGrid(const int& n_levels, const int& resolution = 128)
 		: n_levels(n_levels)
 		, resolution_i(resolution)
 		, resolution_f(resolution)
@@ -38,7 +38,7 @@ struct CascadedOccupancyGrid {
 		, volume_i(resolution * resolution * resolution)
 	{};
 
-	CascadedOccupancyGrid() = default;
+	OccupancyGrid() = default;
 
 	// class function to calculate number of bytes needed to store the grid
 	static inline NRC_HOST_DEVICE size_t get_n_total_elements(
@@ -98,11 +98,11 @@ struct CascadedOccupancyGrid {
 	}
 
 	// instance function to return the number of elements in this grid
-	inline uint32_t NRC_HOST_DEVICE get_n_total_elements() const {
+	inline uint32_t __host__ get_n_total_elements() const {
 		return workspace.n_total_elements;
 	}
 
-	inline uint32_t NRC_HOST_DEVICE get_n_bitfield_elements() const {
+	inline uint32_t __host__ get_n_bitfield_elements() const {
 		return workspace.n_bitfield_elements;
 	}
 	
@@ -228,7 +228,7 @@ struct CascadedOccupancyGrid {
 		const float y = (ray_pos_y * i_level_size + 0.5f) * resolution_f;
 		const float z = (ray_pos_z * i_level_size + 0.5f) * resolution_f;
 		
-		// not really sure how this works, it's from NerfAcc.  It finds the t-space distance to the next voxel
+		// This is adapted from NerfAcc.  It finds the t-space distance to the next voxel
 		const float k = inv_resolution_f * level_size;
 		const float tx = k * ((floorf(0.5f * copysignf(1.0f, ray_dir_x) + x + 0.5f) - x) * inv_dir_x);
 		const float ty = k * ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
@@ -239,7 +239,6 @@ struct CascadedOccupancyGrid {
 		return __fdiv_ru(t_target, dt) * dt;
 	}
 
-	// gets dt
 	inline NRC_HOST_DEVICE float get_dt(
 		const float& t,
 		const float& cone_angle,

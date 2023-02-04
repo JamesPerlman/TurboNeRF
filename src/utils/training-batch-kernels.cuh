@@ -6,8 +6,8 @@
 #include <tiny-cuda-nn/common.h>
 
 #include "../common.h"
+#include "../core/occupancy-grid.cuh"
 #include "../models/bounding-box.cuh"
-#include "../models/cascaded-occupancy-grid.cuh"
 #include "../models/camera.cuh"
 #include "../utils/color-utils.cuh"
 #include "../utils/linalg/transform4f.cuh"
@@ -182,7 +182,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	uint32_t n_rays,
 	uint32_t batch_size,
 	const BoundingBox* bbox,
-	const CascadedOccupancyGrid* occ_grid,
+	const OccupancyGrid* occ_grid,
 	const float cone_angle,
 	const float dt_min,
 	const float dt_max,
@@ -282,7 +282,7 @@ __global__ void march_and_generate_network_positions_kernel(
 	uint32_t batch_size,
 	const BoundingBox* bbox,
 	const float inv_aabb_size,
-	const CascadedOccupancyGrid* occ_grid,
+	const OccupancyGrid* occ_grid,
 	const float dt_min,
 	const float dt_max,
 	const float cone_angle,

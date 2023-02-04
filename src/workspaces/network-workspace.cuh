@@ -7,7 +7,7 @@
 
 NRC_NAMESPACE_BEGIN
 
-struct NeRFNetworkWorkspace : Workspace {
+struct NetworkWorkspace : Workspace {
     uint32_t batch_size;
 
     // gradient calculation buffers

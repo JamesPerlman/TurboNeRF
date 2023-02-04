@@ -38,7 +38,7 @@ __global__ void generate_grid_cell_network_sample_points_kernel(
     const uint32_t n_cells,
     const uint32_t batch_size,
     const uint32_t start_idx,
-    const CascadedOccupancyGrid* __restrict__ grid,
+    const OccupancyGrid* __restrict__ grid,
     const int level,
     const float inv_aabb_size,
     const float* __restrict__ random_float,
@@ -82,7 +82,7 @@ __global__ void update_occupancy_with_density_kernel(
     const float selection_threshold,
     const float* __restrict__ random_float,
     const tcnn::network_precision_t* __restrict__ network_sigma,
-    CascadedOccupancyGrid* __restrict__ grid
+    OccupancyGrid* __restrict__ grid
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_samples) {
@@ -110,7 +110,7 @@ __global__ void update_occupancy_grid_bits_kernel(
     const uint32_t n_cells_per_level,
     const int n_levels,
     const float threshold,
-    CascadedOccupancyGrid* __restrict__ grid,
+    OccupancyGrid* __restrict__ grid,
     const float* __restrict__ grid_sigma,
     uint8_t* __restrict__ grid_bits
 ) {

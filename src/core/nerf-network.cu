@@ -11,7 +11,7 @@
 #include "../utils/gpu-image.cuh"
 #include "../utils/parallel-utils.cuh"
 #include "../utils/training-network-kernels.cuh"
-#include "nerf-network.h"
+#include "nerf-network.cuh"
 
 using namespace tcnn;
 using namespace nrc;

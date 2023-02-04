@@ -9,8 +9,8 @@
 #include <tiny-cuda-nn/optimizer.h>
 
 #include "../common.h"
-#include "nerf-network-params-workspace.cuh"
-#include "nerf-network-workspace.cuh"
+#include "../workspaces/network-workspace.cuh"
+#include "../workspaces/network-params-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -65,8 +65,8 @@ private:
 	bool can_train = false;
 
 	// workspace
-	NeRFNetworkWorkspace workspace;
-	NeRFNetworkParamsWorkspace params_workspace;
+	NetworkWorkspace workspace;
+	NetworkParamsWorkspace params_workspace;
 
 	// Helper context
 	struct ForwardContext : public tcnn::Context {

@@ -5,7 +5,7 @@
 
 NRC_NAMESPACE_BEGIN
 
-struct CascadedOccupancyGridWorkspace: Workspace {
+struct OccupancyGridWorkspace: Workspace {
 	uint32_t n_total_elements;
     uint32_t n_bitfield_elements;
 

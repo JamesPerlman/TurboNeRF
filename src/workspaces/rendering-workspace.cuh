@@ -3,9 +3,9 @@
 #include <tiny-cuda-nn/common.h>
 
 #include "../common.h"
-#include "bounding-box.cuh"
-#include "camera.cuh"
-#include "cascaded-occupancy-grid.cuh"
+#include "../core/occupancy-grid.cuh"
+#include "../models/bounding-box.cuh"
+#include "../models/camera.cuh"
 #include "workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
@@ -17,7 +17,7 @@ struct RenderingWorkspace: Workspace {
 	// misc
 	Camera* camera;
 	BoundingBox* bounding_box;
-	CascadedOccupancyGrid* occupancy_grid;
+	OccupancyGrid* occupancy_grid;
 
 	// compaction
 	int c_block_size;
@@ -70,7 +70,7 @@ struct RenderingWorkspace: Workspace {
 		// camera
 		camera			= allocate<Camera>(stream, 1);
 		bounding_box	= allocate<BoundingBox>(stream, 1);
-		occupancy_grid	= allocate<CascadedOccupancyGrid>(stream, 1);
+		occupancy_grid	= allocate<OccupancyGrid>(stream, 1);
 
 		// compaction
 		c_block_size	= compaction_block_size;

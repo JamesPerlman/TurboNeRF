@@ -6,6 +6,11 @@
 
 #include "../common.h"
 
+/**
+ * A workspace is a collection of allocations for GPU memory.
+ * 
+ */
+
 NRC_NAMESPACE_BEGIN
 
 struct Workspace {

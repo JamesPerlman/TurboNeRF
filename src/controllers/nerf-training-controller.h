@@ -10,12 +10,12 @@
 #include <tiny-cuda-nn/network_with_input_encoding.h>
 
 #include "../common.h"
+#include "../core/nerf-network.cuh"
+#include "../core/occupancy-grid.cuh"
 #include "../models/bounding-box.cuh"
-#include "../models/cascaded-occupancy-grid.cuh"
 #include "../models/dataset.h"
-#include "../models/nerf-network.h"
 #include "../models/nerf.cuh"
-#include "../models/training-workspace.cuh"
+#include "../workspaces/training-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 

@@ -9,3 +9,16 @@
 	std::vector<data_type> varname(data_size); \
 	CUDA_CHECK_THROW(cudaMemcpyAsync(varname.data(), data_ptr, data_size * sizeof(data_type), cudaMemcpyDeviceToHost, stream)); \
 	cudaStreamSynchronize(stream);
+
+#define READWRITE_PROPERTY(type, name, default) \
+	private: \
+		type name = default; \
+	public: \
+		type get_##name() const { return name; } \
+		void set_##name(type value) { name = value; }
+
+#define READONLY_PROPERTY(type, name, default) \
+	private: \
+		type name = default; \
+	public: \
+		type get_##name() const { return name; }

@@ -8,13 +8,13 @@
 
 #include "common.h"
 #include "main.h"
-#include "models/camera.cuh"
-#include "models/dataset.h"
-#include "models/cascaded-occupancy-grid.cuh"
-#include "models/render-buffer.cuh"
-#include "models/render-request.cuh"
 #include "controllers/nerf-training-controller.h"
 #include "controllers/nerf-rendering-controller.h"
+#include "core/occupancy-grid.cuh"
+#include "models/camera.cuh"
+#include "models/dataset.h"
+#include "models/render-buffer.cuh"
+#include "models/render-request.cuh"
 #include "services/nerf-manager.cuh"
 #include "utils/linalg/transform4f.cuh"
 
@@ -23,7 +23,6 @@
 
 #include <tiny-cuda-nn/common.h>
 #include "utils/nerf-constants.cuh"
-#include "models/cascaded-occupancy-grid.cuh"
 
 #include "integrations/blender.cuh"
 

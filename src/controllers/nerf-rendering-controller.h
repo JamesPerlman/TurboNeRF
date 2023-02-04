@@ -5,7 +5,7 @@
 #include "../common.h"
 #include "../models/render-buffer.cuh"
 #include "../models/render-request.cuh"
-#include "../models/rendering-workspace.cuh"
+#include "../workspaces/rendering-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 

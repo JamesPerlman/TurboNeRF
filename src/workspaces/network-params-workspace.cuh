@@ -7,7 +7,7 @@
 
 NRC_NAMESPACE_BEGIN
 
-struct NeRFNetworkParamsWorkspace: Workspace {
+struct NetworkParamsWorkspace: Workspace {
     
     float* density_network_params_fp;
     tcnn::network_precision_t* density_network_params_hp;

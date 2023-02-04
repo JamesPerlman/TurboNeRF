@@ -5,9 +5,9 @@
 #include <vector>
 
 #include "../common.h"
-#include "../models/cascaded-occupancy-grid.cuh"
+#include "../core/nerf-network.cuh"
+#include "../core/occupancy-grid.cuh"
 #include "../models/dataset.h"
-#include "../models/nerf-network.h"
 #include "../models/nerf.cuh"
 
 NRC_NAMESPACE_BEGIN
@@ -33,7 +33,7 @@ public:
 	NeRF* create_trainable_nerf(const cudaStream_t& stream, const BoundingBox& bbox) {
 		nerfs.emplace_back(
 			NerfNetwork(bbox.size_x),
-			CascadedOccupancyGrid(CascadedOccupancyGrid::get_max_n_levels(bbox.size_x), 128),
+			OccupancyGrid(OccupancyGrid::get_max_n_levels(bbox.size_x), 128),
 			bbox
 		);
 

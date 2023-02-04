@@ -26,13 +26,12 @@ using namespace nlohmann;
 
 NeRFTrainingController::NeRFTrainingController(Dataset& dataset, NeRF* nerf)
 	: dataset(dataset), nerf(nerf)
-{	
+{
 	// TODO: refactor size_x to just size?
 	// RNG
 	// todo: CURAND_ASSERT_SUCCESS
 	curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_PHILOX4_32_10);
 	curandGenerateSeeds(rng);
-
 }
 
 NeRFTrainingController::~NeRFTrainingController() {
@@ -57,9 +56,9 @@ void NeRFTrainingController::prepare_for_training(
 		nerf->network.get_padded_output_width()
 	);
 
-	// Create a CascadedOccupancyGrid object and copy it to the GPU
+	// Create a OccupancyGrid object and copy it to the GPU
 	CUDA_CHECK_THROW(
-		cudaMemcpyAsync(workspace.occ_grid, &nerf->occupancy_grid, sizeof(CascadedOccupancyGrid), cudaMemcpyHostToDevice, stream)
+		cudaMemcpyAsync(workspace.occ_grid, &nerf->occupancy_grid, sizeof(OccupancyGrid), cudaMemcpyHostToDevice, stream)
 	);
 
 	// Copy dataset's BoundingBox to the GPU
@@ -211,7 +210,6 @@ void NeRFTrainingController::generate_next_training_batch(
 		workspace.ray_step
 	);
 
-	// 
 	/**
 	 * Count the number of rays that will fill the batch with the maximum number of samples
 	 * 

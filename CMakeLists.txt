@@ -47,26 +47,22 @@ set(HEADERS
 	src/controllers/nerf-rendering-controller.h
 	src/controllers/nerf-training-controller.h
 
+	# core
+	src/core/occupancy-grid.cuh
+	src/core/nerf-network.cuh
+
 	# integrations
 	src/integrations/blender.cuh
 
 	# models
 	src/models/bounding-box.cuh
 	src/models/camera.cuh
-	src/models/cascaded-occupancy-grid.cuh
-	src/models/cascaded-occupancy-grid-workspace.cuh
 	src/models/dataset.h
-	src/models/nerf-network-params-workspace.cuh
-	src/models/nerf-network-workspace.cuh
-	src/models/nerf-network.h
 	src/models/nerf.cuh
 	src/models/ray.h
 	src/models/render-buffer.cuh
 	src/models/render-request.cuh
-	src/models/rendering-workspace.cuh
 	src/models/training-image.cuh
-	src/models/training-workspace.cuh
-	src/models/workspace.cuh
 
 	# utils
 	src/utils/bit-utils.cuh
@@ -87,6 +83,16 @@ set(HEADERS
 
 	# services
 	src/services/nerf-manager.cuh
+	src/services/trainer.cuh
+
+	# workspaces
+	src/workspaces/network-params-workspace.cuh
+	src/workspaces/network-workspace.cuh
+	src/workspaces/occupancy-grid-workspace.cuh
+	src/workspaces/rendering-workspace.cuh
+	src/workspaces/training-workspace.cuh
+	src/workspaces/workspace-ref.cuh
+	src/workspaces/workspace.cuh
 
 	# common
 	src/common.h
@@ -98,9 +104,11 @@ set(SOURCES
 	src/controllers/nerf-rendering-controller.cu
 	src/controllers/nerf-training-controller.cu
 
+	# core
+	src/core/nerf-network.cu
+
 	# models
 	src/models/dataset.cu
-	src/models/nerf-network.cu
 	src/models/render-buffer.cu
 	src/models/training-image.cu
 

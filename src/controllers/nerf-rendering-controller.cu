@@ -67,7 +67,7 @@ void NeRFRenderingController::request_render(
         cudaMemcpyAsync(
             workspace.occupancy_grid,
             &nerf->occupancy_grid,
-            sizeof(CascadedOccupancyGrid),
+            sizeof(OccupancyGrid),
             cudaMemcpyHostToDevice,
             stream
         )

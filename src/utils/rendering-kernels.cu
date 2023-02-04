@@ -2,9 +2,9 @@
 #include <device_launch_parameters.h>
 
 #include "rendering-kernels.cuh"
+#include "../core/occupancy-grid.cuh"
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
-#include "../models/cascaded-occupancy-grid.cuh"
 #include "../utils/color-utils.cuh"
 #include "../utils/nerf-constants.cuh"
 
@@ -96,7 +96,7 @@ __global__ void generate_rays_pinhole_kernel(
 __global__ void march_rays_to_first_occupied_cell_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
-	const CascadedOccupancyGrid* occ_grid,
+	const OccupancyGrid* occ_grid,
 	const BoundingBox* bbox,
 	const float dt_min,
 	const float dt_max,
@@ -185,7 +185,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const uint32_t batch_size,
 	const uint32_t n_steps_max,
 	const uint32_t network_stride,
-	const CascadedOccupancyGrid* occ_grid,
+	const OccupancyGrid* occ_grid,
 	const BoundingBox* bbox,
 	const float inv_aabb_size,
 	const float dt_min,

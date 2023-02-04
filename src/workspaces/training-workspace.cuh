@@ -6,10 +6,10 @@
 #include <tiny-cuda-nn/gpu_memory.h>
 
 #include "../common.h"
-#include "bounding-box.cuh"
-#include "camera.cuh"
-#include "cascaded-occupancy-grid.cuh"
-#include "ray.h"
+#include "../core/occupancy-grid.cuh"
+#include "../models/bounding-box.cuh"
+#include "../models/camera.cuh"
+#include "../models/ray.h"
 #include "workspace.cuh"
 
 
@@ -64,7 +64,7 @@ public:
 	tcnn::network_precision_t* network_concat;
 	tcnn::network_precision_t* network_output;
 
-	CascadedOccupancyGrid* occ_grid;
+	OccupancyGrid* occ_grid;
 
 	// sample buffers
 	int* sample_index; // indices of samples (for compaction)
@@ -100,7 +100,7 @@ public:
 		// need to upgrade to C++20 to use typename parameters in lambdas :(
 		// auto alloc = []<typename T>(size_t size) { return allocate<T>(stream, size); };
 
-		occ_grid 		= allocate<CascadedOccupancyGrid>(stream, 1);
+		occ_grid 		= allocate<OccupancyGrid>(stream, 1);
 		bounding_box 	= allocate<BoundingBox>(stream, 1);
 		image_data 		= allocate<stbi_uc>(stream, n_pixel_elements);
 
