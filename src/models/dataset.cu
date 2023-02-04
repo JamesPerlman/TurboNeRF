@@ -2,11 +2,8 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
-#include <functional>
 #include <iostream>
-#include <string>
 #include <thread>
-#include <vector>
 
 #include "dataset.h"
 #include "../utils/coordinate-transformations.cuh"
@@ -16,7 +13,7 @@ using namespace filesystem;
 using json = nlohmann::json;
 using namespace nrc;
 
-Dataset::Dataset(string file_path) {
+Dataset::Dataset(const string& file_path) {
     ifstream input_file(file_path);
     json json_data;
     input_file >> json_data;

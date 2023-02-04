@@ -25,7 +25,7 @@ struct Dataset {
 	int2 image_dimensions;
 	BoundingBox bounding_box;
 
-	Dataset(string file_path);
+	Dataset(const string& file_path);
 	Dataset() = default;
 	void load_images_in_parallel(std::function<void(const size_t, const TrainingImage&)> post_load_image = {});
 };
