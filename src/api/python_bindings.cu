@@ -47,7 +47,17 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
             );
         });
 
-/*
+    py::class_<DistortionParams>(m, "DistortionParams")
+        .def(
+            py::init<float, float, float, float, float, float>(),
+            py::arg("k1") = 0.0f,
+            py::arg("k2") = 0.0f,
+            py::arg("k3") = 0.0f,
+            py::arg("k4") = 0.0f,
+            py::arg("p1") = 0.0f,
+            py::arg("p2") = 0.0f
+        );
+
     py::class_<Camera>(m, "Camera")
         .def(
             py::init<
@@ -66,8 +76,8 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
             py::arg("sensor_size"),
             py::arg("transform"),
             py::arg("dist_params") = DistortionParams()
-        );
-*/
+        )
+        .def("get_res_x", &Camera::get_res_x);
 
     /**
      * Dataset
