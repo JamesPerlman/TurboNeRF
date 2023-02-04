@@ -79,6 +79,7 @@ void NeRFTrainingController::prepare_for_training(
 	// Since there is no previous step here, we set the number of previous rays to the batch size
 	// so that the training batch generator will generate a full batch of rays
 	n_rays_in_batch = workspace.batch_size;
+	n_samples_in_batch = 0;
 	training_step = 0;
 
 	// Initialize the network
@@ -210,21 +211,32 @@ void NeRFTrainingController::generate_next_training_batch(
 		workspace.ray_step
 	);
 
-	// Count the number of rays that will fill the batch with the maximum number of samples
+	// 
 	/**
-	 * Cumulative summation via inclusive_scan gives us the offset index that each ray's first sample should start at, relative to the start of the batch.
-	 * We need to perform this cumsum over the entire batch of rays, not just the rays that were regenerated over the used ones in the previous batch.
+	 * Count the number of rays that will fill the batch with the maximum number of samples
+	 * 
+	 * We don't know how many rays will be in the batch, but we can make an educated guess to limit the amount of computation time by the exclusive_scan.
 	 */
+	
+	uint32_t n_estimated_rays = 0;
+
+	if (n_samples_in_batch > 0) {
+		const float mean_rays_per_sample = static_cast<float>(n_rays_in_batch) / static_cast<float>(n_samples_in_batch);
+		n_estimated_rays = static_cast<uint32_t>(mean_rays_per_sample * static_cast<float>(workspace.batch_size));
+	} else {
+		// just use last batch's number of rays
+		n_estimated_rays = n_rays_in_batch;
+	}
 
 	// Grab some references to the n_steps arrays
 	thrust::device_ptr<uint32_t> n_steps_ptr(workspace.ray_step);
 	thrust::device_ptr<uint32_t> ray_offset_ptr(workspace.ray_offset);
 	
-	// cumulative sum the number of steps for each ray
+	// get ray memory offsets
 	thrust::exclusive_scan(
 		thrust::cuda::par.on(stream),
 		n_steps_ptr,
-		n_steps_ptr + workspace.batch_size,
+		n_steps_ptr + n_estimated_rays,
 		ray_offset_ptr
 	);
 
@@ -232,7 +244,7 @@ void NeRFTrainingController::generate_next_training_batch(
 	const int n_ray_max_idx = find_last_lt_presorted(
 		stream,
 		ray_offset_ptr,
-		workspace.batch_size,
+		n_estimated_rays,
 		workspace.batch_size
 	) - 1;
 
