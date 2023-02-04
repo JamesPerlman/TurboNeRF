@@ -31,8 +31,6 @@ public:
 	float* undistort_map;
 
 	float* random_float;
-	uint32_t* img_index;
-	uint32_t* pix_index; // index of randomly selected pixel in image
 
 	uint32_t* ray_step;
 	uint32_t* ray_offset;
@@ -109,9 +107,6 @@ public:
 		undistort_map	= allocate<float>(stream, 2 * n_pixels_per_image);
 
 		random_float 	= allocate<float>(stream, 4 * batch_size);
-
-		img_index 		= allocate<uint32_t>(stream, batch_size);
-		pix_index 		= allocate<uint32_t>(stream, batch_size);
 
 		pix_rgba		= allocate<float>(stream, 4 * batch_size);
 		ray_rgba 		= allocate<float>(stream, 4 * batch_size);
