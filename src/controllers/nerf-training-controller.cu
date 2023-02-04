@@ -162,17 +162,6 @@ void NeRFTrainingController::generate_next_training_batch(
 
 	const float n_rays_per_image = static_cast<float>(n_rays_in_batch) / static_cast<float>(dataset.images.size());
 	const float chunk_size = static_cast<float>(dataset.n_pixels_per_image) / n_rays_per_image;
-	
-	generate_training_pixel_indices<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
-		n_rays_in_batch,
-		dataset.n_pixels_per_image,
-		n_rays_per_image,
-		chunk_size,
-		workspace.random_float,
-		workspace.pix_index
-	);
-
-	CHECK_DATA(pix_index_cpu, uint32_t, workspace.pix_index, n_rays_in_batch);
 
 	initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
 		n_rays_in_batch,
@@ -182,15 +171,16 @@ void NeRFTrainingController::generate_next_training_batch(
 		dataset.n_pixels_per_image * dataset.n_channels_per_image,
 		dataset.image_dimensions,
 		n_rays_per_image,
+		chunk_size,
 		workspace.bounding_box,
 
 		// input buffers
 		workspace.cameras.data(),
 		workspace.undistort_map,
 		workspace.image_data,
+		workspace.random_float,
 
 		// output buffers
-		workspace.pix_index,
 		workspace.pix_rgba,
 		workspace.ray_origin,
 		workspace.ray_dir,
