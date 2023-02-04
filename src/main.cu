@@ -16,7 +16,7 @@
 #include "controllers/nerf-training-controller.h"
 #include "controllers/nerf-rendering-controller.h"
 #include "services/nerf-manager.cuh"
-#include "utils/linalg.cuh"
+#include "utils/linalg/transform4f.cuh"
 
 #include "utils/coordinate-transformations.cuh"
 #include "utils/linalg/transform4f.cuh"
@@ -60,7 +60,7 @@ int main()
 	CUDA_CHECK_THROW(cudaMallocManaged(&rgba, 1024 * 1024 * 4 * sizeof(float)));
 	auto render_buffer = nrc::RenderBuffer(1024, 1024, rgba);
 
-	auto camera_transform = nrc::Matrix4f::Identity();
+	auto camera_transform = nrc::Transform4f::Identity();
 	auto cam6 = dataset.cameras[6];
 	auto cam0 = dataset.cameras[6];
 
@@ -83,7 +83,7 @@ int main()
 		if (i % 16 == 0 && i > 0) {
 			float progress = (float)i / (360.f * 16.0f);
 			float tau = 2.0f * 3.14159f;
-			auto tform = nrc::Matrix4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
+			auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
 				cam0.near,
 				cam0.far,

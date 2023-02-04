@@ -10,7 +10,7 @@
 #include "../models/cascaded-occupancy-grid.cuh"
 #include "../models/camera.cuh"
 #include "../utils/color-utils.cuh"
-#include "../utils/linalg.cuh"
+#include "../utils/linalg/transform4f.cuh"
 
 NRC_NAMESPACE_BEGIN
 

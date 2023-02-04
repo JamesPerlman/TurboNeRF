@@ -58,9 +58,9 @@ Dataset::Dataset(string file_path) {
         float near = frame.value("near", 2.0f);
         float far = frame.value("far", 16.0f);
 
-        Matrix4f transform_matrix(frame["transform_matrix"]);
+        Transform4f transform_matrix(frame["transform_matrix"]);
 
-        Matrix4f camera_matrix = nerf_to_nrc(transform_matrix);
+        Transform4f camera_matrix = nerf_to_nrc(transform_matrix);
 
         // TODO: per-camera dimensions
         float2 sens_size{

@@ -192,15 +192,6 @@ struct Matrix4f
             m30 * x.m02 + m31 * x.m12 + m32 * x.m22 + m33 * x.m32,
             m30 * x.m03 + m31 * x.m13 + m32 * x.m23 + m33 * x.m33
         };
-
-        // Identity transformation matrix:
-        /*
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-
-        */
     }
 
     // multiplication between two 4x4 transform matrices.  It's assumed that the last line of each matrix is always 0 0 0 1.
@@ -227,15 +218,6 @@ struct Matrix4f
             0.0f,
             1.0f
         };
-
-        // Identity transformation matrix:
-        /*
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-
-        */
     }
 
     // convenience getter, returns the translation of this matrix as a float3

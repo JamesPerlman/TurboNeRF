@@ -6,7 +6,7 @@
 
 #include "../common.h"
 
-#include "../utils/linalg.cuh"
+#include "../utils/linalg/transform4f.cuh"
 #include "ray.h"
 
 NRC_NAMESPACE_BEGIN
@@ -32,7 +32,7 @@ struct Camera {
 	int2 resolution;
 	float2 resolution_f;
 	float2 sensor_size;
-	Matrix4f transform;
+	Transform4f transform;
 	DistortionParams dist_params;
 
 	// constructor
@@ -42,7 +42,7 @@ struct Camera {
 		float2 focal_length,
 		int2 resolution,
 		float2 sensor_size,
-		Matrix4f transform,
+		Transform4f transform,
 		DistortionParams dist_params = DistortionParams()
 	)
 		: near(near)
