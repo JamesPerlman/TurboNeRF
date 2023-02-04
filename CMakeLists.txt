@@ -33,7 +33,6 @@ include_directories(includes/glfw/include)
 # pybind11
 add_subdirectory(includes/pybind11)
 include_directories(pybind11_INCLUDE_DIRS)
-set (PYBIND11_PYTHON_VERSION "3.10")
 
 # Include sub-projects.
 
