@@ -66,13 +66,6 @@ void NeRFTrainingController::prepare_for_training(
 	CUDA_CHECK_THROW(
 		cudaMemcpyAsync(workspace.bounding_box, &dataset.bounding_box, sizeof(BoundingBox), cudaMemcpyHostToDevice, stream)
 	);
-
-	// Training image indices will be reused for each batch.  We select the same number of rays from each image in the dataset.
-	generate_training_image_indices<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
-		workspace.batch_size,
-		dataset.images.size(),
-		workspace.img_index
-	);
 	
 	// Copy training cameras to the GPU
 	workspace.cameras.resize_and_copy_from_host(dataset.cameras);
@@ -159,11 +152,6 @@ void NeRFTrainingController::generate_next_training_batch(
 		printf("Error generating random floats for training batch.\n");
 	}
 	
-	// Convert floats to uint32_t which will be interpreted as pixel indices for any training image
-	resize_floats_to_uint32_with_max<<<n_blocks_linear(workspace.batch_size), n_threads_linear, 0, stream>>>(
-		workspace.batch_size, workspace.random_float, workspace.pix_index, dataset.n_pixels_per_image
-	);
-
 	/**
 	 * Generate rays and pixels for training
 	 * 
@@ -172,6 +160,20 @@ void NeRFTrainingController::generate_next_training_batch(
 	 * for batch_size minus the number of rays that were used.
 	 */
 
+	const float n_rays_per_image = static_cast<float>(n_rays_in_batch) / static_cast<float>(dataset.images.size());
+	const float chunk_size = static_cast<float>(dataset.n_pixels_per_image) / n_rays_per_image;
+	
+	generate_training_pixel_indices<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
+		n_rays_in_batch,
+		dataset.n_pixels_per_image,
+		n_rays_per_image,
+		chunk_size,
+		workspace.random_float,
+		workspace.pix_index
+	);
+
+	CHECK_DATA(pix_index_cpu, uint32_t, workspace.pix_index, n_rays_in_batch);
+
 	initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(n_rays_in_batch), n_threads_linear, 0, stream>>>(
 		n_rays_in_batch,
 		workspace.batch_size,
@@ -179,11 +181,15 @@ void NeRFTrainingController::generate_next_training_batch(
 		dataset.n_pixels_per_image,
 		dataset.n_pixels_per_image * dataset.n_channels_per_image,
 		dataset.image_dimensions,
+		n_rays_per_image,
 		workspace.bounding_box,
+
+		// input buffers
 		workspace.cameras.data(),
 		workspace.undistort_map,
 		workspace.image_data,
-		workspace.img_index,
+
+		// output buffers
 		workspace.pix_index,
 		workspace.pix_rgba,
 		workspace.ray_origin,

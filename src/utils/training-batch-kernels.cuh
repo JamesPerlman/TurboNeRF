@@ -29,18 +29,6 @@ __global__ void stbi_uchar_to_float(
 	}
 }
 
-__global__ void generate_training_image_indices(
-	const uint32_t n_elements,
-	const uint32_t n_images,
-	uint32_t* __restrict__ image_indices
-) {
-	uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-	
-	if (idx >= n_elements) return;
-	
-	image_indices[idx] = idx % n_images;
-}
-
 __global__ void resize_floats_to_uint32_with_max(
 	const uint32_t n_elements,
 	const float* __restrict__ floats,
@@ -55,6 +43,44 @@ __global__ void resize_floats_to_uint32_with_max(
 	uints[idx] = (uint32_t)resized_val;
 }
 
+/**
+ * This kernel generates a list of pixel indices for each image.
+ * Like image indices, we also want them to be in ascending order to preserve spatial locality.
+ * 
+ * To do this we slice the image into equal-sized chunks (not necessarily perfect rectangles, they might wrap).
+ * For each chunk we generate a random pixel index.
+ * 
+ * Some of these parameters are floats because they will lead to a more accurate result.
+ * Using integers could yield less coverage of the very last image.
+ */
+
+__global__ void generate_training_pixel_indices(
+	const uint32_t n_elements,
+	const uint32_t n_pixels_per_image, // total number of pixels in each image
+	const float n_chunks_per_image,
+	const float chunk_size,
+	const float* __restrict__ random,
+	uint32_t* __restrict__ pixel_indices
+) {
+	// this is the index of the chunk we are generating a pixel index for, relative to the buffer containing the entire image dataset
+	const uint32_t global_chunk_index = blockIdx.x * blockDim.x + threadIdx.x;
+	
+	if (global_chunk_index >= n_elements) return;
+	
+	// this is the index of the chunk we are generating a pixel index for, relative to the current image
+	const float local_chunk_index = fmodf((float)global_chunk_index, n_chunks_per_image);
+
+	// start of the current chunk, relative to the current image
+	const float chunk_start = local_chunk_index * n_chunks_per_image;
+
+	// end of the current chunk, relative to the current image
+	const float chunk_end = chunk_start + chunk_size;
+
+	// generate a random index between these two points
+	const float rand = random[global_chunk_index];
+	pixel_indices[global_chunk_index] = (uint32_t)(chunk_start + rand * (chunk_end - chunk_start)) % n_pixels_per_image;
+}
+
 // generates rays and RGBs for training, assigns them to an array of contiguous data
 __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t n_rays,
@@ -63,11 +89,13 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t n_pixels_per_image,
 	const uint32_t image_data_stride,
 	const int2 image_dimensions,
+	const float n_rays_per_image,
+
+	// input buffers
 	const BoundingBox* __restrict__ bbox,
 	const Camera* __restrict__ cameras,
 	const float* __restrict__ undistort_map,
 	const stbi_uc* __restrict__ image_data,
-	const uint32_t* __restrict__ img_index,
 	const uint32_t* __restrict__ pix_index,
 
 	// output buffers
@@ -86,9 +114,8 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t i_offset_2 = i_offset_1 + batch_size;
 	const uint32_t i_offset_3 = i_offset_2 + batch_size;
 	
-	const uint32_t image_idx = img_index[i];
+	const uint32_t image_idx = static_cast<uint32_t>(static_cast<float>(i) / n_rays_per_image);
 	const uint32_t pixel_idx = pix_index[i];
-	
 
 	const float x = undistort_map[pixel_idx + 0 * n_pixels_per_image];
 	const float y = undistort_map[pixel_idx + 1 * n_pixels_per_image];
