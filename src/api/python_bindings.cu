@@ -76,8 +76,7 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
             py::arg("sensor_size"),
             py::arg("transform"),
             py::arg("dist_params") = DistortionParams()
-        )
-        .def("get_res_x", &Camera::get_res_x);
+        );
 
     /**
      * Dataset
