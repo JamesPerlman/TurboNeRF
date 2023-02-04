@@ -12,11 +12,15 @@
 
 NRC_NAMESPACE_BEGIN
 
-struct Transform4f
+struct alignas(float) Transform4f
 {
     float m00, m01, m02, m03;
     float m10, m11, m12, m13;
     float m20, m21, m22, m23;
+
+    float* data() { return &m00; }
+
+    /** Constructors **/
 
     Transform4f() = default;
 
@@ -35,13 +39,15 @@ struct Transform4f
         , m20(m20), m21(m21), m22(m22), m23(m23)
     {};
 
-    // from_json constructor, mij = data[i][j]
+    // json constructor, mij = data[i][j]
     Transform4f(const nlohmann::json& data)
     {
         m00 = data[0][0]; m01 = data[0][1]; m02 = data[0][2]; m03 = data[0][3];
         m10 = data[1][0]; m11 = data[1][1]; m12 = data[1][2]; m13 = data[1][3];
         m20 = data[2][0]; m21 = data[2][1]; m22 = data[2][2]; m23 = data[2][3];
     }
+
+    /** Debug **/
 
     void print() const
     {
