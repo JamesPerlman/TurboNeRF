@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -54,7 +54,7 @@ int main()
 	auto renderer = nrc::NeRFRenderingController();
 	float* rgba;
 	constexpr int IMG_SIZE = 1024;
-	CUDA_CHECK_THROW(cudaMallocManaged(&rgba, IMG_SIZE * IMG_SIZE * 4 * sizeof(float)));
+	CUDA_CHECK_THROW(cudaMallocAsync(&rgba, IMG_SIZE * IMG_SIZE * 4 * sizeof(float), stream));
 	auto render_buffer = nrc::RenderBuffer(IMG_SIZE, IMG_SIZE, rgba);
 
 	auto camera_transform = nrc::Transform4f::Identity();
