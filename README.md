@@ -1,6 +1,6 @@
 ## LATEST UPDATE
 
-A substantial refactor is underway (~90% complete) to make the upcoming Python API easier to manage.  
+Now working on the Python API. (~10% complete)  
 The Python API will allow a developer to consume certain CUDA functionalities.  
 The Blender integration will come after the Python API is complete.  
 Estimated ETA on the Blender plugin is ~March 1, 2022  
