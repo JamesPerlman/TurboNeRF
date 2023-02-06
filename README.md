@@ -3,7 +3,7 @@
 A substantial refactor is underway (~90% complete) to make the upcoming Python API easier to manage.  
 The Python API will allow a developer to consume certain CUDA functionalities.  
 The Blender integration will come after the Python API is complete.  
-Estimated ETA on the Blender plugin is ~February 20, 2022
+Estimated ETA on the Blender plugin is ~February 20, 2022  
 After the Blender integration is complete, I will release a binary along with the [addon codebase](https://github.com/JamesPerlman/blender_nerf_tools)
 
 ## INTRODUCTION
@@ -23,7 +23,7 @@ Since everything here has been written from scratch, this codebase is permissive
 DISCLAIMER: Although I am extremely passionate about NeRFs and their artistic applications, I do not have a deep background in ML research or CUDA development, and the code I've written here will certainly reflect that.  But perhaps that's where you come in!  Feel free to browse and suggest changes, this is all a learning process!  
 
 Enjoy!  
-- James  
+-James  
 https://twitter.com/jperldev
 
 ## TEST DATA
