@@ -31,7 +31,7 @@ std::vector<float> save_buffer_to_memory(
     const uint32_t& height,
     const uint32_t& channels,
     const uint32_t& stride,
-    const float& scale
+    const float& scale = 1.0f
 );
 
 NRC_NAMESPACE_END
