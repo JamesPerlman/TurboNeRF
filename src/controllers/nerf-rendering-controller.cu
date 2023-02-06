@@ -5,7 +5,7 @@ using namespace nrc;
 using namespace tcnn;
 
 NeRFRenderingController::NeRFRenderingController(
-    uint32_t batch_size
+    const uint32_t& batch_size
 ) {
     if (batch_size == 0) {
         // TODO: determine batch size from GPU specs

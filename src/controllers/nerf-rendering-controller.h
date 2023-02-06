@@ -13,7 +13,7 @@ NRC_NAMESPACE_BEGIN
 struct NeRFRenderingController {
 
     NeRFRenderingController(
-        uint32_t batch_size = 0
+        const uint32_t& batch_size = 0
     );
 
     void request_render(
