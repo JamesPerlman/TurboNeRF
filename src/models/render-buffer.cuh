@@ -16,12 +16,26 @@ public:
     // pointer to GPU memory to store the output data
     float* rgba;
 
-    RenderBuffer(uint32_t width, uint32_t height, float* rgba)
+    RenderBuffer(uint32_t width, uint32_t height, float* rgba = nullptr)
         : width(width)
         , height(height)
         , stride(width * height)
-        , rgba(rgba)
-    {};
+    {
+        if (rgba == nullptr) {
+            CUDA_CHECK_THROW(cudaMalloc(&this->rgba, stride * 4 * sizeof(float)));
+        } else {
+            this->rgba = rgba;
+        }
+    };
+
+    ~RenderBuffer()
+    {
+        try {
+            CUDA_CHECK_THROW(cudaFree(rgba));
+        } catch (const std::runtime_error& e) {
+            std::cerr << "Error freeing RenderBuffer memory: " << e.what() << std::endl;
+        }
+    }
 
     void clear(const cudaStream_t& stream = 0);
 
