@@ -62,12 +62,7 @@ int main()
 	auto cam0 = dataset.cameras[6];
 
 	// fetch nerfs as pointers
-	std::vector<nrc::NeRF*> nerf_ptrs;
-	for (auto& proxy : nerf_manager.get_proxies()) {
-		for (auto& nerf : proxy->nerfs) {
-			nerf_ptrs.emplace_back(&nerf);
-		}
-	}
+	auto proxy_ptrs = nerf_manager.get_proxies();
 
 	for (int i = 0; i < 1024 * 10; ++i) {
 		trainer.train_step();
@@ -93,7 +88,7 @@ int main()
 				cam0.dist_params
 			);
 
-			auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);
+			auto render_request = nrc::RenderRequest(render_cam, proxy_ptrs, render_buffer);
 			renderer.request_render(render_request);
 			printf("Done!\n");
 			render_request.output.save_image(stream, OUTPUT_PATH + fmt::format("img-{}.png", i));

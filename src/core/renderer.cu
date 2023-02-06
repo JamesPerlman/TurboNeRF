@@ -19,16 +19,16 @@ void Renderer::enlarge_workspace_if_needed(
 
     // TODO: NeRF network property getters could be made into static members.
     // For now we assume all NeRFs have the same network configuration.
-    NeRF* nerf = request.nerfs[0];
-    
+    NeRF& nerf = request.proxies[0]->nerfs[0];
+
     if (render_area != new_render_area) {
         ctx.workspace.enlarge(
             ctx.stream,
             request.output.width,
             request.output.height,
             ctx.batch_size,
-            nerf->network.get_concat_buffer_width(),
-            nerf->network.get_padded_output_width()
+            nerf.network.get_concat_buffer_width(),
+            nerf.network.get_padded_output_width()
         );
 
         render_area = new_render_area;
@@ -43,7 +43,7 @@ void Renderer::render(
     RenderingWorkspace& workspace = ctx.workspace;
     
     // TODO: this should happen for all NeRFs
-    NeRF* nerf = request.nerfs[0];
+    NeRF& nerf = request.proxies[0]->nerfs[0];
 
     enlarge_workspace_if_needed(ctx, request);
 
@@ -58,22 +58,22 @@ void Renderer::render(
         )
     );
 
-    // workspace.bounding_box = nerf->bounding_box
+    // workspace.bounding_box = nerf.bounding_box
     CUDA_CHECK_THROW(
         cudaMemcpyAsync(
             workspace.bounding_box,
-            &nerf->bounding_box,
+            &nerf.bounding_box,
             sizeof(BoundingBox),
             cudaMemcpyHostToDevice,
             ctx.stream
         )
     );
 
-    // workspace.occupancy_grid = nerf->occupancy_grid
+    // workspace.occupancy_grid = nerf.occupancy_grid
     CUDA_CHECK_THROW(
         cudaMemcpyAsync(
             workspace.occupancy_grid,
-            &nerf->occupancy_grid,
+            &nerf.occupancy_grid,
             sizeof(OccupancyGrid),
             cudaMemcpyHostToDevice,
             ctx.stream
@@ -121,7 +121,7 @@ void Renderer::render(
         );
         
         const float dt_min = NeRFConstants::min_step_size;
-        const float dt_max = nerf->bounding_box.size_x * dt_min;
+        const float dt_max = nerf.bounding_box.size_x * dt_min;
         const float cone_angle = NeRFConstants::cone_angle;
 
         march_rays_to_first_occupied_cell_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, ctx.stream>>>(
@@ -167,7 +167,7 @@ void Renderer::render(
                 network_batch,
                 workspace.occupancy_grid,
                 workspace.bounding_box,
-                1.0f / nerf->bounding_box.size_x,
+                1.0f / nerf.bounding_box.size_x,
                 dt_min,
                 dt_max,
                 cone_angle,
@@ -188,7 +188,7 @@ void Renderer::render(
             );
 
             // query the NeRF network for the samples
-            nerf->network.inference(
+            nerf.network.inference(
                 ctx.stream,
                 network_batch,
                 workspace.network_pos,
