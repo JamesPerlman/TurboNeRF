@@ -50,6 +50,7 @@ set(HEADERS
 	# core
 	src/core/occupancy-grid.cuh
 	src/core/nerf-network.cuh
+	src/core/renderer.cuh
 	src/core/trainer.cuh
 
 	# integrations
@@ -107,6 +108,7 @@ set(SOURCES
 
 	# core
 	src/core/nerf-network.cu
+	src/core/renderer.cu
 	src/core/trainer.cu
 
 	# models

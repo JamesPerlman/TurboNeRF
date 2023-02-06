@@ -73,7 +73,7 @@ void NeRFTrainingController::prepare_for_training() {
 			ctx.stream
 		)
 	);
-	
+
 	// Copy training cameras to the GPU
 	ctx.workspace.cameras.resize_and_copy_from_host(dataset.cameras);
 

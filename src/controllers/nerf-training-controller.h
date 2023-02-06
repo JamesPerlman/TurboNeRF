@@ -22,7 +22,7 @@ NRC_NAMESPACE_BEGIN
 struct NeRFTrainingController {
 	// constructor
 	NeRFTrainingController(Dataset& dataset, NeRFProxy* nerf_proxy, const uint32_t& batch_size);
-	
+
 	// public properties
 
 	// public methods
@@ -49,4 +49,3 @@ private:
 };
 
 NRC_NAMESPACE_END
-

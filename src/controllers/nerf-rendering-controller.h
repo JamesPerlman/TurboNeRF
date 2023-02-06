@@ -1,11 +1,12 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <vector>
 
 #include "../common.h"
+#include "../core/renderer.cuh"
 #include "../models/render-buffer.cuh"
 #include "../models/render-request.cuh"
-#include "../workspaces/rendering-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -16,17 +17,18 @@ struct NeRFRenderingController {
     );
 
     void request_render(
-        // TODO: remove stream
-        const cudaStream_t& stream,
-        const RenderRequest& request
+        RenderRequest& request
     );
 
 private:
-    
+
     uint32_t batch_size;
 
-    RenderingWorkspace workspace;
+    uint32_t render_area;
 
+    std::vector<Renderer::Context> contexts;
+
+    Renderer renderer = Renderer();
 };
 
 NRC_NAMESPACE_END

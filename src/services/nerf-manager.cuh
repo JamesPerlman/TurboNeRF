@@ -34,8 +34,6 @@ public:
 
 	// create a new nerf
 	NeRFProxy* create_trainable_nerf(
-		const int& device_id,
-		const cudaStream_t& stream,
 		const BoundingBox& bbox
 	) {
 		proxies.emplace_back();

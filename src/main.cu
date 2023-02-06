@@ -44,7 +44,7 @@ int main()
 	auto nerf_manager = nrc::NeRFManager();
 
 	// printf("%lu", grid.max_index());
-	auto nerf = nerf_manager.create_trainable_nerf(0, stream, dataset.bounding_box);
+	auto nerf = nerf_manager.create_trainable_nerf(dataset.bounding_box);
 
 	// set up training controller
 	auto trainer = nrc::NeRFTrainingController(dataset, nerf, NeRFConstants::batch_size);
@@ -53,9 +53,9 @@ int main()
 	// set up rendering controller
 	auto renderer = nrc::NeRFRenderingController();
 	float* rgba;
-
-	CUDA_CHECK_THROW(cudaMallocManaged(&rgba, 512 * 512 * 4 * sizeof(float)));
-	auto render_buffer = nrc::RenderBuffer(512, 512, rgba);
+	constexpr int IMG_SIZE = 1024;
+	CUDA_CHECK_THROW(cudaMallocManaged(&rgba, IMG_SIZE * IMG_SIZE * 4 * sizeof(float)));
+	auto render_buffer = nrc::RenderBuffer(IMG_SIZE, IMG_SIZE, rgba);
 
 	auto camera_transform = nrc::Transform4f::Identity();
 	auto cam6 = dataset.cameras[6];
@@ -79,7 +79,7 @@ int main()
 			trainer.update_occupancy_grid(cell_selection_threshold);
 		}
 
-		if (i % 32 == 0 && i > 0) {
+		if (i % 16 == 0 && i > 0) {
 			float progress = (float)i / (360.f * 16.0f);
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
@@ -87,15 +87,14 @@ int main()
 				cam0.near,
 				cam0.far,
 				cam0.focal_length,
-				make_int2(512, 512),
+				make_int2(IMG_SIZE, IMG_SIZE),
 				cam0.sensor_size,
 				tform,
 				cam0.dist_params
 			);
 
 			auto render_request = nrc::RenderRequest(render_buffer, render_cam, nerf_ptrs);
-			render_request.output.clear(stream);
-			renderer.request_render(stream, render_request);
+			renderer.request_render(render_request);
 			printf("Done!\n");
 			render_request.output.save_image(stream, OUTPUT_PATH + fmt::format("img-{}.png", i));
 		}
