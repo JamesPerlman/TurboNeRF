@@ -41,7 +41,7 @@ public:
 
     void save_image(const std::string& filename, const cudaStream_t& stream = 0);
 
-    std::vector<float> fetch_image(const cudaStream_t& stream = 0);
+    std::vector<float> get_image(const cudaStream_t& stream = 0);
 };
 
 NRC_NAMESPACE_END
