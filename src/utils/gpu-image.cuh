@@ -24,4 +24,14 @@ void save_buffer_to_image(
     const float& scale = 1.0f
 );
 
+std::vector<float> save_buffer_to_memory(
+    const cudaStream_t& stream,
+    const float* data,
+    const uint32_t& width,
+    const uint32_t& height,
+    const uint32_t& channels,
+    const uint32_t& stride,
+    const float& scale
+);
+
 NRC_NAMESPACE_END
