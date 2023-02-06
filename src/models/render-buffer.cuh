@@ -23,9 +23,11 @@ public:
         , rgba(rgba)
     {};
 
-    void clear(const cudaStream_t& stream);
+    void clear(const cudaStream_t& stream = 0);
 
-    void save_image(const cudaStream_t& stream, const std::string& filename);
+    void save_image(const std::string& filename, const cudaStream_t& stream = 0);
+
+    std::vector<float> fetch_image(const cudaStream_t& stream = 0);
 };
 
 NRC_NAMESPACE_END

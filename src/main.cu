@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -91,7 +91,7 @@ int main()
 			auto render_request = nrc::RenderRequest(render_cam, proxy_ptrs, render_buffer);
 			renderer.request_render(render_request);
 			printf("Done!\n");
-			render_request.output.save_image(stream, OUTPUT_PATH + fmt::format("img-{}.png", i));
+			render_request.output.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);
 		}
 	}
 
