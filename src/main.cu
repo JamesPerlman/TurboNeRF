@@ -52,10 +52,8 @@ int main()
 
 	// set up rendering controller
 	auto renderer = nrc::NeRFRenderingController();
-	float* rgba;
 	constexpr int IMG_SIZE = 1024;
-	CUDA_CHECK_THROW(cudaMallocAsync(&rgba, IMG_SIZE * IMG_SIZE * 4 * sizeof(float), stream));
-	auto render_buffer = nrc::RenderBuffer(IMG_SIZE, IMG_SIZE, rgba);
+	auto render_buffer = nrc::RenderBuffer(IMG_SIZE, IMG_SIZE);
 
 	auto camera_transform = nrc::Transform4f::Identity();
 	auto cam6 = dataset.cameras[6];
