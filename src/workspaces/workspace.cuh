@@ -51,11 +51,10 @@ public:
             if (allocation.ptr != nullptr) {
                 try {
                     CUDA_CHECK_THROW(cudaFreeAsync(allocation.ptr, allocation.stream));
+                    ++n_allocations_freed;
                 } catch (const std::runtime_error& e) {
                     std::cout << "Error freeing allocation: " << e.what() << std::endl;
-                    continue;
                 }
-                ++n_allocations_freed;
             }
         }
 
