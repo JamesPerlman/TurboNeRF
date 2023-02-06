@@ -7,6 +7,7 @@
 
 #include "../utils/nerf-constants.cuh"
 #include "../services/nerf-manager.cuh"
+#include "../workspaces/training-workspace.cuh"
 
 #include "../common.h"
 

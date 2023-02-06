@@ -5,7 +5,6 @@
 #include "bounding-box.cuh"
 #include "../core/occupancy-grid.cuh"
 #include "../core/nerf-network.cuh"
-#include "../workspaces/nerf-workspace-group.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -27,7 +26,7 @@ struct NeRF {
     // transform
     // bounding box (training, rendering)
     // masks
-    // dist_paramss
+    // distortions :D
 };
 
 NRC_NAMESPACE_END

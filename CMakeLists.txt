@@ -88,8 +88,6 @@ set(HEADERS
 	src/services/nerf-manager.cuh
 
 	# workspaces
-	src/workspaces/distributed-workspace.cuh
-	src/workspaces/nerf-workspace-group.cuh
 	src/workspaces/network-params-workspace.cuh
 	src/workspaces/network-workspace.cuh
 	src/workspaces/occupancy-grid-workspace.cuh
