@@ -3,7 +3,7 @@
 A substantial refactor is underway (~90% complete) to make the upcoming Python API easier to manage.  
 The Python API will allow a developer to consume certain CUDA functionalities.  
 The Blender integration will come after the Python API is complete.  
-Estimated ETA on the Blender plugin is ~February 20, 2022  
+Estimated ETA on the Blender plugin is ~March 1, 2022  
 After the Blender integration is complete, I will release a binary along with the [addon codebase](https://github.com/JamesPerlman/blender_nerf_tools)
 
 ## INTRODUCTION
