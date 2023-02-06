@@ -13,4 +13,7 @@ void RenderBuffer::save_image(const std::string& filename, const cudaStream_t& s
     CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
     save_buffer_to_image(stream, filename, rgba, width, height, 4, stride);
 }
+
+std::vector<float> RenderBuffer::get_image(const cudaStream_t& stream) {
+    return save_buffer_to_memory(stream, rgba, width, height, 4, stride);
 }
