@@ -27,7 +27,13 @@ using json = nlohmann::json;
 
 // Constructor
 
-NerfNetwork::NerfNetwork(const float& aabb_size) {
+NerfNetwork::NerfNetwork(
+	const int& device_id,
+	const float& aabb_size
+)
+	: network_ws(device_id)
+	, params_ws(device_id)
+{
 	this->aabb_size = aabb_size;
 
 	// These values are from the Instant-NGP paper, page 4. "Multiresolution Hash Encoding"
@@ -104,43 +110,43 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
 	pcg32 rng(rng_seed);
 
 	// initialize params
-	params_workspace.enlarge(
+	params_ws.enlarge(
 		stream,
 		density_network->n_params(),
 		color_network->n_params()
 	);
 	
-	density_network->initialize_params(rng, params_workspace.density_network_params_fp);
-	color_network->initialize_params(rng, params_workspace.color_network_params_fp);
+	density_network->initialize_params(rng, params_ws.density_network_params_fp);
+	color_network->initialize_params(rng, params_ws.color_network_params_fp);
 
 	// initialize_params only initializes full precision params, need to copy to half precision
 
 	copy_and_cast<network_precision_t, float>(
 		stream,
 		density_network->n_params(),
-		params_workspace.density_network_params_hp,
-		params_workspace.density_network_params_fp
+		params_ws.density_network_params_hp,
+		params_ws.density_network_params_fp
 	);
 
 	copy_and_cast<network_precision_t, float>(
 		stream,
 		color_network->n_params(),
-		params_workspace.color_network_params_hp,
-		params_workspace.color_network_params_fp
+		params_ws.color_network_params_hp,
+		params_ws.color_network_params_fp
 	);
 
 	// assign params pointers
 
 	density_network->set_params(
-		params_workspace.density_network_params_hp,
-		params_workspace.density_network_params_hp,
-		params_workspace.density_network_gradients_hp
+		params_ws.density_network_params_hp,
+		params_ws.density_network_params_hp,
+		params_ws.density_network_gradients_hp
 	);
 
 	color_network->set_params(
-		params_workspace.color_network_params_hp,
-		params_workspace.color_network_params_hp,
-		params_workspace.color_network_gradients_hp
+		params_ws.color_network_params_hp,
+		params_ws.color_network_params_hp,
+		params_ws.color_network_gradients_hp
 	);
 
 	// initialize optimizers
@@ -224,7 +230,6 @@ void NerfNetwork::train(
 		ray_steps,
 		ray_offset,
 		concat_buffer,
-		workspace.sigma_buf,
 		output_buffer,
 		pos_batch,
 		dir_batch,
@@ -414,20 +419,20 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	);
 	
 	// Zero out transmittance
-	cudaMemsetAsync(workspace.trans_buf, 0, batch_size * sizeof(float), stream);
+	cudaMemsetAsync(network_ws.trans_buf, 0, batch_size * sizeof(float), stream);
 
 	// Continue forward with custom operators
 	density_to_sigma_forward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
 		concat_buffer,
-		workspace.sigma_buf
+		network_ws.sigma_buf
 	);
 
 	sigma_to_alpha_forward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
-		workspace.sigma_buf,
+		network_ws.sigma_buf,
 		dt_batch,
-		workspace.alpha_buf
+		network_ws.alpha_buf
 	);
 
 	sigma_to_ray_rgba_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
@@ -435,19 +440,18 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		batch_size,
 		ray_steps,
 		ray_offset,
-		workspace.sigma_buf,
-		dt_batch,
+		network_ws.sigma_buf,
 		output_buffer,
-		workspace.alpha_buf,
-		workspace.ray_rgba
+		network_ws.alpha_buf,
+		network_ws.ray_rgba
 	);
 
 	ray_rgba_to_loss_forward_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
-		workspace.ray_rgba,
+		network_ws.ray_rgba,
 		target_rgba,
-		workspace.loss_buf
+		network_ws.loss_buf
 	);
 
 	return fwd_ctx;
@@ -459,7 +463,7 @@ float NerfNetwork::calculate_loss(
 	const uint32_t& n_rays
 ) {
 	// Add all loss values together
-	thrust::device_ptr<float> loss_buffer_ptr(workspace.loss_buf);
+	thrust::device_ptr<float> loss_buffer_ptr(network_ws.loss_buf);
 
 	return (1.0f / (float)n_rays) * thrust::reduce(
 		thrust::cuda::par_nosync.on(stream),
@@ -479,7 +483,6 @@ void NerfNetwork::backward(
 	const uint32_t* ray_steps,
 	const uint32_t* ray_offset,
 	const tcnn::network_precision_t* network_density,
-	const float* network_sigma,
 	const tcnn::network_precision_t* network_color,
 	float* pos_batch,
 	float* dir_batch,
@@ -487,18 +490,18 @@ void NerfNetwork::backward(
 	float* target_rgba
 ) {
 	// zero out previous gradients
-	cudaMemsetAsync(workspace.grad_dL_dR, 0, 4 * batch_size * sizeof(float), stream);
-	cudaMemsetAsync(workspace.grad_dL_dcolor, 0, 3 * batch_size * sizeof(float), stream);
-	cudaMemsetAsync(workspace.grad_dL_dsigma, 0, batch_size * sizeof(float), stream);
+	cudaMemsetAsync(network_ws.grad_dL_dR, 0, 4 * batch_size * sizeof(float), stream);
+	cudaMemsetAsync(network_ws.grad_dL_dcolor, 0, 3 * batch_size * sizeof(float), stream);
+	cudaMemsetAsync(network_ws.grad_dL_dsigma, 0, batch_size * sizeof(float), stream);
 
 	// Backpropagate loss
 	ray_rgba_to_loss_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		1.0f / (2.0f * (float)n_rays),
-		workspace.ray_rgba,
+		network_ws.ray_rgba,
 		target_rgba,
-		workspace.grad_dL_dR
+		network_ws.grad_dL_dR
 	);
 
 	sigma_to_ray_rgba_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
@@ -506,26 +509,25 @@ void NerfNetwork::backward(
 		batch_size,
 		ray_steps,
 		ray_offset,
-		workspace.sigma_buf,
 		dt_batch,
-		workspace.alpha_buf,
+		network_ws.alpha_buf,
 		network_color,
-		workspace.ray_rgba,
-		workspace.grad_dL_dR,
-		workspace.grad_dL_dsigma,
-		workspace.grad_dL_dcolor
+		network_ws.ray_rgba,
+		network_ws.grad_dL_dR,
+		network_ws.grad_dL_dsigma,
+		network_ws.grad_dL_dcolor
 	);
 
 	density_to_sigma_backward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
 		network_density,
-		workspace.grad_dL_dsigma,
-		workspace.grad_dL_ddensity
+		network_ws.grad_dL_dsigma,
+		network_ws.grad_dL_ddensity
 	);
 
 	// Backpropagate through the color network
 	GPUMatrixDynamic color_network_dL_doutput_matrix(
-		workspace.color_network_dL_doutput,
+		network_ws.color_network_dL_doutput,
 		color_network->padded_output_width(),
 		batch_size,
 		MatrixLayout::RowMajor
@@ -538,12 +540,12 @@ void NerfNetwork::backward(
 		n_samples,
 		batch_size,
 		LOSS_SCALE,
-		workspace.grad_dL_dcolor,
+		network_ws.grad_dL_dcolor,
 		color_network_dL_doutput_matrix.data()
 	);
 
 	GPUMatrixDynamic color_network_dL_dinput_matrix(
-		workspace.color_network_dL_dinput,
+		network_ws.color_network_dL_dinput,
 		color_network->input_width(),
 		batch_size,
 		MatrixLayout::RowMajor
@@ -560,7 +562,7 @@ void NerfNetwork::backward(
 
 	// Backpropagate through the density network
 	GPUMatrixDynamic density_network_dL_dinput_matrix(
-		workspace.density_network_dL_dinput,
+		network_ws.density_network_dL_dinput,
 		density_network->input_width(),
 		batch_size,
 		MatrixLayout::RowMajor
@@ -581,7 +583,7 @@ void NerfNetwork::backward(
 		n_samples,
 		batch_size,
 		LOSS_SCALE,
-		workspace.grad_dL_ddensity,
+		network_ws.grad_dL_ddensity,
 		density_network_dL_doutput_matrix.data()
 	);
 
@@ -601,17 +603,17 @@ void NerfNetwork::optimizer_step(const cudaStream_t& stream) {
 	density_optimizer->step(
 		stream,
 		LOSS_SCALE,
-		params_workspace.density_network_params_fp,
-		params_workspace.density_network_params_hp,
-		params_workspace.density_network_gradients_hp
+		params_ws.density_network_params_fp,
+		params_ws.density_network_params_hp,
+		params_ws.density_network_gradients_hp
 	);
 
 	color_optimizer->step(
 		stream,
 		LOSS_SCALE,
-		params_workspace.color_network_params_fp,
-		params_workspace.color_network_params_hp,
-		params_workspace.color_network_gradients_hp
+		params_ws.color_network_params_fp,
+		params_ws.color_network_params_hp,
+		params_ws.color_network_gradients_hp
 	);
 }
 
@@ -621,7 +623,7 @@ void NerfNetwork::enlarge_workspace_if_needed(const cudaStream_t& stream, const 
 		return;
 	}
 
-	workspace.enlarge(
+	network_ws.enlarge(
 		stream,
 		batch_size,
 		density_network->input_width(),

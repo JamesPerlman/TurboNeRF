@@ -12,6 +12,8 @@ NRC_NAMESPACE_BEGIN
 
 struct RenderingWorkspace: Workspace {
 
+    using Workspace::Workspace;
+
 	uint32_t batch_size;
 	
 	// misc
@@ -20,10 +22,6 @@ struct RenderingWorkspace: Workspace {
 	OccupancyGrid* occupancy_grid;
 
 	// compaction
-	int c_block_size;
-	int c_n_blocks;
-	int* c_block_counts;
-	int* c_block_offsets;
 	int* compact_idx;
 
 	// rays
@@ -59,8 +57,7 @@ struct RenderingWorkspace: Workspace {
 		const uint32_t& output_height,
 		const uint32_t& n_elements_per_batch,
 		const uint32_t& n_network_concat_elements,
-		const uint32_t& n_network_output_elements,
-		const uint32_t& compaction_block_size
+		const uint32_t& n_network_output_elements
 	) {
 		free_allocations();
 
@@ -73,11 +70,6 @@ struct RenderingWorkspace: Workspace {
 		occupancy_grid	= allocate<OccupancyGrid>(stream, 1);
 
 		// compaction
-		c_block_size	= compaction_block_size;
-		c_n_blocks		= tcnn::div_round_up((int)batch_size, c_block_size);
-
-		c_block_counts	= allocate<int>(stream, c_n_blocks);
-		c_block_offsets	= allocate<int>(stream, c_n_blocks);
 		compact_idx		= allocate<int>(stream, batch_size);
 
 		// rays

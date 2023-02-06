@@ -96,7 +96,7 @@ __global__ void generate_rays_pinhole_kernel(
 __global__ void march_rays_to_first_occupied_cell_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
-	const OccupancyGrid* occ_grid,
+	const OccupancyGrid* grid,
 	const BoundingBox* bbox,
 	const float dt_min,
 	const float dt_max,
@@ -157,10 +157,10 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 			return;
 		}
 
-		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
+		const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
+		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
 
-		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
+		if (grid->is_occupied_at(grid_level, x, y, z)) {
 			ray_ori[i_offset_0] = x;
 			ray_ori[i_offset_1] = y;
 			ray_ori[i_offset_2] = z;
@@ -169,7 +169,7 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 			return;
 		} else {
 			// otherwise we need to find the next occupied cell
-			t += occ_grid->get_dt_to_next_voxel(
+			t += grid->get_dt_to_next_voxel(
 				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
@@ -185,7 +185,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const uint32_t batch_size,
 	const uint32_t n_steps_max,
 	const uint32_t network_stride,
-	const OccupancyGrid* occ_grid,
+	const OccupancyGrid* grid,
 	const BoundingBox* bbox,
 	const float inv_aabb_size,
 	const float dt_min,
@@ -250,10 +250,10 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			break;
 		}
 
-		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
+		const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
+		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
 
-		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
+		if (grid->is_occupied_at(grid_level, x, y, z)) {
 
 			const uint32_t step_offset_0 = n_steps * n_rays + i; // coalesced!
 			const uint32_t step_offset_1 = step_offset_0 + network_stride;
@@ -274,7 +274,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			++n_steps;
 		} else {
 			// otherwise we need to find the next occupied cell
-			t += occ_grid->get_dt_to_next_voxel(
+			t += grid->get_dt_to_next_voxel(
 				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,

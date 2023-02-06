@@ -8,6 +8,9 @@
 NRC_NAMESPACE_BEGIN
 
 struct NetworkWorkspace : Workspace {
+
+    using Workspace::Workspace;
+
     uint32_t batch_size;
 
     // gradient calculation buffers

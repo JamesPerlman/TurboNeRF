@@ -20,6 +20,11 @@
 NRC_NAMESPACE_BEGIN
 
 struct OccupancyGrid {
+private:
+	float* __restrict__ density;
+	uint8_t* __restrict__ bitfield;
+
+public:
 	const int n_levels;
 	const float resolution_f;
 	const float inv_resolution_f;
@@ -29,8 +34,9 @@ struct OccupancyGrid {
 
 	OccupancyGridWorkspace workspace;
 
-	OccupancyGrid(const int& n_levels, const int& resolution = 128)
-		: n_levels(n_levels)
+	OccupancyGrid(const int& device_id, const int& n_levels, const int& resolution = 128)
+		: workspace(device_id)
+		, n_levels(n_levels)
 		, resolution_i(resolution)
 		, resolution_f(resolution)
 		, inv_resolution_f(1.0f / resolution_f)
@@ -55,23 +61,25 @@ struct OccupancyGrid {
 	}
 	
 	// allocators/initializers
-	uint8_t* initialize(const cudaStream_t& stream, const bool& use_full_precision_values) {
+	__host__ void initialize(const cudaStream_t& stream, const bool& use_full_precision_values) {
 		workspace.enlarge(
 			stream,
 			n_levels,
 			volume_i,
 			use_full_precision_values
 		);
-		return workspace.bitfield;
+		
+		density = workspace.values;
+		bitfield = workspace.bitfield;
 	}
 
 	// pointer getters
 	inline NRC_HOST_DEVICE uint8_t* get_bitfield() const {
-		return workspace.bitfield;
+		return bitfield;
 	}
 
 	inline NRC_HOST_DEVICE float* get_density() const {
-		return workspace.values;
+		return density;
 	}
 
 	// memory setters
@@ -181,10 +189,11 @@ struct OccupancyGrid {
 	inline __device__ float update_sigma_at(
 		const int& level,
 		const uint32_t& byte_idx,
-		const float& value
-	) const {
-		float* ptr = workspace.values + level * volume_i + byte_idx;
-		*ptr = 0.5f * (*ptr + value);
+		const float& value,
+		const float& decay_factor
+	) {
+		float* ptr = density + level * volume_i + byte_idx;
+		*ptr = 0.5f * ((*ptr * decay_factor) + value);
 	}
 
 	/* From Müller, et al. 2022

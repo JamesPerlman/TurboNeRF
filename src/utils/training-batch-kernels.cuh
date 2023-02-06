@@ -182,7 +182,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	uint32_t n_rays,
 	uint32_t batch_size,
 	const BoundingBox* bbox,
-	const OccupancyGrid* occ_grid,
+	const OccupancyGrid* grid,
 	const float cone_angle,
 	const float dt_min,
 	const float dt_max,
@@ -235,10 +235,10 @@ __global__ void march_and_count_steps_per_ray_kernel(
 			break;
 		}
 
-		const float dt = occ_grid->get_dt(t, cone_angle, dt_min, dt_max);
-		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
+		const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
+		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
 
-		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
+		if (grid->is_occupied_at(grid_level, x, y, z)) {
 
 			t += dt;
 
@@ -254,7 +254,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 		} else {
 			// otherwise we need to find the next occupied cell
 			// TODO: feed in normalized positions so we don't have to calculate them here!
-			t += occ_grid->get_dt_to_next_voxel(
+			t += grid->get_dt_to_next_voxel(
 				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
@@ -282,7 +282,7 @@ __global__ void march_and_generate_network_positions_kernel(
 	uint32_t batch_size,
 	const BoundingBox* bbox,
 	const float inv_aabb_size,
-	const OccupancyGrid* occ_grid,
+	const OccupancyGrid* grid,
 	const float dt_min,
 	const float dt_max,
 	const float cone_angle,
@@ -357,10 +357,10 @@ __global__ void march_and_generate_network_positions_kernel(
 			break;
 		}
 
-		float dt = occ_grid->get_dt(t1, cone_angle, dt_min, dt_max);
-		const int grid_level = occ_grid->get_grid_level_at(x, y, z, dt);
+		float dt = grid->get_dt(t1, cone_angle, dt_min, dt_max);
+		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
 
-		if (occ_grid->is_occupied_at(grid_level, x, y, z)) {
+		if (grid->is_occupied_at(grid_level, x, y, z)) {
 
 			const uint32_t step_offset_0 = sample_offset + n_steps_taken;
 			const uint32_t step_offset_1 = step_offset_0 + batch_size;
@@ -380,7 +380,7 @@ __global__ void march_and_generate_network_positions_kernel(
 			++n_steps_taken;
 		} else {
 			// otherwise we need to find the next occupied cell
-			dt += occ_grid->get_dt_to_next_voxel(
+			dt += grid->get_dt_to_next_voxel(
 				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,

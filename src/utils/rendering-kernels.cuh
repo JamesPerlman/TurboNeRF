@@ -31,7 +31,7 @@ __global__ void generate_rays_pinhole_kernel(
 __global__ void march_rays_to_first_occupied_cell_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
-	const OccupancyGrid* occ_grid,
+	const OccupancyGrid* grid,
 	const BoundingBox* bbox,
 	const float dt_min,
 	const float dt_max,
@@ -57,7 +57,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const uint32_t batch_size,
 	const uint32_t n_steps_max,
 	const uint32_t network_stride,
-	const OccupancyGrid* occ_grid,
+	const OccupancyGrid* grid,
 	const BoundingBox* bbox,
 	const float inv_aabb_size,
 	const float dt_min,

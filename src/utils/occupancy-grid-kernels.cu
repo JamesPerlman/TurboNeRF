@@ -38,7 +38,7 @@ __global__ void generate_grid_cell_network_sample_points_kernel(
     const uint32_t n_cells,
     const uint32_t batch_size,
     const uint32_t start_idx,
-    const OccupancyGrid* __restrict__ grid,
+    const OccupancyGrid* grid,
     const int level,
     const float inv_aabb_size,
     const float* __restrict__ random_float,
@@ -80,9 +80,10 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t start_idx,
     const uint32_t level,
     const float selection_threshold,
+    const float decay_factor,
     const float* __restrict__ random_float,
     const tcnn::network_precision_t* __restrict__ network_sigma,
-    OccupancyGrid* __restrict__ grid
+    OccupancyGrid* grid
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_samples) {
@@ -92,41 +93,39 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t idx = i + start_idx;
 
     // (selection_threshold * 100)% of cells are sampled randomly, and half of the rest are sampled based on the current occupancy
-    if (selection_threshold < random_float[i]) {
-        if (selection_threshold < 0.5f * random_float[i]) {
-            if (!grid->is_occupied_at(level, idx)) {
-                return;
-            }
-        } else {
-            return;
-        }
-    }
-    
-    grid->update_sigma_at(level, idx, (float)network_sigma[i]);
+    // if (selection_threshold < random_float[i]) {
+    //     if (selection_threshold < 0.5f * random_float[i]) {
+    //         if (!grid->is_occupied_at(level, idx)) {
+    //             return;
+    //         }
+    //     } else {
+    //         return;
+    //     }
+    // }
+
+    grid->update_sigma_at(level, idx, (float)network_sigma[i], decay_factor);
 }
 
 // occupancy bits are updated by thresholding each cell's density, default = 0.01 * 1024 / sqrt(3)
 __global__ void update_occupancy_grid_bits_kernel(
-    const uint32_t n_cells_per_level,
-    const int n_levels,
     const float threshold,
-    OccupancyGrid* __restrict__ grid,
-    const float* __restrict__ grid_sigma,
-    uint8_t* __restrict__ grid_bits
+    OccupancyGrid* grid
 ) {
     const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= n_cells_per_level) {
+    if (idx >= grid->volume_i) {
         return;
     }
-
+    
+    float* __restrict__ grid_density = grid->get_density();
+    uint8_t* __restrict__ grid_bits = grid->get_bitfield();
     uint8_t cell_bits = 0b00000000;
 
     #pragma unroll
-    for (int level = 0; level < n_levels; ++level) {
-        const uint32_t density_idx = level * n_cells_per_level + idx;
+    for (int level = 0; level < grid->n_levels; ++level) {
+        const uint32_t density_idx = level * grid->volume_i + idx;
         
         // get "is threshold exceeded?" as a bit
-        uint8_t b = grid_sigma[density_idx] > threshold ? 1 : 0;
+        uint8_t b = grid_density[density_idx] > threshold ? 1 : 0;
         cell_bits |= b << level;
     }
 

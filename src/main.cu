@@ -44,20 +44,18 @@ int main()
 	auto nerf_manager = nrc::NeRFManager();
 
 	// printf("%lu", grid.max_index());
-	
-
-	auto nerf = nerf_manager.create_trainable_nerf(stream, dataset.bounding_box);
+	auto nerf = nerf_manager.create_trainable_nerf(0, stream, dataset.bounding_box);
 
 	// set up training controller
-	auto trainer = nrc::NeRFTrainingController(dataset, nerf);
-	trainer.prepare_for_training(stream, NeRFConstants::batch_size);
+	auto trainer = nrc::NeRFTrainingController(dataset, nerf, NeRFConstants::batch_size);
+	trainer.prepare_for_training();
 
 	// set up rendering controller
 	auto renderer = nrc::NeRFRenderingController();
 	float* rgba;
 
-	CUDA_CHECK_THROW(cudaMallocManaged(&rgba, 1024 * 1024 * 4 * sizeof(float)));
-	auto render_buffer = nrc::RenderBuffer(1024, 1024, rgba);
+	CUDA_CHECK_THROW(cudaMallocManaged(&rgba, 512 * 512 * 4 * sizeof(float)));
+	auto render_buffer = nrc::RenderBuffer(512, 512, rgba);
 
 	auto camera_transform = nrc::Transform4f::Identity();
 	auto cam6 = dataset.cameras[6];
@@ -65,21 +63,23 @@ int main()
 
 	// fetch nerfs as pointers
 	std::vector<nrc::NeRF*> nerf_ptrs;
-	for (auto& nerf : nerf_manager.get_nerfs()) {
-		nerf_ptrs.emplace_back(nerf);
+	for (auto& proxy : nerf_manager.get_proxies()) {
+		for (auto& nerf : proxy->nerfs) {
+			nerf_ptrs.emplace_back(&nerf);
+		}
 	}
 
 	for (int i = 0; i < 1024 * 10; ++i) {
-		trainer.train_step(stream);
+		trainer.train_step();
 		// every 16 training steps, update the occupancy grid
 
 		if (i % 16 == 0 && i > 0) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
-			trainer.update_occupancy_grid(stream, cell_selection_threshold);
+			trainer.update_occupancy_grid(cell_selection_threshold);
 		}
 
-		if (i % 16 == 0 && i > 0) {
+		if (i % 32 == 0 && i > 0) {
 			float progress = (float)i / (360.f * 16.0f);
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
@@ -87,7 +87,7 @@ int main()
 				cam0.near,
 				cam0.far,
 				cam0.focal_length,
-				make_int2(1024, 1024),
+				make_int2(512, 512),
 				cam0.sensor_size,
 				tform,
 				cam0.dist_params

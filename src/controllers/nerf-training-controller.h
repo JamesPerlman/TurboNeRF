@@ -1,35 +1,34 @@
 # pragma once
 #include <cuda_runtime.h>
-#include <curand.h>
-#include <curand_kernel.h>
 #include <memory>
 #include <tiny-cuda-nn/common.h>
 #include <tiny-cuda-nn/encoding.h>
 #include <tiny-cuda-nn/optimizer.h>
 #include <tiny-cuda-nn/network.h>
 #include <tiny-cuda-nn/network_with_input_encoding.h>
+#include <vector>
 
 #include "../common.h"
 #include "../core/nerf-network.cuh"
 #include "../core/occupancy-grid.cuh"
+#include "../core/trainer.cuh"
 #include "../models/bounding-box.cuh"
 #include "../models/dataset.h"
-#include "../models/nerf.cuh"
+#include "../models/nerf-proxy.cuh"
 #include "../workspaces/training-workspace.cuh"
 
 NRC_NAMESPACE_BEGIN
 
 struct NeRFTrainingController {
 	// constructor
-	NeRFTrainingController(Dataset& dataset, NeRF* nerf);
-	~NeRFTrainingController();
+	NeRFTrainingController(Dataset& dataset, NeRFProxy* nerf_proxy, const uint32_t& batch_size);
 	
 	// public properties
 
 	// public methods
-	void prepare_for_training(const cudaStream_t& stream, const uint32_t& batch_size);
-	void train_step(const cudaStream_t& stream);
-	void update_occupancy_grid(const cudaStream_t& stream, const float& selection_threshold);
+	void prepare_for_training();
+	void train_step();
+	void update_occupancy_grid(const float& selection_threshold);
 
 	uint32_t get_training_step() const {
 		return training_step;
@@ -37,21 +36,16 @@ struct NeRFTrainingController {
 
 private:
 	// private properties
-	NeRF* nerf;
-	Dataset& dataset;
+	std::vector<Trainer::Context> contexts;
+
+	Dataset dataset;
+
+	Trainer trainer;
 
 	uint32_t training_step;
-	uint32_t n_rays_in_batch;
-	uint32_t n_samples_in_batch;
-
-	// workspace
-	TrainingWorkspace workspace;
-	curandGenerator_t rng;
 	
 	// private methods
-	void generate_next_training_batch(const cudaStream_t& stream);
-	void load_images(const cudaStream_t& stream);
-	void create_pixel_undistort_map(const cudaStream_t& stream, const Camera& camera);
+	void load_images(const cudaStream_t& stream, TrainingWorkspace& workspace);
 };
 
 NRC_NAMESPACE_END

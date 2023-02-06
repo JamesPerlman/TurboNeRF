@@ -6,6 +6,9 @@
 NRC_NAMESPACE_BEGIN
 
 struct OccupancyGridWorkspace: Workspace {
+
+    using Workspace::Workspace;
+
 	uint32_t n_total_elements;
     uint32_t n_bitfield_elements;
 

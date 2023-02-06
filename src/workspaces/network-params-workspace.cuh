@@ -8,7 +8,9 @@
 NRC_NAMESPACE_BEGIN
 
 struct NetworkParamsWorkspace: Workspace {
-    
+
+    using Workspace::Workspace;
+
     float* density_network_params_fp;
     tcnn::network_precision_t* density_network_params_hp;
     tcnn::network_precision_t* density_network_gradients_hp;

@@ -34,8 +34,7 @@ void NeRFRenderingController::request_render(
         request.output.height,
         batch_size,
         nerf->network.get_concat_buffer_width(),
-        nerf->network.get_padded_output_width(),
-        n_threads_linear
+        nerf->network.get_padded_output_width()
     );
 
     printf("Rendering...\n");
@@ -235,7 +234,7 @@ void NeRFRenderingController::request_render(
             }
             
             // check if compaction is required
-            if (n_rays_to_compact < n_rays_alive) {
+            if (n_rays_to_compact < n_rays_alive && n_rays_to_compact < n_rays_alive / 2) {
                 // get compacted ray indices
                 generate_compaction_indices(
                     stream,

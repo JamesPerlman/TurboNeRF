@@ -50,6 +50,7 @@ set(HEADERS
 	# core
 	src/core/occupancy-grid.cuh
 	src/core/nerf-network.cuh
+	src/core/trainer.cuh
 
 	# integrations
 	src/integrations/blender.cuh
@@ -59,6 +60,7 @@ set(HEADERS
 	src/models/camera.cuh
 	src/models/dataset.h
 	src/models/nerf.cuh
+	src/models/nerf-proxy.cuh
 	src/models/ray.h
 	src/models/render-buffer.cuh
 	src/models/render-request.cuh
@@ -82,16 +84,17 @@ set(HEADERS
 	src/utils/training-network-kernels.cuh
 
 	# services
+	src/services/device-manager.cuh
 	src/services/nerf-manager.cuh
-	src/services/trainer.cuh
 
 	# workspaces
+	src/workspaces/distributed-workspace.cuh
+	src/workspaces/nerf-workspace-group.cuh
 	src/workspaces/network-params-workspace.cuh
 	src/workspaces/network-workspace.cuh
 	src/workspaces/occupancy-grid-workspace.cuh
 	src/workspaces/rendering-workspace.cuh
 	src/workspaces/training-workspace.cuh
-	src/workspaces/workspace-ref.cuh
 	src/workspaces/workspace.cuh
 
 	# common
@@ -106,6 +109,7 @@ set(SOURCES
 
 	# core
 	src/core/nerf-network.cu
+	src/core/trainer.cu
 
 	# models
 	src/models/dataset.cu

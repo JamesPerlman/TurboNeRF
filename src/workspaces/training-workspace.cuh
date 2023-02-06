@@ -18,12 +18,13 @@ NRC_NAMESPACE_BEGIN
 // NeRFWorkspace?
 // TODO: Make this a derived struct from RenderingWorkspace
 struct TrainingWorkspace: Workspace {
-public:
+
+    using Workspace::Workspace;
 
 	uint32_t batch_size;
 
-	// arena properties
 	BoundingBox* bounding_box;
+	OccupancyGrid* occupancy_grid;
 
 	stbi_uc* image_data;
 
@@ -64,8 +65,6 @@ public:
 	tcnn::network_precision_t* network_concat;
 	tcnn::network_precision_t* network_output;
 
-	OccupancyGrid* occ_grid;
-
 	// sample buffers
 	int* sample_index; // indices of samples (for compaction)
 	bool* sample_visible; // is visible
@@ -76,8 +75,11 @@ public:
 	// GPUMemory managed properties
 	tcnn::GPUMemory<Camera> cameras;
 
-	// constructor
-	TrainingWorkspace() {};
+	// primitives
+	size_t n_images;
+	size_t n_pixels_per_image;
+	size_t n_channels_per_image;
+	uint32_t n_samples_per_batch;
 
 	// member functions
 	void enlarge(
@@ -92,6 +94,11 @@ public:
 		const size_t& n_network_output_elements
 	) {
 		free_allocations();
+
+		this->n_images = n_images;
+		this->n_pixels_per_image = n_pixels_per_image;
+		this->n_channels_per_image = n_channels_per_image;
+		this->n_samples_per_batch = n_samples_per_batch;
 		
 		batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
 		uint32_t n_cameras = n_images;
@@ -100,7 +107,7 @@ public:
 		// need to upgrade to C++20 to use typename parameters in lambdas :(
 		// auto alloc = []<typename T>(size_t size) { return allocate<T>(stream, size); };
 
-		occ_grid 		= allocate<OccupancyGrid>(stream, 1);
+		occupancy_grid 		= allocate<OccupancyGrid>(stream, 1);
 		bounding_box 	= allocate<BoundingBox>(stream, 1);
 		image_data 		= allocate<stbi_uc>(stream, n_pixel_elements);
 

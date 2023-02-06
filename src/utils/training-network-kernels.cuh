@@ -39,7 +39,7 @@ __global__ void copy_gradients_kernel(
 
 template <typename T>
 inline __device__ float density_to_sigma(const T& density) {
-	return __expf((float)density);
+	return __expf((float)density - 1.0f);
 }
 
 inline __device__ float sigma_to_trans(
@@ -70,7 +70,7 @@ __global__ void density_to_sigma_forward_kernel(
 
 	if (i >= n_samples) return;
 
-	sigma[i] = (T)density_to_sigma(density[i]);
+	sigma[i] = (T)density_to_sigma(fminf(density[i], 12.0f));
 }
 
 // this computes dL/ddensity = dL/dsigma * dsigma/ddensity and applies it back to the original density
@@ -94,7 +94,6 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 	const uint32_t* __restrict__ n_samples_buf,
 	const uint32_t* __restrict__ ray_offset_buf,
     const float* __restrict__ sigma_buf,
-    const float* __restrict__ dt_buf,
     const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
 	const float* __restrict__ alpha_buf,
     float* __restrict__ ray_rgba_buf
@@ -109,7 +108,6 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 
     // local references to sample data
     const float* __restrict__ s_sigma = sigma_buf + sample_offset;
-    const float* __restrict__ s_dt = dt_buf + sample_offset;
     
     const tcnn::network_precision_t* __restrict__ s_r = sample_rgb_buf + sample_offset;
     const tcnn::network_precision_t* __restrict__ s_g = s_r + batch_size;
@@ -156,7 +154,6 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
     const uint32_t batch_size,
     const uint32_t* __restrict__ n_samples_buf,
     const uint32_t* __restrict__ ray_offset_buf,
-    const float* __restrict__ sigma_buf,
     const float* __restrict__ dt_buf,
 	const float* __restrict__ alpha_buf,
     const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
@@ -179,7 +176,6 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	const uint32_t idx_offset_3 = idx_offset_2 + batch_size;
 
     // local references to sample data
-    const float* __restrict__ s_sigma = sigma_buf + sample_offset;
     const float* __restrict__ s_dt = dt_buf + sample_offset;
 
     const tcnn::network_precision_t* __restrict__ s_r = sample_rgb_buf + sample_offset;
