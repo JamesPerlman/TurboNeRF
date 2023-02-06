@@ -27,15 +27,20 @@ void NeRFRenderingController::request_render(
     // TODO: this should happen for all NeRFs
     NeRF* nerf = request.nerfs[0];
 
-    // TODO: enlarge workspace only on batch size or output size change
-    workspace.enlarge(
-        stream,
-        request.output.width,
-        request.output.height,
-        batch_size,
-        nerf->network.get_concat_buffer_width(),
-        nerf->network.get_padded_output_width()
-    );
+    const uint32_t new_render_area = request.output.width * request.output.height;
+
+    if (render_area != new_render_area) {
+        workspace.enlarge(
+            stream,
+            request.output.width,
+            request.output.height,
+            batch_size,
+            nerf->network.get_concat_buffer_width(),
+            nerf->network.get_padded_output_width()
+        );
+
+        render_area = new_render_area;
+    }
 
     printf("Rendering...\n");
 
@@ -234,7 +239,7 @@ void NeRFRenderingController::request_render(
             }
             
             // check if compaction is required
-            if (n_rays_to_compact < n_rays_alive && n_rays_to_compact < n_rays_alive / 2) {
+            if (n_rays_to_compact < n_rays_alive / 2) {
                 // get compacted ray indices
                 generate_compaction_indices(
                     stream,
