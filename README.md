@@ -8,7 +8,7 @@ After the Blender integration is complete, I will release a binary along with th
 
 ## INTRODUCTION
 
-Hello NeRF enthusaists!  Here you will find my NeRF rendering and training library.  The core principles of this NeRF method are based on the incredible work of [Thomas Müller](https://tom94.net/), [Alex Evans](https://research.nvidia.com/person/alex-evans), [Christoph Schied](https://research.nvidia.com/person/christoph-schied), and [Alex Keller](https://research.nvidia.com/person/alex-keller), in their paper [Instant neural graphics primitives with a multiresolution hash encoding](https://arxiv.org/abs/2003.08934).  
+Hello NeRF enthusiasts!  Here you will find my NeRF rendering and training library.  The core principles of this NeRF method are based on the incredible work of [Thomas Müller](https://tom94.net/), [Alex Evans](https://research.nvidia.com/person/alex-evans), [Christoph Schied](https://research.nvidia.com/person/christoph-schied), and [Alex Keller](https://research.nvidia.com/person/alex-keller), in their paper [Instant neural graphics primitives with a multiresolution hash encoding](https://arxiv.org/abs/2003.08934).  
 
 Yes, I realize there is already a [CUDA implementation](https://github.com/nvlabs/instant-ngp), but I wanted to take a crack at reimplimenting this myself for the challenge, and for artistic uses such as:  
 
