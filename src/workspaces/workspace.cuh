@@ -15,10 +15,9 @@ NRC_NAMESPACE_BEGIN
 
 struct Workspace {
     struct Allocation {
-        const cudaStream_t stream;
         void* ptr;
 
-        Allocation(const cudaStream_t& stream, void* ptr = nullptr) : stream(stream), ptr(ptr) {};
+        Allocation(void* ptr = nullptr) : ptr(ptr) {};
     };
 
 private:
@@ -36,7 +35,7 @@ public:
         const size_t n_bytes = n_elements * sizeof(T);
         CUDA_CHECK_THROW(cudaMallocAsync(&ptr, n_bytes, stream));
         _total_size += n_bytes;
-        _allocations.emplace_back(stream, ptr);
+        _allocations.emplace_back(ptr);
         return ptr;
     }
 
@@ -46,11 +45,12 @@ public:
 
     // free all allocations
     void free_allocations() {
+        CUDA_CHECK_THROW(cudaSetDevice(device_id));
         int n_allocations_freed = 0;
         for (const auto& allocation : _allocations) {
             if (allocation.ptr != nullptr) {
                 try {
-                    CUDA_CHECK_THROW(cudaFreeAsync(allocation.ptr, allocation.stream));
+                    CUDA_CHECK_THROW(cudaFreeAsync(allocation.ptr, 0));
                     ++n_allocations_freed;
                 } catch (const std::runtime_error& e) {
                     std::cout << "Error freeing allocation: " << e.what() << std::endl;
