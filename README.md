@@ -1,6 +1,6 @@
 ## LATEST UPDATE
 
-Now working on the Python API. (~10% complete)  
+Now working on the Python API. (~99% complete - untested)  
 The Python API will allow a developer to consume certain CUDA functionalities.  
 The Blender integration will come after the Python API is complete.  
 Estimated ETA on the Blender plugin is ~March 1, 2022  
@@ -18,9 +18,11 @@ Yes, I realize there is already a [CUDA implementation](https://github.com/nvlab
 * Shadertoy-style effects  
 * Fractals  
 
-Since everything here has been written from scratch, this codebase is permissively licensed and commercial-use-friendly.  
+Since everything here has been written from scratch*, this codebase is permissively licensed and commercial-use-friendly.  
 
-DISCLAIMER: Although I am extremely passionate about NeRFs and their artistic applications, I do not have a deep background in ML research or CUDA development, and the code I've written here will certainly reflect that.  But perhaps that's where you come in!  Feel free to browse and suggest changes, this is all a learning process!  
+(*with generous help from [NeRF](https://github.com/bmild/nerf), [nerfstudio](https://github.com/nerfstudio-project/nerfstudio), [NerfAcc](https://github.com/KAIR-BAIR/nerfacc), and completely built on the [tiny-cuda-nn](https://github.com/NVLabs/tiny-cuda-nn) backend.)  
+
+DISCLAIMER: Although I am extremely passionate about NeRFs and their artistic applications, I do not have a deep background in ML research or CUDA development, and the code I've written here may certainly reflect that.  But perhaps that's where you come in!  Feel free to browse and suggest changes, this is all a learning process!  
 
 Enjoy!  
 -James  
@@ -34,20 +36,19 @@ https://www.dropbox.com/sh/qkt4t1tk1o7pdc6/AAD218LLtAavRZykYl33mO8ia?dl=1
 
 ## THANK YOU
 
-Many thank-yous to open source projects that will allow this project to reach its full potential (in order of integration date):
+Extreme gratitude to open source projects that will allow this project to reach its full potential (in order of integration date):
 
-https://github.com/pkestene/cuda-proj-tmpl [[LICENSE](https://github.com/pkestene/cuda-proj-tmpl/blob/master/LICENSE)]  
-https://github.com/NVlabs/tiny-cuda-nn [[LICENSE](https://github.com/NVlabs/tiny-cuda-nn/blob/master/LICENSE.txt)]  
-https://github.com/nlohmann/json [[LICENSE](https://github.com/nlohmann/json/blob/develop/LICENSE.MIT)]  
-https://gitlab.com/libeigen/eigen [[LICENSE](https://gitlab.com/libeigen/eigen/-/blob/master/COPYING.APACHE)]  
-https://github.com/nothings/stb [[LICENSE](https://github.com/nothings/stb/blob/master/LICENSE)]  
-https://github.com/bmild/nerf [[LICENSE](https://github.com/bmild/nerf/blob/master/LICENSE)]  
-https://github.com/nerfstudio-project/nerfstudio [[LICENSE](https://github.com/nerfstudio-project/nerfstudio/blob/main/LICENSE)]  
-https://github.com/KAIR-BAIR/nerfacc [[LICENSE](https://github.com/KAIR-BAIR/nerfacc/blob/master/LICENSE)]  
-https://github.com/ashawkey/torch-ngp [[LICENSE](https://github.com/ashawkey/torch-ngp/blob/main/LICENSE)]  
-https://github.com/google/nerfies [[LICENSE](https://github.com/google/nerfies/blob/main/LICENSE)]  
-https://github.com/glfw/glfw [[LICENSE](https://github.com/glfw/glfw/blob/master/LICENSE.md)]  
-https://github.com/pybind/pybind11 [[LICENSE](https://github.com/pybind/pybind11/blob/master/LICENSE)]  
+* (CUDA CMake Starter)[https://github.com/pkestene/cuda-proj-tmpl]  
+* (tiny-cuda-nn)[https://github.com/NVlabs/tiny-cuda-nn]  
+* (JSON for modern C++)[https://github.com/nlohmann/json]  
+* (stb)[https://github.com/nothings/stb]  
+* (NeRF)[https://github.com/bmild/nerf]  
+* (nerfstudio)[https://github.com/nerfstudio-project/nerfstudio]  
+* (NerfAcc)[https://github.com/KAIR-BAIR/nerfacc]  
+* (torch-ngp)[https://github.com/ashawkey/torch-ngp]  
+* (Nerfies)[https://github.com/google/nerfies]  
+* (glfw)[https://github.com/glfw/glfw]  
+* (pybind11)[https://github.com/pybind/pybind11]  
 
 LICENSES TO BE ADDED TO CODEBASE SOON.  CHECK LICENSES/ DIRECTORY
 
