@@ -23,7 +23,7 @@ NRC_NAMESPACE_BEGIN
  * @return * The index of the last element less than `max_value`, or -1 if no element was found.
  */
 template <typename T>
-inline NRC_HOST_DEVICE int find_last_lt_presorted(
+inline __host__ int find_last_lt_presorted(
 	const cudaStream_t& stream,
     const thrust::device_ptr<T>& data_begin_ptr,
 	const size_t& n_elements,
@@ -39,7 +39,7 @@ inline NRC_HOST_DEVICE int find_last_lt_presorted(
 		exec_policy,
         iter_end_reverse,
         iter_begin_reverse,
-        [max_value] NRC_HOST_DEVICE (T x) { return x < max_value; }
+        [max_value] __device__ (T x) { return x < max_value; }
     );
 
     // if an element was found, compute its index relative to the beginning of the vector

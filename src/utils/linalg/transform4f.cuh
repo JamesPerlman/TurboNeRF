@@ -24,13 +24,13 @@ struct alignas(float) Transform4f
 
     Transform4f() = default;
 
-    Transform4f(Matrix4f m)
+    NRC_HOST_DEVICE Transform4f(Matrix4f m)
         : m00(m.m00), m01(m.m01), m02(m.m02), m03(m.m03)
         , m10(m.m10), m11(m.m11), m12(m.m12), m13(m.m13)
         , m20(m.m20), m21(m.m21), m22(m.m22), m23(m.m23)
     {};
 
-    Transform4f(
+    NRC_HOST_DEVICE Transform4f(
         const float& m00, const float& m01, const float& m02, const float& m03,
         const float& m10, const float& m11, const float& m12, const float& m13,
         const float& m20, const float& m21, const float& m22, const float& m23)

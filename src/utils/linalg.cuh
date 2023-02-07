@@ -31,11 +31,11 @@ struct Matrix4f
 
     Matrix4f() = default;
 
-    Matrix4f(
-        float m00, float m01, float m02, float m03,
-        float m10, float m11, float m12, float m13,
-        float m20, float m21, float m22, float m23,
-        float m30, float m31, float m32, float m33
+    NRC_HOST_DEVICE Matrix4f(
+        const float& m00, const float& m01, const float& m02, const float& m03,
+        const float& m10, const float& m11, const float& m12, const float& m13,
+        const float& m20, const float& m21, const float& m22, const float& m23,
+        const float& m30, const float& m31, const float& m32, const float& m33
     ) : m00(m00), m01(m01), m02(m02), m03(m03),
         m10(m10), m11(m11), m12(m12), m13(m13),
         m20(m20), m21(m21), m22(m22), m23(m23),
