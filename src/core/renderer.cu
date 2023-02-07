@@ -108,6 +108,7 @@ void Renderer::render(
             ctx.batch_size,
             workspace.bounding_box,
             workspace.camera,
+            pixel_start,
             workspace.ray_origin[active_buf_idx],
             workspace.ray_dir[active_buf_idx],
             workspace.ray_idir[active_buf_idx],
@@ -115,10 +116,9 @@ void Renderer::render(
             workspace.ray_trans[active_buf_idx],
             workspace.ray_idx[active_buf_idx],
             workspace.ray_alive,
-            workspace.ray_active[active_buf_idx],
-            pixel_start
+            workspace.ray_active[active_buf_idx]
         );
-        
+
         const float dt_min = NeRFConstants::min_step_size;
         const float dt_max = nerf.bounding_box.size_x * dt_min;
         const float cone_angle = NeRFConstants::cone_angle;
@@ -135,7 +135,7 @@ void Renderer::render(
             // input buffers
             workspace.ray_dir[active_buf_idx],
             workspace.ray_idir[active_buf_idx],
-            
+
             // dual-use buffers
             workspace.ray_alive,
             workspace.ray_origin[active_buf_idx],
@@ -149,7 +149,7 @@ void Renderer::render(
 
         // ray marching loop
         uint32_t n_rays_alive = n_rays;
-        
+
         int n_steps = 0;
 
         // TODO: march rays to bounding box first

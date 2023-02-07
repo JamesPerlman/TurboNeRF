@@ -17,6 +17,7 @@ __global__ void generate_rays_pinhole_kernel(
 	const uint32_t batch_size,
 	const BoundingBox* __restrict__ bbox,
 	const Camera* __restrict__ cam,
+	const uint32_t start_idx,
 	float* __restrict__ ray_ori,
 	float* __restrict__ ray_dir,
 	float* __restrict__ ray_idir,
@@ -24,8 +25,7 @@ __global__ void generate_rays_pinhole_kernel(
 	float* __restrict__ ray_trans,
     uint32_t* __restrict__ ray_idx,
 	bool* __restrict__ ray_alive,
-	bool* __restrict__ ray_active,
-	const uint32_t start_idx
+	bool* __restrict__ ray_active
 );
 
 __global__ void march_rays_to_first_occupied_cell_kernel(
