@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -44,7 +44,7 @@ int main()
 	auto nerf_manager = nrc::NeRFManager();
 
 	// printf("%lu", grid.max_index());
-	auto nerf = nerf_manager.create_trainable_nerf(dataset.bounding_box);
+	auto nerf = nerf_manager.create_trainable(dataset.bounding_box);
 
 	// set up training controller
 	auto trainer = nrc::NeRFTrainingController(dataset, nerf, NeRFConstants::batch_size);

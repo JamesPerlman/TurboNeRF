@@ -33,7 +33,7 @@ public:
 	}
 
 	// create a new nerf
-	NeRFProxy* create_trainable_nerf(
+	NeRFProxy* create_trainable(
 		const BoundingBox& bbox
 	) {
 		proxies.emplace_back();
