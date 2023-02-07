@@ -16,7 +16,7 @@ struct NeRFRenderingController {
         const uint32_t& batch_size = 0
     );
 
-    void request_render(
+    void request(
         RenderRequest& request
     );
 

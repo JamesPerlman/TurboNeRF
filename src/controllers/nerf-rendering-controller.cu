@@ -23,7 +23,7 @@ NeRFRenderingController::NeRFRenderingController(
     }
 }
 
-void NeRFRenderingController::request_render(
+void NeRFRenderingController::request(
     RenderRequest& request
 ) {
     // TODO: batching/chunking/distributing requests across multiple GPUs
