@@ -143,7 +143,6 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 set(NeRFRenderCore_LIBRARIES
 	PRIVATE
 	${CUDA_LIBRARIES}
-	${CUDA_CUDART_LIBRARY}
 	curand
 	cublas
 	glfw
@@ -165,6 +164,7 @@ target_link_libraries(PyNeRFRenderCore
 # Copy DLLs to output directory
 # This is super hacky, but I don't know how else to do it.
 # I spent about 4 hours in a CMake rabbit hole trying to find a better way.
+# - James
 
 function(copy_cuda_dlls)
   # These are the DLL names
