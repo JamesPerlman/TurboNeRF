@@ -39,7 +39,6 @@ void Renderer::render(
     Renderer::Context& ctx,
     RenderRequest& request
 ) {
-    const cudaStream_t& stream = ctx.stream;
     RenderingWorkspace& workspace = ctx.workspace;
     
     // TODO: this should happen for all NeRFs
