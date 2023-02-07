@@ -32,10 +32,7 @@ Dataset::Dataset(const string& file_path) {
     float2 view_angle{json_data["camera_angle_x"], json_data["camera_angle_y"]};
     float2 angle_tans{tanf(view_angle.x), tanf(view_angle.y)};
     // sensor size is the size of the sensor at distance 1 from the camera's origin
-    float2 sensor_size{
-        2.0f * focal_length.x * tanf(0.5f * view_angle.x),
-        2.0f * focal_length.y * tanf(0.5f * view_angle.y)
-    };
+    
 
     uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
     bounding_box = BoundingBox((float)aabb_size);
@@ -60,12 +57,7 @@ Dataset::Dataset(const string& file_path) {
         Transform4f camera_matrix = nerf_to_nrc(transform_matrix);
 
         // TODO: per-camera dimensions
-        float2 sens_size{
-            near / focal_length.x * sensor_size.x,
-            near / focal_length.y * sensor_size.y
-        };
-
-        cameras.emplace_back(near, far, focal_length, image_dimensions, sens_size, camera_matrix, dist_params);
+        cameras.emplace_back(image_dimensions, near, far, focal_length, view_angle, camera_matrix, dist_params);
 
         // images
         string file_path = frame["file_path"];
@@ -98,4 +90,8 @@ void Dataset::load_images_in_parallel(std::function<void(const size_t, const Tra
     for (auto& thread : threads) {
         thread.join();
     }
+}
+
+const Camera& Dataset::get_camera(const size_t& index) const {
+    return cameras.at(index);
 }

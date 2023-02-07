@@ -28,6 +28,7 @@ struct Dataset {
 	Dataset(const string& file_path);
 	Dataset() = default;
 	void load_images_in_parallel(std::function<void(const size_t, const TrainingImage&)> post_load_image = {});
+	const Camera& get_camera(const size_t& index) const;
 };
 
 NRC_NAMESPACE_END
