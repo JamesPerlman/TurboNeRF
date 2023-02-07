@@ -76,7 +76,7 @@ __global__ void density_to_sigma_forward_kernel(
 // this computes dL/ddensity = dL/dsigma * dsigma/ddensity and applies it back to the original density
 __global__ void density_to_sigma_backward_kernel(
 	uint32_t n_samples,
-	const tcnn::network_precision_t* __restrict__ density,
+	const float* __restrict__ sigma,
 	const float* __restrict__ dL_dsigma,
 	float* __restrict__ dL_ddensity
 ) {
@@ -84,7 +84,7 @@ __global__ void density_to_sigma_backward_kernel(
 
 	if (i >= n_samples) return;
 	
-	dL_ddensity[i] = dL_dsigma[i] * density_to_sigma(density[i]);
+	dL_ddensity[i] = dL_dsigma[i] * sigma[i];
 }
 
 // sigma to ray color

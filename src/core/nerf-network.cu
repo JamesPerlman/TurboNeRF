@@ -519,7 +519,7 @@ void NerfNetwork::backward(
 
 	density_to_sigma_backward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
-		network_density,
+		network_ws.sigma_buf,
 		network_ws.grad_dL_dsigma,
 		network_ws.grad_dL_ddensity
 	);
