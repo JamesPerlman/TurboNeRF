@@ -59,16 +59,18 @@ private:
         return _streams[device];
     }
 
-    ~DeviceManager() {
+    void _teardown() {
+        int prev_device;
+        CUDA_CHECK_THROW(cudaGetDevice(&prev_device));
+
         for (int i = 0; i < _streams.size(); i++) {
-            try {
-                CUDA_CHECK_THROW(cudaSetDevice(i));
-                CUDA_CHECK_THROW(cudaStreamDestroy(_streams[i]));
-            } catch (const std::runtime_error& e) {
-                std::cerr << "Error destroying stream: " << e.what() << std::endl;
-            }
+            CUDA_CHECK_THROW(cudaSetDevice(i));
+            CUDA_CHECK_THROW(cudaStreamDestroy(_streams[i]));
         }
+
         _streams.clear();
+
+        CUDA_CHECK_THROW(cudaSetDevice(prev_device));
     }
 
 public:
@@ -99,6 +101,8 @@ public:
         foreach_device([](const int& device_id, const cudaStream_t& stream) {
             CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
         });
+    static void teardown() {
+        _get_instance()._teardown();
     }
 };
 
