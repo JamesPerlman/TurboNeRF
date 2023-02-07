@@ -14,7 +14,7 @@ struct RenderRequest {
     std::vector<NeRFProxy*> proxies;
     RenderBuffer* output;
 
-    RenderRequest(Camera camera, std::vector<NeRFProxy*>& proxies, RenderBuffer* output)
+    RenderRequest(const Camera& camera, std::vector<NeRFProxy*>& proxies, RenderBuffer* output)
         : camera(camera), proxies(proxies), output(output) {};
 };
 
