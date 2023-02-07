@@ -32,15 +32,13 @@ include_directories(includes/glfw/include)
 
 # pybind11
 add_subdirectory(includes/pybind11)
-include_directories(pybind11_INCLUDE_DIRS)
+include_directories(${pybind11_INCLUDE_DIRS})
 
 # Include sub-projects.
 
 set(TCNN_BUILD_EXAMPLES OFF)
 set(TCNN_BUILD_BENCHMARK OFF)
 add_subdirectory(includes/tiny-cuda-nn)
-
-# src project
 
 set(HEADERS
 	# controllers
@@ -145,6 +143,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 set(NeRFRenderCore_LIBRARIES
 	PRIVATE
 	${CUDA_LIBRARIES}
+	${CUDA_CUDART_LIBRARY}
 	curand
 	cublas
 	glfw
@@ -154,7 +153,6 @@ set(NeRFRenderCore_LIBRARIES
 target_link_libraries(${PROJECT_NAME}
 	PRIVATE
 	${NeRFRenderCore_LIBRARIES}
-	pybind11::module
 )
 
 target_link_libraries(PyNeRFRenderCore
@@ -162,3 +160,37 @@ target_link_libraries(PyNeRFRenderCore
 	${NeRFRenderCore_LIBRARIES}
 	pybind11::module
 )
+
+
+# Copy DLLs to output directory
+# This is super hacky, but I don't know how else to do it.
+# I spent about 4 hours in a CMake rabbit hole trying to find a better way.
+
+function(copy_cuda_dlls)
+  # These are the DLL names
+	set(CUDA_DLL_NAMES
+		cublas64_12
+		cublasLt64_12
+		cudart64_12
+		curand64_10
+	)
+
+	# Convert them to paths
+	set(CUDA_DLL_PATHS "")
+
+	foreach(CUDA_DLL_NAME ${CUDA_DLL_NAMES})
+		list(APPEND CUDA_DLL_PATHS "${CUDA_TOOLKIT_ROOT_DIR}/bin/${CUDA_DLL_NAME}.dll")
+	endforeach()
+
+	# Copy them to the output directory after building
+	foreach(CUDA_DLL_PATH ${CUDA_DLL_PATHS})
+	add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+		"${CUDA_DLL_PATH}"
+		$<TARGET_FILE_DIR:${PROJECT_NAME}>)
+	endforeach()
+endfunction()
+
+if(MSVC)
+  copy_cuda_dlls()
+endif()
