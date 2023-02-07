@@ -10,11 +10,11 @@
 NRC_NAMESPACE_BEGIN
 
 struct RenderRequest {
-    Camera camera;
+    const Camera camera;
     std::vector<NeRFProxy*> proxies;
     RenderBuffer* output;
 
-    RenderRequest(Camera& camera, std::vector<NeRFProxy*>& proxies, RenderBuffer* output)
+    RenderRequest(Camera camera, std::vector<NeRFProxy*>& proxies, RenderBuffer* output)
         : camera(camera), proxies(proxies), output(output) {};
 };
 
