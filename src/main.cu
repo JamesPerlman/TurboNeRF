@@ -86,10 +86,10 @@ int main()
 				cam0.dist_params
 			);
 
-			auto render_request = nrc::RenderRequest(render_cam, proxy_ptrs, render_buffer);
+			auto render_request = nrc::RenderRequest(render_cam, proxy_ptrs, &render_buffer);
 			renderer.request_render(render_request);
 			printf("Done!\n");
-			render_request.output.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);
+			render_request.output->save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);
 		}
 	}
 

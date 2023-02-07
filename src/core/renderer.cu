@@ -15,7 +15,7 @@ void Renderer::enlarge_workspace_if_needed(
     Renderer::Context& ctx,
     const RenderRequest& request
 ) {
-    const uint32_t new_render_area = request.output.width * request.output.height;
+    const uint32_t new_render_area = request.output->width * request.output->height;
 
     // TODO: NeRF network property getters could be made into static members.
     // For now we assume all NeRFs have the same network configuration.
@@ -24,8 +24,8 @@ void Renderer::enlarge_workspace_if_needed(
     if (render_area != new_render_area) {
         ctx.workspace.enlarge(
             ctx.stream,
-            request.output.width,
-            request.output.height,
+            request.output->width,
+            request.output->height,
             ctx.batch_size,
             nerf.network.get_concat_buffer_width(),
             nerf.network.get_padded_output_width()
@@ -81,7 +81,7 @@ void Renderer::render(
     );
 
     // calculate the number of pixels we need to fill
-    uint32_t n_pixels = request.output.width * request.output.height;
+    uint32_t n_pixels = request.output->width * request.output->height;
 
     // double buffer indices
     int active_buf_idx = 0;
@@ -209,7 +209,7 @@ void Renderer::render(
             composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, ctx.stream>>>(
                 n_rays_alive,
                 network_batch,
-                request.output.stride,
+                request.output->stride,
 
                 // input buffers
                 workspace.ray_active[active_buf_idx],
@@ -221,7 +221,7 @@ void Renderer::render(
                 // output buffers
                 workspace.ray_alive,
                 workspace.ray_trans[active_buf_idx],
-                request.output.rgba
+                request.output->rgba
             );
 
             n_steps += n_steps_per_ray;

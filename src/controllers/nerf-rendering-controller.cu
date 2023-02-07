@@ -28,6 +28,6 @@ void NeRFRenderingController::request_render(
 ) {
     // TODO: batching/chunking/distributing requests across multiple GPUs
     auto& ctx = contexts[0];
-    request.output.clear(ctx.stream);
+    request.output->clear(ctx.stream);
     renderer.render(ctx, request);
 }
