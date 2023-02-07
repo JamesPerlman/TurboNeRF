@@ -397,7 +397,6 @@ __global__ void composite_samples_kernel(
 		const uint32_t step_offset_0 = i * n_rays + idx;
 		const uint32_t step_offset_1 = step_offset_0 + network_stride;
 		const uint32_t step_offset_2 = step_offset_1 + network_stride;
-		const uint32_t step_offset_3 = step_offset_2 + network_stride;
 
 		// sample properties
 		const float alpha = sample_alpha[step_offset_0];

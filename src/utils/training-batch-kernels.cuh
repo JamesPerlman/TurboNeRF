@@ -341,7 +341,6 @@ __global__ void march_and_generate_network_positions_kernel(
 
 	float t0 = in_ray_t[i];
 	float t1 = t0;
-	float dt = 0.0f;
 
 	uint32_t n_steps_taken = 0;
 

@@ -440,7 +440,6 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		batch_size,
 		ray_steps,
 		ray_offset,
-		network_ws.sigma_buf,
 		output_buffer,
 		network_ws.alpha_buf,
 		network_ws.ray_rgba
