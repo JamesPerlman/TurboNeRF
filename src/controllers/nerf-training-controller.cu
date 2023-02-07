@@ -16,19 +16,19 @@ using namespace nrc;
 using namespace tcnn;
 using namespace nlohmann;
 
-NeRFTrainingController::NeRFTrainingController(Dataset& dataset, NeRFProxy* nerf_proxy, const uint32_t& batch_size)
+NeRFTrainingController::NeRFTrainingController(Dataset& dataset, NeRFProxy* nerf_proxy, const uint32_t batch_size)
 	: dataset(dataset)
 {
 	contexts.reserve(DeviceManager::get_device_count());
 	for (int i = 0; i < DeviceManager::get_device_count(); ++i) {
-		auto& nerf = nerf_proxy->nerfs[i];
+		
 		contexts.emplace_back(
-			DeviceManager::get_stream(i),
-			TrainingWorkspace(i),
+			DeviceManager::get_stream(i), 
+			TrainingWorkspace(i), 
 			&this->dataset,
-			&nerf,
+			&nerf_proxy->nerfs[i],
 			batch_size
-		);
+			);
 	}
 }
 

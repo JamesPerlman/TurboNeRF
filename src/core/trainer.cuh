@@ -34,17 +34,17 @@ public:
 
 		Context(
 			const cudaStream_t& stream,
-			TrainingWorkspace& workspace,
+			TrainingWorkspace workspace,
 			Dataset* dataset,
 			NeRF* nerf,
-			const uint32_t& batch_size
+			uint32_t batch_size
 		)
 			: stream(stream)
-			, workspace(workspace)
+			, workspace(std::move(workspace))
 			, dataset(dataset)
 			, nerf(nerf)
 			, batch_size(batch_size)
-			, n_rays_in_batch(batch_size)
+			, n_rays_in_batch(std::move(batch_size))
 			, n_samples_in_batch(0)
 		{
 			// TODO: CURAND_ASSERT_SUCCESS
