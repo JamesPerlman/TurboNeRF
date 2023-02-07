@@ -8,37 +8,24 @@
 NRC_NAMESPACE_BEGIN
 
 struct RenderBuffer {
-private:
-    bool self_managed_memory;
 public:
     uint32_t width;
     uint32_t height;
     uint32_t stride;
 
     // pointer to GPU memory to store the output data
-    float* rgba;
+    float* rgba = nullptr;
 
     RenderBuffer(const uint32_t& width, const uint32_t& height, float* rgba = nullptr)
         : width(width)
         , height(height)
         , stride(width * height)
     {
-        if (rgba != nullptr) {
-            this->rgba = rgba;
-            self_managed_memory = false;
-            return;
-        }
-
-        self_managed_memory = true;
         CUDA_CHECK_THROW(cudaMalloc(&this->rgba, stride * 4 * sizeof(float)));
     };
 
     ~RenderBuffer()
     {
-        if (!self_managed_memory) {
-            return;
-        }
-        
         try {
             CUDA_CHECK_THROW(cudaFree(rgba));
         } catch (const std::runtime_error& e) {
