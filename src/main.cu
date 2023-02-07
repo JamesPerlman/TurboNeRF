@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -77,11 +77,11 @@ int main()
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
+				cam0.resolution,
 				cam0.near,
 				cam0.far,
 				cam0.focal_length,
-				make_int2(IMG_SIZE, IMG_SIZE),
-				cam0.sensor_size,
+				cam0.view_angle,
 				tform,
 				cam0.dist_params
 			);

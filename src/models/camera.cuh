@@ -26,41 +26,43 @@ struct DistortionParams {
 };
 
 struct Camera {
-	float near;
-	float far;
-	float2 focal_length;
-	int2 resolution;
-	float2 resolution_f;
-	float2 sensor_size;
-	Transform4f transform;
-	DistortionParams dist_params;
+	const float near;
+	const float far;
+	const float2 focal_length;
+	const int2 resolution;
+	const float2 resolution_f;
+	const float2 view_angle;
+	const float2 sensor_size;
+	const Transform4f transform;
+	const DistortionParams dist_params;
 
 	// constructor
 	Camera(
+		int2 resolution,
 		float near,
 		float far,
 		float2 focal_length,
-		int2 resolution,
-		float2 sensor_size,
+		float2 view_angle,
 		Transform4f transform,
 		DistortionParams dist_params = DistortionParams()
 	)
-		: near(near)
+		: resolution(resolution)
+		, resolution_f(float2{float(resolution.x), float(resolution.y)})
+		, near(near)
 		, far(far)
 		, focal_length(focal_length)
-		, resolution(resolution)
-		, resolution_f(make_float2(float(resolution.x), float(resolution.y)))
-		, sensor_size(sensor_size)
+		, view_angle(view_angle)
+		, sensor_size(float2{2.0f * near * tanf(view_angle.x * 0.5f), 2.0f * near * tanf(view_angle.y * 0.5f)})
 		, transform(transform)
 		, dist_params(dist_params)
-	{ }
-
-	// member functions
+	{ };
 
 	// returns a ray in the camera's local coordinate system
 
-	inline __device__ Ray local_ray_at_pixel_xy_index(const uint32_t& x, const uint32_t& y) const {
-		
+	inline __device__ Ray local_ray_at_pixel_xy_index(
+		const uint32_t& x,
+		const uint32_t& y
+	) const {
 		// sx and sy are the corresponding x and y in the sensor rect's 2D coordinate system
 		// this will put rays at pixel centers
 		const float sx = sensor_size.x * ((float(x) + 0.5f) / (resolution_f.x) - 0.5f);
