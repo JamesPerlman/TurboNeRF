@@ -128,7 +128,7 @@ set(SOURCES
 
 # Build results
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-pybind11_add_module(PyNeRFRenderCore src/api/python_bindings.cu)
+pybind11_add_module(PyNeRFRenderCore src/api/python_bindings.cu ${SOURCES} ${HEADERS})
 
 # Set stricter compile flag
 target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler)
