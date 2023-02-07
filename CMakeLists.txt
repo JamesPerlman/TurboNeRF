@@ -131,7 +131,9 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 pybind11_add_module(PyNeRFRenderCore src/api/python_bindings.cu ${SOURCES} ${HEADERS})
 
 # Set stricter compile flag
-target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler)
+if(NOT MSVC)
+	target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler)
+endif()
 
 # CUDA includes / linkage
 set_target_properties(${PROJECT_NAME} PROPERTIES
