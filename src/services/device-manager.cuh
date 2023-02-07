@@ -98,9 +98,15 @@ public:
     }
 
     static void synchronize() {
+        int prev_device;
+        CUDA_CHECK_THROW(cudaGetDevice(&prev_device));
         foreach_device([](const int& device_id, const cudaStream_t& stream) {
+            CUDA_CHECK_THROW(cudaSetDevice(device_id));
             CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
         });
+        CUDA_CHECK_THROW(cudaSetDevice(prev_device));
+    }
+
     static void teardown() {
         _get_instance()._teardown();
     }
