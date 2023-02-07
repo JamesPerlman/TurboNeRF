@@ -165,7 +165,7 @@ void Trainer::generate_next_training_batch(
 		ctx.workspace.batch_size
 	) - 1;
 
-	if (ctx.n_rays_in_batch < 0) {
+	if (n_ray_max_idx < 0) {
 		throw std::runtime_error("No rays were generated for this training batch!\n");
 	}
 
