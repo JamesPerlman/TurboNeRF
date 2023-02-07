@@ -33,15 +33,23 @@ private:
 
     const cudaStream_t& _get_stream(int device) {
         const int n_devices = _get_device_count();
+
         if (_streams.size() <= n_devices) {
             // if this is the first call, we need to create streams for each device
+            
+            int prev_device;
+            CUDA_CHECK_THROW(cudaGetDevice(&prev_device));
+
             _streams.reserve(n_devices);
+
             for (int i = 0; i < n_devices; i++) {
                 CUDA_CHECK_THROW(cudaSetDevice(i));
                 cudaStream_t stream;
                 CUDA_CHECK_THROW(cudaStreamCreate(&stream));
                 _streams.emplace_back(stream);
             }
+
+            CUDA_CHECK_THROW(cudaSetDevice(prev_device));
         }
 
         if (device >= n_devices) {
