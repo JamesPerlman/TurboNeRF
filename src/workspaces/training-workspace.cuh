@@ -101,7 +101,6 @@ struct TrainingWorkspace: Workspace {
 		this->n_samples_per_batch = n_samples_per_batch;
 		
 		batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
-		uint32_t n_cameras = n_images;
 		size_t n_pixel_elements = n_channels_per_image * n_pixels_per_image * n_images;
 
 		// need to upgrade to C++20 to use typename parameters in lambdas :(
