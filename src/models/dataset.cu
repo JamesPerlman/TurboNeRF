@@ -91,7 +91,3 @@ void Dataset::load_images_in_parallel(std::function<void(const size_t, const Tra
         thread.join();
     }
 }
-
-const Camera& Dataset::get_camera(const size_t& index) const {
-    return cameras.at(index);
-}
