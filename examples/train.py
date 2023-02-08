@@ -43,7 +43,6 @@ render_cam = nrc.Camera(
 
 # this method loads all the images and other data the Trainer needs
 trainer.prepare_for_training()
-req = nrc.RenderRequest(render_cam, [nerf], render_buf)
 
 for i in range(1024):
     print(f"Training step {i}...")
