@@ -7,3 +7,6 @@
 [submodule "includes/pybind11"]
 	path = includes/pybind11
 	url = git@github.com:pybind/pybind11.git
+[submodule "includes/glew-cmake"]
+	path = includes/glew-cmake
+	url = git@github.com:JamesPerlman/glew-cmake.git

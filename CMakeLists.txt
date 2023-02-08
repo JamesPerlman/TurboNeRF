@@ -6,6 +6,8 @@ cmake_minimum_required (VERSION 3.24)
 
 cmake_policy(SET CMP0104 NEW)
 
+cmake_policy(SET CMP0077 NEW)
+
 project (NeRFRenderCore LANGUAGES CUDA CXX)
 
 
@@ -14,9 +16,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-
 # CUDA
-
 include(FindCUDA/select_compute_arch)
 CUDA_DETECT_INSTALLED_GPUS(INSTALLED_GPU_CCS_1)
 string(STRIP "${INSTALLED_GPU_CCS_1}" INSTALLED_GPU_CCS_2)
@@ -27,24 +27,22 @@ SET(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_LIST})
 find_package(CUDA 12.0 REQUIRED)
 include_directories(${CUDA_INCLUDE_DIRS})
 
-# CUDA+OpenGL
 
+# OpenGL
 find_package(OpenGL REQUIRED)
 include_directories(${OPENGL_INCLUDE_DIR})
 
-# glfw
-
-add_subdirectory(includes/glfw)
-include_directories(includes/glfw/include)
+# GLEW
+set(ONLY_LIBS ON)
+add_subdirectory(includes/glew-cmake)
+include_directories(includes/glew-cmake/include)
 
 # tiny-cuda-nn
-
 set(TCNN_BUILD_EXAMPLES OFF)
 set(TCNN_BUILD_BENCHMARK OFF)
 add_subdirectory(includes/tiny-cuda-nn)
 
 # project includes
-
 set(HEADERS
 	# controllers
 	src/controllers/nerf-rendering-controller.h
@@ -127,11 +125,9 @@ set(SOURCES
 )
 
 # project executable
-
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 # pybind11
-
 add_subdirectory(includes/pybind11)
 include_directories(${pybind11_INCLUDE_DIRS})
 
@@ -161,11 +157,12 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 
 set(NeRFRenderCore_LIBRARIES
 	PRIVATE
-	${CUDA_LIBRARIES}
 	${OPENGL_LIBRARIES}
+	${CUDA_LIBRARIES}
 	curand
 	cublas
 	glfw
+	libglew_static
 	tiny-cuda-nn
 )
 
