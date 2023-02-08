@@ -126,7 +126,12 @@ set(SOURCES
 
 # Build results
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-pybind11_add_module(PyNeRFRenderCore src/api/python_bindings.cu ${SOURCES} ${HEADERS})
+pybind11_add_module(PyNeRFRenderCore
+	src/api/pybind_cuda.cuh
+	src/api/python_bindings.cu
+	${SOURCES}
+	${HEADERS}
+)
 
 # Set stricter compile flag
 if(NOT MSVC)
