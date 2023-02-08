@@ -1,15 +1,13 @@
 from pathlib import Path
-import dlltracer
-
 
 # Search for pyNeRFRenderCore in build/Debug/
 import sys
 path_to_pyNeRFRenderCore = Path(__file__).parent.parent / "build" / "Debug"
-import os
 
 print("Searching for PyNeRFRenderCore in", path_to_pyNeRFRenderCore)
 
 sys.path.append(str(path_to_pyNeRFRenderCore))
+
 import PyNeRFRenderCore as nrc # type: ignore
 
 # check if PyNeRFRenderCore is loaded
