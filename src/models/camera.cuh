@@ -26,10 +26,10 @@ struct DistortionParams {
 };
 
 struct Camera {
+	const int2 resolution;
 	const float near;
 	const float far;
 	const float2 focal_length;
-	const int2 resolution;
 	const float2 resolution_f;
 	const float2 view_angle;
 	const float2 sensor_size;
