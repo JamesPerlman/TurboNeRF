@@ -16,6 +16,7 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 
 # CUDA
+
 include(FindCUDA/select_compute_arch)
 CUDA_DETECT_INSTALLED_GPUS(INSTALLED_GPU_CCS_1)
 string(STRIP "${INSTALLED_GPU_CCS_1}" INSTALLED_GPU_CCS_2)
@@ -26,19 +27,23 @@ SET(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_LIST})
 find_package(CUDA 12.0 REQUIRED)
 include_directories(${CUDA_INCLUDE_DIRS})
 
+# CUDA+OpenGL
+
+find_package(OpenGL REQUIRED)
+include_directories(${OPENGL_INCLUDE_DIR})
+
 # glfw
+
 add_subdirectory(includes/glfw)
 include_directories(includes/glfw/include)
 
-# pybind11
-add_subdirectory(includes/pybind11)
-include_directories(${pybind11_INCLUDE_DIRS})
-
-# Include sub-projects.
+# tiny-cuda-nn
 
 set(TCNN_BUILD_EXAMPLES OFF)
 set(TCNN_BUILD_BENCHMARK OFF)
 add_subdirectory(includes/tiny-cuda-nn)
+
+# project includes
 
 set(HEADERS
 	# controllers
@@ -50,9 +55,6 @@ set(HEADERS
 	src/core/nerf-network.cuh
 	src/core/renderer.cuh
 	src/core/trainer.cuh
-
-	# integrations
-	src/integrations/blender.cuh
 
 	# models
 	src/models/bounding-box.cuh
@@ -124,14 +126,26 @@ set(SOURCES
 	src/main.cu	
 )
 
-# Build results
+# project executable
+
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-pybind11_add_module(PyNeRFRenderCore
+
+# pybind11
+
+add_subdirectory(includes/pybind11)
+include_directories(${pybind11_INCLUDE_DIRS})
+
+set(PYBIND_INCLUDES
 	src/api/pybind_cuda.cuh
 	src/api/python_bindings.cu
+
+	src/integrations/blender.cuh
+
 	${SOURCES}
 	${HEADERS}
 )
+
+pybind11_add_module(PyNeRFRenderCore ${PYBIND_INCLUDES})
 
 # Set stricter compile flag
 if(NOT MSVC)
@@ -148,6 +162,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 set(NeRFRenderCore_LIBRARIES
 	PRIVATE
 	${CUDA_LIBRARIES}
+	${OPENGL_LIBRARIES}
 	curand
 	cublas
 	glfw
