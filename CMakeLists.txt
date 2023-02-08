@@ -145,7 +145,7 @@ pybind11_add_module(PyNeRFRenderCore ${PYBIND_INCLUDES})
 
 # Set stricter compile flag
 if(NOT MSVC)
-	target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler)
+	target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler -Werror)
 endif()
 
 # CUDA includes / linkage

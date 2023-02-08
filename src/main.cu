@@ -5,6 +5,7 @@
 
 #include <json/json.hpp>
 #include <set>
+#include <unordered_map>
 
 #include "common.h"
 #include "main.h"
@@ -28,13 +29,62 @@
 
 using namespace tcnn;
 using namespace nrc;
-int main()
+
+
+
+// Put strings in in .bss part of program
+static const std::string DEFAULT_DATASET_PATH = "E:\\2022\\nerf-library\\testdata\\lego\\transforms.json";
+static const std::string DEFAULT_OUTPUT_PATH = "H:\\";
+static const std::string HELP_OUTPUT = R"(
+	Usage: NeRFRenderCore -i <path_to_json> -o <path_to_output_dir>
+
+	Options:
+	-h,			Show this help message
+	-i,			Path to trainings data, e.g.: E:\\nerf\\transforms.json (windows) or /home/developer/transforms.json
+	-o,			Path to directory with rendering output, e.g.: E:\\ (windows) or /home/developer/ 
+
+)";
+
+bool validPathDirectory(const std::string&); 
+bool isJSONFile(const std::string &);
+
+int main(int argc, char* argv[])
 {
+	std::unordered_map<std::string, std::string> args;
+	// If we don't have any arguments, we proceed with the default input and output locations.
+	// We start with i = 1 because i = 0 is the program name.
+	for(int i = 1; i < argc; ++i) { 
+		const std::string arg = argv[i];
+		if (arg == "-h") {
+			std::cout << HELP_OUTPUT;
+			return 0;
+		} else if (arg.size() == 2 && i + 1 < argc) {
+			args[arg] = argv[++i];
+		} else if (arg.size() == 2) {
+			std::cout << fmt::format("Invalid argument {} {}", args[arg], argv[++i]);
+			return -1;
+		} else {
+			std::cout << fmt::format("Invalid argument {}", args[arg]);
+			return -1;
+		}
+	}
+
+
+	if (!args["-h"].empty()) {
+		std::cout << HELP_OUTPUT;
+		return 0;
+	}
+
+	const std::string DATASET_PATH = args["-i"].empty() ? DEFAULT_DATASET_PATH : args["-i"];
+	const std::string OUTPUT_PATH =  args["-o"].empty() ? DEFAULT_OUTPUT_PATH : args["-o"];
+
+	std::cout << DATASET_PATH << std::endl;
+	std::cout << OUTPUT_PATH << std::endl;
+	
+	if (!validPathDirectory(OUTPUT_PATH) || !isJSONFile(DATASET_PATH)) {
+		return -1;
+	}
 	test();
-	// path to downloaded dataset
-	std::string DATASET_PATH = "E:\\2022\\nerf-library\\testdata\\lego\\transforms.json";
-	// path to write images to
-	std::string OUTPUT_PATH = "H:\\";
 
 	cudaStream_t stream;
 	CUDA_CHECK_THROW(cudaStreamCreate(&stream));
@@ -98,4 +148,33 @@ int main()
 
 	cudaStreamDestroy(stream);
 	return 0;
+}
+
+bool validPathDirectory(const std::string &pathToDir) {
+	std::filesystem::path path(pathToDir);
+	if (!path.has_relative_path() || path.filename() != "") {
+		std::cout << fmt::format("Invalid Directory - Should end either with \\\\ on windows or / on linux", pathToDir);
+		return false;
+	}
+	if (std::filesystem::is_directory(path) && path.has_relative_path()) {
+		return true;
+	} else {
+		std::cout << fmt::format("Directory invalid: {}", pathToDir);
+		return false;
+	}
+}
+
+bool isJSONFile(const std::string &pathToFile) {
+	
+	if (!std::filesystem::exists(pathToFile)) {
+		std::cout << fmt::format("{} doesn't exist", pathToFile);
+		return false;
+	}
+	
+	if (std::filesystem::path(pathToFile).extension() == ".json")	{
+		return true;
+	} else {
+		std::cout << fmt::format("Fileformat not JSON : {}", pathToFile);
+		return false;
+	}
 }
