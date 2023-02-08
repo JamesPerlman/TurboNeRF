@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../common.h"
-#include <glfw/glfw3.h>
+#include <GLFW/glfw3.h>
 
 NRC_NAMESPACE_BEGIN
 
