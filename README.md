@@ -56,17 +56,17 @@ This project has only been tested on that one Lego scene.  Real scenes appear to
 
 Extreme gratitude to open source projects that will allow this project to reach its full potential (in order of integration date):
 
-* (CUDA CMake Starter)[https://github.com/pkestene/cuda-proj-tmpl]  
-* (tiny-cuda-nn)[https://github.com/NVlabs/tiny-cuda-nn]  
-* (JSON for modern C++)[https://github.com/nlohmann/json]  
-* (stb)[https://github.com/nothings/stb]  
-* (NeRF)[https://github.com/bmild/nerf]  
-* (nerfstudio)[https://github.com/nerfstudio-project/nerfstudio]  
-* (NerfAcc)[https://github.com/KAIR-BAIR/nerfacc]  
-* (torch-ngp)[https://github.com/ashawkey/torch-ngp]  
-* (Nerfies)[https://github.com/google/nerfies]  
-* (glfw)[https://github.com/glfw/glfw]  
-* (pybind11)[https://github.com/pybind/pybind11]  
+* [CUDA CMake Starter](https://github.com/pkestene/cuda-proj-tmpl)  
+* [tiny-cuda-nn](https://github.com/NVlabs/tiny-cuda-nn)  
+* [JSON for modern C++](https://github.com/nlohmann/json)  
+* [stb](https://github.com/nothings/stb)  
+* [NeRF](https://github.com/bmild/nerf)  
+* [nerfstudio](https://github.com/nerfstudio-project/nerfstudio)  
+* [NerfAcc](https://github.com/KAIR-BAIR/nerfacc)  
+* [torch-ngp](https://github.com/ashawkey/torch-ngp)  
+* [Nerfies](https://github.com/google/nerfies)  
+* [glfw](https://github.com/glfw/glfw)  
+* [pybind11](https://github.com/pybind/pybind11]  
 
 LICENSES TO BE ADDED TO CODEBASE SOON.  CHECK LICENSES/ DIRECTORY
 
