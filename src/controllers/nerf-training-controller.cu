@@ -28,7 +28,7 @@ NeRFTrainingController::NeRFTrainingController(Dataset& dataset, NeRFProxy* nerf
 			&this->dataset,
 			&nerf_proxy->nerfs[i],
 			batch_size
-			);
+		);
 	}
 }
 
