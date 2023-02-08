@@ -1,18 +1,52 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <string>
+#include <vector>
 
-#include "../utils/linalg/transform4f.cuh"
+#include "../controllers/nerf-rendering-controller.h"
+#include "../controllers/nerf-training-controller.h"
+#include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
 #include "../models/dataset.h"
+#include "../models/nerf-proxy.cuh"
+#include "../models/render-buffer.cuh"
+#include "../models/render-request.cuh"
+#include "../services/device-manager.cuh"
+#include "../services/nerf-manager.cuh"
+#include "../utils/linalg/transform4f.cuh"
+#include "pybind_cuda.cuh"
 
 namespace py = pybind11;
 
 using namespace nrc;
 
+#define GET(type, name) \
+    #name,\
+    [](const type& obj) { return obj.name; }
+
+#define GETSET(type, name) \
+    #name,\
+    [](const type& obj) { return obj.name; },\
+    [](type& obj, const auto& value) { obj.name = value; }
+
 PYBIND11_MODULE(PyNeRFRenderCore, m) {
     m.doc() = "NeRFRenderCore Python Bindings";
-    m.def("test", []() { return "hello world!"; });
+
+    /**
+     * Global functions
+     */
+
+    m.def(
+        "teardown",
+        []() {
+            DeviceManager::teardown();
+        }
+    );
+    
+    /**
+     * Utility classes
+     */
 
     py::class_<Transform4f>(m, "Transform4f", py::buffer_protocol())
         .def(
@@ -46,7 +80,12 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
                 {3, 4},
                 {sizeof(float) * 4, sizeof(float)}
             );
-        });
+        })
+    ;
+
+    /**
+     * Model classes
+     */
 
     py::class_<DistortionParams>(m, "DistortionParams")
         .def(
@@ -57,57 +96,142 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
             py::arg("k4") = 0.0f,
             py::arg("p1") = 0.0f,
             py::arg("p2") = 0.0f
-        );
+        )
+    ;
 
     py::class_<Camera>(m, "Camera")
         .def(
             py::init<
+                int2,
                 float,
                 float,
                 float2,
-                int2,
                 float2,
                 Transform4f,
                 DistortionParams
             >(),
+            py::arg("resolution"),
             py::arg("near"),
             py::arg("far"),
             py::arg("focal_length"),
-            py::arg("resolution"),
-            py::arg("sensor_size"),
+            py::arg("view_angle"),
             py::arg("transform"),
             py::arg("dist_params") = DistortionParams()
-        );
+        )
+        .def_readonly("resolution", &Camera::resolution)
+        .def_readonly("near", &Camera::near)
+        .def_readonly("far", &Camera::far)
+        .def_readonly("focal_length", &Camera::focal_length)
+        .def_readonly("view_angle", &Camera::view_angle)
+        .def_readonly("transform", &Camera::transform)
+        .def_readonly("dist_params", &Camera::dist_params)
+    ;
 
     py::class_<Dataset>(m, "Dataset")
         .def(
             py::init<const string&>(),
             py::arg("file_path")
-        );
+        )
+        .def_readonly("cameras", &Dataset::cameras)
+        .def_readonly("image_dimensions", &Dataset::image_dimensions)
+        .def_readonly("bounding_box", &Dataset::bounding_box)
+    ;
+    
+    // TODO: split into Training and Rendering bbox?
+    py::class_<BoundingBox>(m, "BoundingBox")
+        .def(
+            py::init<float>(),
+            py::arg("size")
+        )
+    ;
+
+    py::class_<NeRFProxy>(m, "NeRF");
+
+    py::class_<RenderBuffer>(m, "RenderBuffer")
+        .def(
+            py::init<const uint32_t&, const uint32_t&>(),
+            py::arg("width"),
+            py::arg("height")
+        )
+        .def(
+            "save_image",
+            [](RenderBuffer& rb, const string& file_path) {
+                rb.save_image(file_path);
+            },
+            py::arg("file_path")
+        )
+        .def("get_image", [](RenderBuffer& rb) { return rb.get_image(); })
+        .def_readonly("width", &RenderBuffer::width)
+        .def_readonly("height", &RenderBuffer::height)
+    ;
+
+    py::class_<RenderRequest>(m, "RenderRequest")
+        .def(
+            py::init<
+                const Camera&,
+                std::vector<NeRFProxy*>&,
+                RenderBuffer*
+            >(),
+            py::arg("camera"),
+            py::arg("nerfs"),
+            py::arg("output")
+        )
+    ;
 
     /**
-     * Dataset
-     *  - constructor(filepath)
-     * 
-     * Trainer
-     *  - load_data
-     *  - train
-     * 
-     * Renderer
-     *  - create_render_surface
-     *  - render_to_surface
-     *  - render_to_file
-     * 
-     * RenderRequest
-     *  - constructor
-     *    + camera
-     *    + resolution
-     *    + nerfs
-     * 
-     * Camera
-     *  - constructor
-     * 
-     * NeuralField
-     *  - constructor
+     * Controller classes
      */
+
+    py::class_<NeRFRenderingController>(m, "Renderer")
+        .def(
+           py::init<const uint32_t&>(),
+           py::arg("batch_size") 
+        )
+        .def(
+            "request",
+            &NeRFRenderingController::request,
+            py::arg("request")
+        )
+    ;
+
+    py::class_<NeRFTrainingController>(m, "Trainer")
+        .def(
+            py::init<
+                Dataset&,
+                NeRFProxy*,
+                const uint32_t&
+            >(),
+            py::arg("dataset"),
+            py::arg("nerf"),
+            py::arg("batch_size")
+        )
+        .def(
+            "prepare_for_training",
+            &NeRFTrainingController::prepare_for_training,
+            "Call this once before starting training."
+        )
+        .def(
+            "update_occupancy_grid",
+            &NeRFTrainingController::update_occupancy_grid,
+            py::arg("selection_threshold")
+        )
+        .def(
+            "train_step",
+            &NeRFTrainingController::train_step
+        )
+    ;
+
+    /**
+     * Service classes
+     */
+
+    py::class_<NeRFManager>(m, "Manager")
+        .def(py::init<>())
+        .def(
+            "create_trainable",
+            &NeRFManager::create_trainable,
+            py::arg("bbox"),
+            py::return_value_policy::reference
+        )
+    ;
 }
