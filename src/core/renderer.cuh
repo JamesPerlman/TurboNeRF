@@ -18,12 +18,12 @@ struct Renderer {
 
         Context(
             const cudaStream_t& stream,
-            RenderingWorkspace& workspace,
-            const uint32_t& batch_size
+            RenderingWorkspace workspace,
+            uint32_t batch_size
         )
             : stream(stream)
-            , workspace(workspace)
-            , batch_size(batch_size)
+            , workspace(std::move(workspace))
+            , batch_size(std::move(batch_size))
         {};
     };
 
