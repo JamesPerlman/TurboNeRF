@@ -1,8 +1,7 @@
 ## LATEST UPDATE
 
-Now working on the Python API. (~99% complete - untested)  
-The Python API will allow a developer to consume certain CUDA functionalities.  
-The Blender integration will come after the Python API is complete.  
+Python API is working! Check examples/ folder.  
+Workin on the Blender integration now.
 Estimated ETA on the Blender plugin is ~March 1, 2022  
 After the Blender integration is complete, I will release a binary along with the [addon codebase](https://github.com/JamesPerlman/blender_nerf_tools)
 
@@ -28,11 +27,30 @@ Enjoy!
 -James  
 https://twitter.com/jperldev
 
-## TEST DATA
+## INSTALLATION
+
+Required toolkits:
+* [CUDA 12](https://developer.nvidia.com/cuda-downloads)
+* [CMake 3.25.2](https://cmake.org/download/)
+
+Tested Configuration:
+* [Windows 11](https://www.microsoft.com/software-download/windows11)
+* [NVIDIA RTX A6000](https://www.nvidia.com/en-us/design-visualization/rtx-a6000/)
+
+Build steps:
+
+```
+git clone git@github.com:JamesPerlman/NeRFRenderCore --recursive
+cd NeRFRenderCore
+cmake . -B build
+cmake --build build -j
+```
 
 Until we have an extensible data loader, the test data I'm working with is here:  
 
 https://www.dropbox.com/sh/qkt4t1tk1o7pdc6/AAD218LLtAavRZykYl33mO8ia?dl=1
+
+This project has only been tested on that one Lego scene.  Real scenes appear to be broken for now.  
 
 ## THANK YOU
 
