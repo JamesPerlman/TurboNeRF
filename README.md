@@ -82,7 +82,7 @@ Max, Nelson. "Optical Models for Direct Volume Rendering." IEEE Transactions on 
 Müller, T. (2021). tiny-cuda-nn (Version 1.7) [Computer software]. https://github.com/NVlabs/tiny-cuda-nn  
 Fawzi, A., Balog, M., Huang, A. et al. Discovering faster matrix multiplication algorithms with reinforcement learning. Nature 610, 47–53 (2022). https://doi.org/10.1038/s41586-022-05172-4  
 Alman, Josh, and Virginia Vassilevska Williams. "A Refined Laser Method and Faster Matrix Multiplication." arXiv, 2020, doi:10.48550/arxiv.2010.05846.  https://arxiv.org/abs/2010.05846  
-
+Sabour, Sara, et al. "RobustNeRF: Ignoring Distractors with Robust Losses." arXiv, 2023, arXiv:2302.00833.  https://arxiv.org/abs/2302.00833  
 
 ## SUPPORTERS
 
