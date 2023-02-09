@@ -148,27 +148,27 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-bool check_is_directory(const std::string &pathToDir) {
-	std::filesystem::path path(pathToDir);
+bool check_is_directory(const std::string &path_str) {
+	std::filesystem::path path(path_str);
 	if (std::filesystem::is_directory(path)) {
 		return true;
 	} else {
-		std::cout << fmt::format("Directory invalid: {}", pathToDir);
+		std::cout << fmt::format("Directory invalid: {}", path_str);
 		return false;
 	}
 }
 
-bool check_is_json_file(const std::string &pathToFile) {
+bool check_is_json_file(const std::string &path_str) {
 	
-	if (!std::filesystem::exists(pathToFile)) {
-		std::cout << fmt::format("{} doesn't exist", pathToFile);
+	if (!std::filesystem::exists(path_str)) {
+		std::cout << fmt::format("{} doesn't exist", path_str);
 		return false;
 	}
 	
-	if (std::filesystem::path(pathToFile).extension() == ".json")	{
+	if (std::filesystem::path(path_str).extension() == ".json")	{
 		return true;
 	} else {
-		std::cout << fmt::format("Fileformat not JSON : {}", pathToFile);
+		std::cout << fmt::format("Fileformat not JSON : {}", path_str);
 		return false;
 	}
 }
