@@ -67,6 +67,7 @@ Extreme gratitude to open source projects that will allow this project to reach 
 * [Nerfies](https://github.com/google/nerfies)  
 * [glfw](https://github.com/glfw/glfw)  
 * [pybind11](https://github.com/pybind/pybind11)  
+* [glew-cmake](https://github.com/Perlmint/glew-cmake)
 
 LICENSES TO BE ADDED TO CODEBASE SOON.  CHECK LICENSES/ DIRECTORY
 

@@ -1,12 +1,10 @@
 [submodule "includes/tiny-cuda-nn"]
 	path = includes/tiny-cuda-nn
 	url = https://github.com/NVLabs/tiny-cuda-nn.git
-[submodule "includes/glfw"]
-	path = includes/glfw
-	url = https://github.com/glfw/glfw.git
 [submodule "includes/pybind11"]
 	path = includes/pybind11
 	url = git@github.com:pybind/pybind11.git
 [submodule "includes/glew-cmake"]
 	path = includes/glew-cmake
 	url = git@github.com:JamesPerlman/glew-cmake.git
+	branch = patch-1

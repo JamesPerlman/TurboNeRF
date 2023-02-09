@@ -27,7 +27,6 @@ SET(CMAKE_CUDA_ARCHITECTURES ${CUDA_ARCH_LIST})
 find_package(CUDA 12.0 REQUIRED)
 include_directories(${CUDA_INCLUDE_DIRS})
 
-
 # OpenGL
 find_package(OpenGL REQUIRED)
 include_directories(${OPENGL_INCLUDE_DIR})
@@ -161,7 +160,6 @@ set(NeRFRenderCore_LIBRARIES
 	${CUDA_LIBRARIES}
 	curand
 	cublas
-	glfw
 	libglew_static
 	tiny-cuda-nn
 )

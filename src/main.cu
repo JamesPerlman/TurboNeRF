@@ -40,8 +40,8 @@ static const std::string HELP_OUTPUT = R"(
 
 	Options:
 	-h,			Show this help message
-	-i,			Path to trainings data, e.g.: E:\\nerf\\transforms.json (windows) or /home/developer/transforms.json
-	-o,			Path to directory with rendering output, e.g.: E:\\ (windows) or /home/developer/ 
+	-i,			Path to training data, e.g.: E:\\nerf\\transforms.json (windows) or /home/developer/transforms.json
+	-o,			Path to render output, e.g.: E:\\ (windows) or /home/developer/ 
 
 )";
 
@@ -84,16 +84,14 @@ int main(int argc, char* argv[])
 	if (!validPathDirectory(OUTPUT_PATH) || !isJSONFile(DATASET_PATH)) {
 		return -1;
 	}
-	test();
 
 	cudaStream_t stream;
 	CUDA_CHECK_THROW(cudaStreamCreate(&stream));
 
 	nrc::Dataset dataset = nrc::Dataset(DATASET_PATH);
-	// auto dataset = nrc::Dataset("E:\\2022\\nerf-library\\FascinatedByFungi2022\\big-white-chanterelle\\transforms.json");
+
 	auto nerf_manager = nrc::NeRFManager();
 
-	// printf("%lu", grid.max_index());
 	auto nerf = nerf_manager.create_trainable(dataset.bounding_box);
 
 	// set up training controller
@@ -152,11 +150,7 @@ int main(int argc, char* argv[])
 
 bool validPathDirectory(const std::string &pathToDir) {
 	std::filesystem::path path(pathToDir);
-	if (!path.has_relative_path() || path.filename() != "") {
-		std::cout << fmt::format("Invalid Directory - Should end either with \\\\ on windows or / on linux", pathToDir);
-		return false;
-	}
-	if (std::filesystem::is_directory(path) && path.has_relative_path()) {
+	if (std::filesystem::is_directory(path)) {
 		return true;
 	} else {
 		std::cout << fmt::format("Directory invalid: {}", pathToDir);
