@@ -60,9 +60,13 @@ set(HEADERS
 	src/models/nerf.cuh
 	src/models/nerf-proxy.cuh
 	src/models/ray.h
-	src/models/render-buffer.cuh
 	src/models/render-request.cuh
 	src/models/training-image.cuh
+
+	# render-targets
+	src/render-targets/cuda-render-buffer.cuh
+	src/render-targets/opengl-render-surface.cuh
+	src/render-targets/render-target.cuh
 
 	# utils
 	src/utils/bit-utils.cuh
@@ -110,7 +114,6 @@ set(SOURCES
 
 	# models
 	src/models/dataset.cu
-	src/models/render-buffer.cu
 	src/models/training-image.cu
 
 	# utils

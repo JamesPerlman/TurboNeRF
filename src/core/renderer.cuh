@@ -2,10 +2,9 @@
 #include <cuda_runtime.h>
 #include <tiny-cuda-nn/common.h>
 
-#include "../common.h"
-#include "../models/render-buffer.cuh"
 #include "../models/render-request.cuh"
 #include "../workspaces/rendering-workspace.cuh"
+#include "../common.h"
 
 NRC_NAMESPACE_BEGIN
 

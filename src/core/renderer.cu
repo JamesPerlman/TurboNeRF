@@ -204,24 +204,27 @@ void Renderer::render(
                 workspace.sample_alpha
             );
 
-            // accumulate these samples into the pixel colors
-            composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, ctx.stream>>>(
-                n_rays_alive,
-                network_batch,
-                request.output->stride,
+            request.output->open_for_cuda_access([&](float* rgba) {
+                // accumulate these samples into the pixel colors
+                composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, ctx.stream>>>(
+                    n_rays_alive,
+                    network_batch,
+                    request.output->stride,
 
-                // input buffers
-                workspace.ray_active[active_buf_idx],
-                workspace.ray_steps[active_buf_idx],
-                workspace.ray_idx[active_buf_idx],
-                workspace.network_output,
-                workspace.sample_alpha,
-                
-                // output buffers
-                workspace.ray_alive,
-                workspace.ray_trans[active_buf_idx],
-                request.output->rgba
-            );
+                    // input buffers
+                    workspace.ray_active[active_buf_idx],
+                    workspace.ray_steps[active_buf_idx],
+                    workspace.ray_idx[active_buf_idx],
+                    workspace.network_output,
+                    workspace.sample_alpha,
+                    
+                    // output buffers
+                    workspace.ray_alive,
+                    workspace.ray_trans[active_buf_idx],
+                    rgba
+                );
+            });
+            
 
             n_steps += n_steps_per_ray;
             if (n_steps < NeRFConstants::n_steps_per_render_compaction) {

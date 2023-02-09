@@ -14,9 +14,9 @@
 #include "core/occupancy-grid.cuh"
 #include "models/camera.cuh"
 #include "models/dataset.h"
-#include "models/render-buffer.cuh"
 #include "models/render-request.cuh"
 #include "services/nerf-manager.cuh"
+#include "render-targets/cuda-render-buffer.cuh"
 #include "utils/linalg/transform4f.cuh"
 
 #include "utils/coordinate-transformations.cuh"
@@ -101,7 +101,8 @@ int main(int argc, char* argv[])
 	// set up rendering controller
 	auto renderer = nrc::NeRFRenderingController();
 	constexpr int IMG_SIZE = 1024;
-	auto render_buffer = nrc::RenderBuffer(IMG_SIZE, IMG_SIZE);
+	auto render_buffer = nrc::CUDARenderBuffer(IMG_SIZE, IMG_SIZE);
+	render_buffer.allocate();
 
 	auto camera_transform = nrc::Transform4f::Identity();
 	auto cam6 = dataset.cameras[6];
@@ -125,7 +126,7 @@ int main(int argc, char* argv[])
 			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
-				cam0.resolution,
+				make_int2(IMG_SIZE, IMG_SIZE),
 				cam0.near,
 				cam0.far,
 				cam0.focal_length,
@@ -145,6 +146,7 @@ int main(int argc, char* argv[])
 	cudaDeviceSynchronize();
 
 	cudaStreamDestroy(stream);
+	render_buffer.free();
 	return 0;
 }
 

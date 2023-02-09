@@ -25,7 +25,8 @@ trainer = nrc.Trainer(dataset, nerf, batch_size=2<<21)
 
 renderer = nrc.Renderer(batch_size=2<<20)
 
-render_buf = nrc.RenderBuffer(512, 512)
+render_buf = nrc.CUDARenderBuffer(512, 512)
+render_buf.allocate()
 
 # Just pull a random camera from the dataset
 cam6 = dataset.cameras[6]
@@ -57,6 +58,6 @@ for i in range(1024):
         render_buf.save_image(f"H:\\render_{i:05d}.png")
         print(f"Saved render_{i:05d}.png!")
 
-# it is recommended to call this method at the end of your program
-
+# it is recommended to call these methods at the end of your program
+render_buf.free()
 nrc.teardown()

@@ -10,8 +10,8 @@
 #include "../models/camera.cuh"
 #include "../models/dataset.h"
 #include "../models/nerf-proxy.cuh"
-#include "../models/render-buffer.cuh"
 #include "../models/render-request.cuh"
+#include "../render-targets/cuda-render-buffer.cuh"
 #include "../services/device-manager.cuh"
 #include "../services/nerf-manager.cuh"
 #include "../utils/linalg/transform4f.cuh"
@@ -147,22 +147,26 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
 
     py::class_<NeRFProxy>(m, "NeRF");
 
-    py::class_<RenderBuffer>(m, "RenderBuffer")
+    py::class_<RenderTarget>(m, "RenderTarget");
+
+    py::class_<CUDARenderBuffer, RenderTarget>(m, "CUDARenderBuffer")
         .def(
             py::init<const uint32_t&, const uint32_t&>(),
             py::arg("width"),
             py::arg("height")
         )
+        .def("allocate", [](CUDARenderBuffer& rb) { rb.allocate(); })
+        .def("free", [](CUDARenderBuffer& rb) { rb.free(); })
         .def(
             "save_image",
-            [](RenderBuffer& rb, const string& file_path) {
+            [](CUDARenderBuffer& rb, const string& file_path) {
                 rb.save_image(file_path);
             },
             py::arg("file_path")
         )
-        .def("get_image", [](RenderBuffer& rb) { return rb.get_image(); })
-        .def_readonly("width", &RenderBuffer::width)
-        .def_readonly("height", &RenderBuffer::height)
+        .def("get_data", [](CUDARenderBuffer& rb) { return rb.get_data(); })
+        .def_readonly("width", &CUDARenderBuffer::width)
+        .def_readonly("height", &CUDARenderBuffer::height)
     ;
 
     py::class_<RenderRequest>(m, "RenderRequest")
@@ -170,7 +174,7 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
             py::init<
                 const Camera&,
                 std::vector<NeRFProxy*>&,
-                RenderBuffer*
+                RenderTarget*
             >(),
             py::arg("camera"),
             py::arg("nerfs"),
