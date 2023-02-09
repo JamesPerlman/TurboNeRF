@@ -12,6 +12,7 @@
 #include "../models/nerf-proxy.cuh"
 #include "../models/render-request.cuh"
 #include "../render-targets/cuda-render-buffer.cuh"
+#include "../render-targets/opengl-render-surface.cuh"
 #include "../services/device-manager.cuh"
 #include "../services/nerf-manager.cuh"
 #include "../utils/linalg/transform4f.cuh"
@@ -147,7 +148,16 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
 
     py::class_<NeRFProxy>(m, "NeRF");
 
-    py::class_<RenderTarget>(m, "RenderTarget");
+    py::class_<RenderTarget>(m, "RenderTarget")
+        .def(
+            "save_image",
+            [](CUDARenderBuffer& rb, const string& file_path) {
+                rb.save_image(file_path);
+            },
+            py::arg("file_path")
+        )
+        .def("get_data", [](CUDARenderBuffer& rb) { return rb.get_data(); })
+    ;
 
     py::class_<CUDARenderBuffer, RenderTarget>(m, "CUDARenderBuffer")
         .def(
@@ -157,16 +167,20 @@ PYBIND11_MODULE(PyNeRFRenderCore, m) {
         )
         .def("allocate", [](CUDARenderBuffer& rb) { rb.allocate(); })
         .def("free", [](CUDARenderBuffer& rb) { rb.free(); })
-        .def(
-            "save_image",
-            [](CUDARenderBuffer& rb, const string& file_path) {
-                rb.save_image(file_path);
-            },
-            py::arg("file_path")
-        )
-        .def("get_data", [](CUDARenderBuffer& rb) { return rb.get_data(); })
+        .def("resize", [](CUDARenderBuffer& rb, const uint32_t& width, const uint32_t& height) { rb.resize(width, height); })
         .def_readonly("width", &CUDARenderBuffer::width)
         .def_readonly("height", &CUDARenderBuffer::height)
+    ;
+
+    py::class_<OpenGLRenderSurface, RenderTarget>(m, "OpenGLRenderSurface")
+        .def(
+            py::init<const uint32_t&, const uint32_t&>(),
+            py::arg("width"),
+            py::arg("height")
+        )
+        .def("allocate", [](OpenGLRenderSurface& rs) { rs.allocate(); })
+        .def("free", [](OpenGLRenderSurface& rs) { rs.free(); })
+        .def("resize", [](OpenGLRenderSurface& rs, const uint32_t& width, const uint32_t& height) { rs.resize(width, height); })
     ;
 
     py::class_<RenderRequest>(m, "RenderRequest")
