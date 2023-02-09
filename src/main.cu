@@ -45,8 +45,8 @@ static const std::string HELP_OUTPUT = R"(
 
 )";
 
-bool validPathDirectory(const std::string&); 
-bool isJSONFile(const std::string &);
+bool check_is_directory(const std::string&); 
+bool check_is_json_file(const std::string &);
 
 int main(int argc, char* argv[])
 {
@@ -81,7 +81,7 @@ int main(int argc, char* argv[])
 	std::cout << DATASET_PATH << std::endl;
 	std::cout << OUTPUT_PATH << std::endl;
 	
-	if (!validPathDirectory(OUTPUT_PATH) || !isJSONFile(DATASET_PATH)) {
+	if (!check_is_directory(OUTPUT_PATH) || !check_is_json_file(DATASET_PATH)) {
 		return -1;
 	}
 
@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-bool validPathDirectory(const std::string &pathToDir) {
+bool check_is_directory(const std::string &pathToDir) {
 	std::filesystem::path path(pathToDir);
 	if (std::filesystem::is_directory(path)) {
 		return true;
@@ -158,7 +158,7 @@ bool validPathDirectory(const std::string &pathToDir) {
 	}
 }
 
-bool isJSONFile(const std::string &pathToFile) {
+bool check_is_json_file(const std::string &pathToFile) {
 	
 	if (!std::filesystem::exists(pathToFile)) {
 		std::cout << fmt::format("{} doesn't exist", pathToFile);
