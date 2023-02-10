@@ -17,6 +17,10 @@ NRC_NAMESPACE_BEGIN
 
 struct NeRFProxy {
     std::vector<NeRF> nerfs;
+
+    BoundingBox get_bounding_box() const {
+        return nerfs[0].bounding_box;
+    }
 };
 
 NRC_NAMESPACE_END

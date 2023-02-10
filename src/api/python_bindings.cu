@@ -144,9 +144,12 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::init<float>(),
             py::arg("size")
         )
+        .def("get_size", [](BoundingBox& bb) { return bb.size_x; })
     ;
 
-    py::class_<NeRFProxy>(m, "NeRF");
+    py::class_<NeRFProxy>(m, "NeRF")
+        .def("get_bounding_box", &NeRFProxy::get_bounding_box)
+    ;
 
     py::class_<RenderTarget>(m, "RenderTarget")
         .def(
