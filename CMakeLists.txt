@@ -143,7 +143,7 @@ set(PYBIND_INCLUDES
 	${HEADERS}
 )
 
-pybind11_add_module(PyNeRFRenderCore ${PYBIND_INCLUDES})
+pybind11_add_module(PyTurboNeRF ${PYBIND_INCLUDES})
 
 # Set stricter compile flag
 if(NOT MSVC)
@@ -172,7 +172,7 @@ target_link_libraries(${PROJECT_NAME}
 	${NeRFRenderCore_LIBRARIES}
 )
 
-target_link_libraries(PyNeRFRenderCore
+target_link_libraries(PyTurboNeRF
 	PRIVATE
 	${NeRFRenderCore_LIBRARIES}
 	pybind11::module
