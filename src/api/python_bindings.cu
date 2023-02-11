@@ -236,10 +236,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             &NeRFTrainingController::update_occupancy_grid,
             py::arg("selection_threshold")
         )
-        .def(
-            "train_step",
-            &NeRFTrainingController::train_step
-        )
+        .def("get_training_step", &NeRFTrainingController::get_training_step)
+        .def("train_step", &NeRFTrainingController::train_step)
     ;
 
     /**
