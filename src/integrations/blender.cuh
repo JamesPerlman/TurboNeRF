@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include <cuda_gl_interop.h>
+
 #include "../render-targets/opengl-render-surface.cuh"
 #include "../common.h"
 
@@ -12,13 +13,12 @@ NRC_NAMESPACE_BEGIN
 class BlenderRenderEngine 
 {
 private:
+
     BlenderRenderEngine() {}
     BlenderRenderEngine(BlenderRenderEngine const&) = delete;
     void operator=(BlenderRenderEngine const&) = delete;
 
     bool is_initialized = false;
-
-
 
     static BlenderRenderEngine& _getInstance()
     {
@@ -38,6 +38,11 @@ private:
     }
 
 public:
+
+    /**
+     * Initialize
+     * 
+     */
 
     static void init()
     {
