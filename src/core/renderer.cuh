@@ -31,7 +31,7 @@ struct Renderer {
         RenderRequest& request
     );
 
-    void Renderer::write_to(
+    void write_to(
         Context& ctx,
         RenderTarget* target
     );
