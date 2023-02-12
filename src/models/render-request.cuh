@@ -10,19 +10,22 @@
 
 NRC_NAMESPACE_BEGIN
 
+typedef std::function<void(bool)> OnResultCallback;
+typedef std::function<bool()> ShouldCancelCallback;
+
 struct RenderRequest {
     const Camera camera;
     std::vector<NeRFProxy*> proxies;
     RenderTarget* output;
-    std::function<void(bool)> on_result;
-    std::function<bool()> should_cancel;
+    OnResultCallback on_result;
+    ShouldCancelCallback should_cancel;
 
     RenderRequest(
         const Camera& camera,
         std::vector<NeRFProxy*>& proxies,
         RenderTarget* output,
-        std::function<void(bool)> on_result = nullptr,
-        std::function<bool()> should_cancel = nullptr
+        OnResultCallback on_result = nullptr,
+        ShouldCancelCallback should_cancel = nullptr
     )
         : camera(camera)
         , proxies(proxies)
