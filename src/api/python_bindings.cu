@@ -196,14 +196,16 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
                 const Camera&,
                 std::vector<NeRFProxy*>&,
                 RenderTarget*,
-                OnResultCallback,
-                ShouldCancelCallback
+                OnCompleteCallback,
+                OnProgressCallback,
+                OnCancelCallback
             >(),
             py::arg("camera"),
             py::arg("nerfs"),
             py::arg("output"),
-            py::arg("on_result") = OnResultCallback([](bool) {}),
-            py::arg("should_cancel") = ShouldCancelCallback([]{ return false; })
+            py::arg("on_complete") = nullptr,
+            py::arg("on_progress") = nullptr,
+            py::arg("on_cancel") = nullptr
         )
     ;
 

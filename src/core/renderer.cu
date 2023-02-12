@@ -89,12 +89,6 @@ void Renderer::submit(
         )
     );
 
-    // on_result callback
-    const auto on_result = [&request](bool is_done) {
-        if (request.on_result)
-            request.on_result(is_done);
-    };
-
     // calculate the number of pixels we need to fill
     uint32_t n_pixels = workspace.n_pixels;
 
@@ -170,8 +164,8 @@ void Renderer::submit(
 
         // TODO: march rays to bounding box first
         while (n_rays_alive > 0) {
-            if (request.should_cancel && request.should_cancel()) {
-                on_result(true);
+            if (request.is_canceled()) {
+                request.on_cancel();
                 return;
             }
 
@@ -244,7 +238,9 @@ void Renderer::submit(
             );
 
             // We have an opportunity to render a partial result here
-            on_result(false);
+            // this progress is not very accurate, but it is fast.
+            float progress = (float)(n_rays - n_rays_alive) / (float)n_rays;
+            request.on_progress(progress);
 
             n_steps += n_steps_per_ray;
             if (n_steps < NeRFConstants::n_steps_per_render_compaction) {
@@ -316,7 +312,7 @@ void Renderer::submit(
         n_pixels_filled += n_pixels_to_fill;
     }
 
-    on_result(true);
+    request.on_complete();
 };
 
 void Renderer::write_to(
