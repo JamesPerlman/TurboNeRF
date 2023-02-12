@@ -48,7 +48,8 @@ struct RenderingWorkspace: Workspace {
 	tcnn::network_precision_t* network_output;
 
 	// output buffers
-	float* pixel_buffer;
+	float* rgba;
+	uint32_t n_pixels;
 
 	// samples
 	void enlarge(
@@ -61,8 +62,9 @@ struct RenderingWorkspace: Workspace {
 	) {
 		free_allocations();
 
+		n_pixels = output_width * output_height;
 		batch_size = tcnn::next_multiple(n_elements_per_batch, tcnn::batch_size_granularity);
-		uint32_t n_output_pixel_elements = tcnn::next_multiple(4 * output_width * output_height, tcnn::batch_size_granularity);
+		uint32_t n_output_pixel_elements = tcnn::next_multiple(4 * n_pixels, tcnn::batch_size_granularity);
 
 		// camera
 		camera			= allocate<Camera>(stream, 1);
@@ -111,7 +113,7 @@ struct RenderingWorkspace: Workspace {
 		network_output	= allocate<tcnn::network_precision_t>(stream, n_network_output_elements * batch_size);
 
 		// output
-		pixel_buffer	= allocate<float>(stream, n_output_pixel_elements);
+		rgba			= allocate<float>(stream, n_output_pixel_elements);
 	};
 };
 
