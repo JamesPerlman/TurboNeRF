@@ -18,6 +18,7 @@ private:
 
     // openGL references
 public:
+
     using RenderTarget::RenderTarget;
 
     GLuint get_texture_id() const {
@@ -32,8 +33,12 @@ public:
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 
-        cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, pbo, cudaGraphicsMapFlagsNone);
+        CUDA_CHECK_THROW(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, pbo, cudaGraphicsMapFlagsNone));
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
     }
 
     void free(const cudaStream_t& stream = 0) override {
@@ -45,18 +50,31 @@ public:
     void resize(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
         this->width = width;
         this->height = height;
+
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
         glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        
     }
 
     void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) override {
         float *rgba;
-        cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
-        cudaGraphicsResourceGetMappedPointer((void **)&rgba, nullptr, cuda_pbo_resource);
+        CUDA_CHECK_THROW(cudaGraphicsMapResources(1, &cuda_pbo_resource, stream));
+        CUDA_CHECK_THROW(cudaGraphicsResourceGetMappedPointer((void **)&rgba, nullptr, cuda_pbo_resource));
 
         handle(rgba);
-        
-        cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0);
+
+        CUDA_CHECK_THROW(cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0));
+
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_FLOAT, NULL);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
     }
 };
 
