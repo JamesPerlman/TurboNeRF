@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <future>
 #include <vector>
 
 #include "../common.h"
@@ -16,7 +17,8 @@ struct NeRFRenderingController {
     );
 
     void submit(
-        RenderRequest& request
+        RenderRequest& request,
+        bool async = false
     );
 
     void write_to(
@@ -27,11 +29,11 @@ private:
 
     uint32_t batch_size;
 
-    uint32_t render_area;
-
     std::vector<Renderer::Context> contexts;
 
     Renderer renderer = Renderer();
+
+    std::future<void> render_future;
 };
 
 NRC_NAMESPACE_END

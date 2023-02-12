@@ -1,8 +1,12 @@
+#include <chrono>
+
 #include "nerf-rendering-controller.h"
 #include "../services/device-manager.cuh"
 
 using namespace nrc;
 using namespace tcnn;
+
+void render_thread_fn(NeRFRenderingController* controller, RenderRequest& request);
 
 NeRFRenderingController::NeRFRenderingController(
     const uint32_t& batch_size
@@ -24,11 +28,30 @@ NeRFRenderingController::NeRFRenderingController(
 }
 
 void NeRFRenderingController::submit(
-    RenderRequest& request
+    RenderRequest& request,
+    bool async
 ) {
+    // if we are still rendering in the background...
+    if (render_future.valid() && render_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        // then just ignore this request
+        return;
+    } 
+
+    // otherwise, we can start rendering
+    
     // TODO: batching/chunking/distributing requests across multiple GPUs
     auto& ctx = contexts[0];
-    renderer.submit(ctx, request);
+
+    render_future = std::async(
+        std::launch::async,
+        [this, &ctx, &request]() {
+            renderer.submit(ctx, request);
+        }
+    );
+
+    if (!async) {
+        render_future.wait();
+    }
 }
 
 void NeRFRenderingController::write_to(

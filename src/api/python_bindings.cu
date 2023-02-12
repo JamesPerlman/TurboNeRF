@@ -221,7 +221,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def(
             "submit",
             &NeRFRenderingController::submit,
-            py::arg("request")
+            py::arg("request"),
+            py::arg("async") = false
         )
         .def(
             "write_to",
