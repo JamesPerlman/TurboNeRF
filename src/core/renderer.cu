@@ -35,7 +35,7 @@ void Renderer::enlarge_workspace_if_needed(
     }
 }
 
-void Renderer::render(
+void Renderer::submit(
     Renderer::Context& ctx,
     RenderRequest& request
 ) {
@@ -45,6 +45,8 @@ void Renderer::render(
     NeRF& nerf = request.proxies[0]->nerfs[0];
 
     enlarge_workspace_if_needed(ctx, request);
+    
+    cudaStream_t stream = ctx.stream;
 
     // workspace.camera = request.camera
     CUDA_CHECK_THROW(
@@ -53,7 +55,7 @@ void Renderer::render(
             &request.camera,
             sizeof(Camera),
             cudaMemcpyHostToDevice,
-            ctx.stream
+            stream
         )
     );
 
@@ -64,7 +66,7 @@ void Renderer::render(
             &nerf.bounding_box,
             sizeof(BoundingBox),
             cudaMemcpyHostToDevice,
-            ctx.stream
+            stream
         )
     );
 
@@ -75,12 +77,28 @@ void Renderer::render(
             &nerf.occupancy_grid,
             sizeof(OccupancyGrid),
             cudaMemcpyHostToDevice,
-            ctx.stream
+            stream
         )
     );
 
+    // clear workspace.rgba
+    CUDA_CHECK_THROW(
+        cudaMemsetAsync(
+            workspace.rgba,
+            0,
+            4 * workspace.n_pixels * sizeof(float),
+            stream
+        )
+    );
+
+    // on_result callback
+    const auto on_result = [&request](bool is_done) {
+        if (request.on_result)
+            request.on_result(is_done);
+    };
+
     // calculate the number of pixels we need to fill
-    uint32_t n_pixels = request.output->width * request.output->height;
+    uint32_t n_pixels = workspace.n_pixels;
 
     // double buffer indices
     int active_buf_idx = 0;
@@ -103,7 +121,7 @@ void Renderer::render(
         uint32_t pixel_start = n_pixels_filled;
 
         // generate rays for the pixels in this batch
-        generate_rays_pinhole_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, ctx.stream>>>(
+        generate_rays_pinhole_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
             n_rays,
             ctx.batch_size,
             workspace.bounding_box,
@@ -123,7 +141,7 @@ void Renderer::render(
         const float dt_max = nerf.bounding_box.size_x * dt_min;
         const float cone_angle = NeRFConstants::cone_angle;
 
-        march_rays_to_first_occupied_cell_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, ctx.stream>>>(
+        march_rays_to_first_occupied_cell_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
             n_rays,
             ctx.batch_size,
             workspace.occupancy_grid,
@@ -154,12 +172,16 @@ void Renderer::render(
 
         // TODO: march rays to bounding box first
         while (n_rays_alive > 0) {
+            if (request.should_cancel && request.should_cancel()) {
+                on_result(true);
+                return;
+            }
 
             // need to figure out how many rays can fit in this batch
             const uint32_t n_steps_per_ray = std::max(ctx.batch_size / n_rays_alive, (uint32_t)1);
             const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_rays_alive, tcnn::batch_size_granularity);
 
-            march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, ctx.stream>>>(
+            march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
                 ctx.batch_size,
                 n_steps_per_ray,
@@ -188,7 +210,7 @@ void Renderer::render(
 
             // query the NeRF network for the samples
             nerf.network.inference(
-                ctx.stream,
+                stream,
                 network_batch,
                 workspace.network_pos,
                 workspace.network_dir,
@@ -197,34 +219,34 @@ void Renderer::render(
             );
 
             // save alpha in an buffer
-            sigma_to_alpha_forward_kernel<<<n_blocks_linear(network_batch), n_threads_linear, 0, ctx.stream>>>(
+            sigma_to_alpha_forward_kernel<<<n_blocks_linear(network_batch), n_threads_linear, 0, stream>>>(
                 network_batch,
                 workspace.network_output + 3 * network_batch,
                 workspace.network_dt,
                 workspace.sample_alpha
             );
 
-            request.output->open_for_cuda_access([&](float* rgba) {
-                // accumulate these samples into the pixel colors
-                composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, ctx.stream>>>(
-                    n_rays_alive,
-                    network_batch,
-                    request.output->stride,
+            // accumulate these samples into the pixel colors
+            composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+                n_rays_alive,
+                network_batch,
+                workspace.n_pixels,
 
-                    // input buffers
-                    workspace.ray_active[active_buf_idx],
-                    workspace.ray_steps[active_buf_idx],
-                    workspace.ray_idx[active_buf_idx],
-                    workspace.network_output,
-                    workspace.sample_alpha,
-                    
-                    // output buffers
-                    workspace.ray_alive,
-                    workspace.ray_trans[active_buf_idx],
-                    rgba
-                );
-            });
-            
+                // input buffers
+                workspace.ray_active[active_buf_idx],
+                workspace.ray_steps[active_buf_idx],
+                workspace.ray_idx[active_buf_idx],
+                workspace.network_output,
+                workspace.sample_alpha,
+                
+                // output buffers
+                workspace.ray_alive,
+                workspace.ray_trans[active_buf_idx],
+                workspace.rgba
+            );
+
+            // We have an opportunity to render a partial result here
+            on_result(false);
 
             n_steps += n_steps_per_ray;
             if (n_steps < NeRFConstants::n_steps_per_render_compaction) {
@@ -233,7 +255,7 @@ void Renderer::render(
 
             // update how many rays are still alive
             const int n_rays_to_compact = count_true_elements(
-                ctx.stream,
+                stream,
                 n_rays_alive,
                 workspace.ray_alive
             );
@@ -247,14 +269,14 @@ void Renderer::render(
             if (n_rays_to_compact < n_rays_alive / 2) {
                 // get compacted ray indices
                 generate_compaction_indices(
-                    ctx.stream,
+                    stream,
                     n_rays_alive,
                     workspace.ray_alive,
                     workspace.compact_idx
                 );
 
                 // compact ray properties via the indices
-                compact_rays_kernel<<<n_blocks_linear(n_rays_to_compact), n_threads_linear, 0, ctx.stream>>>(
+                compact_rays_kernel<<<n_blocks_linear(n_rays_to_compact), n_threads_linear, 0, stream>>>(
                     n_rays_to_compact,
                     ctx.batch_size,
                     workspace.compact_idx,
@@ -279,7 +301,7 @@ void Renderer::render(
                 );
 
                 // all compacted rays are alive
-                CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_compact * sizeof(bool), ctx.stream));
+                CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_compact * sizeof(bool), stream));
 
                 // swap the active and compact buffer indices
                 std::swap(active_buf_idx, compact_buf_idx);
@@ -295,4 +317,28 @@ void Renderer::render(
         // increment the number of pixels filled
         n_pixels_filled += n_pixels_to_fill;
     }
+
+    on_result(true);
 };
+
+void Renderer::write_to(
+    Renderer::Context& ctx,
+    RenderTarget* target
+) {
+    CUDA_CHECK_THROW(cudaStreamSynchronize(ctx.stream));
+    target->open_for_cuda_access(
+        [&target, &ctx](float* rgba) {
+            CUDA_CHECK_THROW(
+                cudaMemcpyAsync(
+                    rgba,
+                    ctx.workspace.rgba,
+                    ctx.workspace.n_pixels * 4 * sizeof(float),
+                    cudaMemcpyDeviceToHost,
+                    ctx.stream
+                )
+            );
+        },
+        ctx.stream
+    );
+    CUDA_CHECK_THROW(cudaStreamSynchronize(ctx.stream));
+}

@@ -1,3 +1,4 @@
+#include <pybind11/functional.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -6,6 +7,7 @@
 
 #include "../controllers/nerf-rendering-controller.h"
 #include "../controllers/nerf-training-controller.h"
+#include "../integrations/blender.cuh"
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
 #include "../models/dataset.h"
@@ -184,6 +186,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("allocate", [](OpenGLRenderSurface& rs) { rs.allocate(); })
         .def("free", [](OpenGLRenderSurface& rs) { rs.free(); })
         .def("resize", [](OpenGLRenderSurface& rs, const uint32_t& width, const uint32_t& height) { rs.resize(width, height); })
+        .def_readonly("width", &OpenGLRenderSurface::width)
+        .def_readonly("height", &OpenGLRenderSurface::height)
     ;
 
     py::class_<RenderRequest>(m, "RenderRequest")
@@ -191,11 +195,15 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::init<
                 const Camera&,
                 std::vector<NeRFProxy*>&,
-                RenderTarget*
+                RenderTarget*,
+                OnResultCallback,
+                ShouldCancelCallback
             >(),
             py::arg("camera"),
             py::arg("nerfs"),
-            py::arg("output")
+            py::arg("output"),
+            py::arg("on_result") = OnResultCallback([](bool) {}),
+            py::arg("should_cancel") = ShouldCancelCallback([]{ return false; })
         )
     ;
 
@@ -209,9 +217,14 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
            py::arg("batch_size") 
         )
         .def(
-            "request",
-            &NeRFRenderingController::request,
+            "submit",
+            &NeRFRenderingController::submit,
             py::arg("request")
+        )
+        .def(
+            "write_to",
+            &NeRFRenderingController::write_to,
+            py::arg("target")
         )
     ;
 
@@ -238,6 +251,15 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         )
         .def("get_training_step", &NeRFTrainingController::get_training_step)
         .def("train_step", &NeRFTrainingController::train_step)
+    ;
+
+    /**
+     * Integration classes
+     */
+
+    py::class_<BlenderRenderEngine>(m, "BlenderRenderEngine")
+        .def_static("init", &BlenderRenderEngine::init)
+        .def_static("draw", &BlenderRenderEngine::draw, py::arg("render_surface"))
     ;
 
     /**

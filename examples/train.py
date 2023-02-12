@@ -53,8 +53,15 @@ for i in range(1024):
         trainer.update_occupancy_grid(0.9)
 
     if i % 32 == 0 and i > 0:
-        req = tn.RenderRequest(render_cam, [nerf], render_buf)
-        renderer.request(req)
+
+        request = tn.RenderRequest(
+            render_cam,
+            [nerf],
+            render_buf
+        )
+
+        renderer.submit(request)
+        renderer.write_to(render_buf)
         render_buf.save_image(f"H:\\render_{i:05d}.png")
         print(f"Saved render_{i:05d}.png!")
 

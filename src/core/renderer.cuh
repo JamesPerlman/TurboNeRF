@@ -26,7 +26,15 @@ struct Renderer {
         {};
     };
 
-    void render(Context& ctx, RenderRequest& request);
+    void submit(
+        Context& ctx,
+        RenderRequest& request
+    );
+
+    void Renderer::write_to(
+        Context& ctx,
+        RenderTarget* target
+    );
 
 private:
     uint32_t render_area = 0;

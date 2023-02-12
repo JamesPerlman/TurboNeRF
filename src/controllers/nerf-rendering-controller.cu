@@ -9,7 +9,7 @@ NeRFRenderingController::NeRFRenderingController(
 ) {
     if (batch_size == 0) {
         // TODO: determine batch size from GPU specs
-        this->batch_size = 1<<21;
+        this->batch_size = 1<<20;
     } else {
         this->batch_size = batch_size;
     }
@@ -23,11 +23,17 @@ NeRFRenderingController::NeRFRenderingController(
     }
 }
 
-void NeRFRenderingController::request(
+void NeRFRenderingController::submit(
     RenderRequest& request
 ) {
     // TODO: batching/chunking/distributing requests across multiple GPUs
     auto& ctx = contexts[0];
-    request.output->clear(ctx.stream);
-    renderer.render(ctx, request);
+    renderer.submit(ctx, request);
+}
+
+void NeRFRenderingController::write_to(
+    RenderTarget* target
+) {
+    auto& ctx = contexts[0];
+    renderer.write_to(ctx, target);
 }

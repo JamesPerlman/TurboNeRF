@@ -15,8 +15,12 @@ struct NeRFRenderingController {
         const uint32_t& batch_size = 0
     );
 
-    void request(
+    void submit(
         RenderRequest& request
+    );
+
+    void write_to(
+        RenderTarget* target
     );
 
 private:
