@@ -37,7 +37,6 @@ struct Renderer {
     );
 
 private:
-    uint32_t render_area = 0;
 
     void enlarge_workspace_if_needed(Context& ctx, const RenderRequest& request);
 };

@@ -21,7 +21,7 @@ void Renderer::enlarge_workspace_if_needed(
     // For now we assume all NeRFs have the same network configuration.
     NeRF& nerf = request.proxies[0]->nerfs[0];
 
-    if (render_area != new_render_area) {
+    if (ctx.workspace.n_pixels != new_render_area) {
         ctx.workspace.enlarge(
             ctx.stream,
             request.output->width,
@@ -30,8 +30,6 @@ void Renderer::enlarge_workspace_if_needed(
             nerf.network.get_concat_buffer_width(),
             nerf.network.get_padded_output_width()
         );
-
-        render_area = new_render_area;
     }
 }
 
