@@ -49,7 +49,7 @@ public:
         glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
     }
 
-    void open_for_cuda_access(std::function<void(float* rgba)> handle) override {
+    void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) override {
         float *rgba;
         cudaGraphicsMapResources(1, &cuda_pbo_resource, 0);
         cudaGraphicsResourceGetMappedPointer((void **)&rgba, nullptr, cuda_pbo_resource);

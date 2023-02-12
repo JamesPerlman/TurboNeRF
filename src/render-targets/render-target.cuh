@@ -27,7 +27,7 @@ public:
 
     virtual void resize(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) = 0;
 
-    virtual void open_for_cuda_access(std::function<void(float* rgba)> handle) = 0;
+    virtual void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) = 0;
 
     void clear(const cudaStream_t& stream = 0) {
         open_for_cuda_access([&](float* rgba) {

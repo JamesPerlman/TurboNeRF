@@ -32,7 +32,7 @@ public:
         allocate(stream);
     }
 
-    void open_for_cuda_access(std::function<void(float* rgba)> handle) override {
+    void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) override {
         // this is a CUDA buffer with CUDA-allocated data, so there's nothing special we need to do here to prepare for readwrite access.
         handle(rgba);
     }
