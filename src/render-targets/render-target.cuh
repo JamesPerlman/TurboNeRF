@@ -31,6 +31,9 @@ public:
 
     void clear(const cudaStream_t& stream = 0) {
         open_for_cuda_access([&](float* rgba) {
+            if (rgba == nullptr)
+                return;
+            
             CUDA_CHECK_THROW(cudaMemsetAsync(rgba, 0, width * height * 4 * sizeof(float), stream));
         });
     };
