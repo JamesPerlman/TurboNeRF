@@ -46,22 +46,12 @@ public:
     // free all allocations
     void free_allocations() {
         CUDA_CHECK_THROW(cudaSetDevice(device_id));
-        int n_allocations_freed = 0;
         for (const auto& allocation : _allocations) {
             if (allocation.ptr != nullptr) {
-                try {
-                    CUDA_CHECK_THROW(cudaFreeAsync(allocation.ptr, 0));
-                    ++n_allocations_freed;
-                } catch (const std::runtime_error& e) {
-                    std::cout << "Error freeing allocation: " << e.what() << std::endl;
-                }
+                CUDA_CHECK_THROW(cudaFreeAsync(allocation.ptr, 0));
             }
         }
-
-        if (n_allocations_freed != _allocations.size()) {
-            throw std::runtime_error("Failed to free all allocations!");
-        }
-
+        
         _allocations.clear();
     }
 
