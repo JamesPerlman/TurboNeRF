@@ -142,6 +142,7 @@ public:
             _current_request = std::make_unique<RenderRequest>(request);
         } else {
             _current_request->cancel();
+            _next_request.reset();
             _next_request = std::make_unique<RenderRequest>(request);
         }
 
