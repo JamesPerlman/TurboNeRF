@@ -101,8 +101,8 @@ int main(int argc, char* argv[])
 	// set up rendering controller
 	auto renderer = nrc::NeRFRenderingController();
 	constexpr int IMG_SIZE = 1024;
-	auto render_buffer = nrc::CUDARenderBuffer(IMG_SIZE, IMG_SIZE);
-	render_buffer.allocate();
+	auto render_buffer = nrc::CUDARenderBuffer();
+	render_buffer.set_size(IMG_SIZE, IMG_SIZE);
 
 	auto camera_transform = nrc::Transform4f::Identity();
 	auto cam6 = dataset.cameras[6];
@@ -141,7 +141,7 @@ int main(int argc, char* argv[])
 				&render_buffer
 			);
 
-			renderer.submit(render_request);
+			renderer.submit(&render_request);
 			renderer.write_to(&render_buffer);
 			printf("Done!\n");
 			render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);
