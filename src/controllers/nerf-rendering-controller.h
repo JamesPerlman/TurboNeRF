@@ -17,13 +17,17 @@ struct NeRFRenderingController {
     );
 
     void submit(
-        RenderRequest& request,
+        RenderRequest* request,
         bool async = false
     );
 
     void write_to(
         RenderTarget* target
     );
+
+    bool is_rendering() const;
+
+    void NeRFRenderingController::wait_until_finished() const;
 
 private:
 

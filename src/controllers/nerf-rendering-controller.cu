@@ -27,12 +27,22 @@ NeRFRenderingController::NeRFRenderingController(
     }
 }
 
+bool NeRFRenderingController::is_rendering() const {
+    return render_future.valid() && render_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
+}
+
+void NeRFRenderingController::wait_until_finished() const {
+    if (is_rendering()) {
+        render_future.wait();
+    }
+}
+
 void NeRFRenderingController::submit(
-    RenderRequest& request,
+    RenderRequest* request,
     bool async
 ) {
     // if we are still rendering in the background...
-    if (render_future.valid() && render_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+    if (is_rendering()) {
         // then just ignore this request
         return;
     } 

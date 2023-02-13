@@ -257,8 +257,23 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
      */
 
     py::class_<BlenderRenderEngine>(m, "BlenderRenderEngine")
-        .def_static("init", &BlenderRenderEngine::init)
-        .def_static("draw", &BlenderRenderEngine::draw, py::arg("render_surface"))
+        .def(py::init<>())
+        .def("set_tag_redraw_callback", &BlenderRenderEngine::set_tag_redraw_callback)
+        .def("did_begin_drawing", &BlenderRenderEngine::did_begin_drawing)
+        .def("did_finish_drawing", &BlenderRenderEngine::did_finish_drawing)
+        .def(
+            "request_render",
+            &BlenderRenderEngine::request_render,
+            py::arg("camera"),
+            py::arg("nerfs")
+        )
+        .def(
+            "resize_render_surface",
+            &BlenderRenderEngine::resize_render_surface,
+            py::arg("width"),
+            py::arg("height")
+        )
+        .def("draw", &BlenderRenderEngine::draw)
     ;
 
     /**

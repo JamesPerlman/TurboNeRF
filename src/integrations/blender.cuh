@@ -4,7 +4,13 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include <cuda_gl_interop.h>
+#include <memory>
+#include <mutex>
 
+#include "../controllers/nerf-rendering-controller.h"
+#include "../models/camera.cuh"
+#include "../models/nerf-proxy.cuh"
+#include "../models/render-request.cuh"
 #include "../render-targets/opengl-render-surface.cuh"
 #include "../common.h"
 
@@ -13,56 +19,154 @@ NRC_NAMESPACE_BEGIN
 class BlenderRenderEngine 
 {
 private:
-
-    BlenderRenderEngine() {}
-    BlenderRenderEngine(BlenderRenderEngine const&) = delete;
-    void operator=(BlenderRenderEngine const&) = delete;
-
-    bool is_initialized = false;
-
-    static BlenderRenderEngine& _getInstance()
-    {
-        static BlenderRenderEngine instance;
-        return instance;
-    }
-    
-    void _init()
-    {
-        if (!is_initialized)
-        {
-            if (glewInit() != GLEW_OK)
-                throw std::runtime_error("Failed to initialize GLEW.");
-
-            is_initialized = true;
-        }
-    }
+    NeRFRenderingController _renderer;
+    bool _is_drawing = false;
+    bool _did_request_redraw = false;
+    int _current_draw_request_id = 0;
+    int _n_draw_requests = 0;
+    std::mutex _drawing_mutex;
+    OpenGLRenderSurface _render_surface;
+    std::unique_ptr<RenderRequest> _current_request;
+    std::unique_ptr<RenderRequest> _next_request;
+    std::function<void()> _tag_redraw;
+    std::future<void> _render_flusher;
 
 public:
 
-    /**
-     * Initialize
-     * 
-     */
-
-    static void init()
+    BlenderRenderEngine()
+        : _renderer()
     {
-        _getInstance()._init();
+        if (glewInit() != GLEW_OK)
+            throw std::runtime_error("Failed to initialize GLEW.");
+    };
+
+    /** INTERNAL METHODS **/
+
+    void submit_draw_request() {
+        std::unique_lock lock(_drawing_mutex);
+        ++_n_draw_requests;
+
+        if (!_is_drawing) {
+            lock.unlock();
+            request_redraw();
+        }
+    }
+
+    void submit_render_request() {
+        if (_renderer.is_rendering()) {
+            return;
+        }
+        _renderer.submit(_current_request.get(), true);
+        _render_flusher = std::async(
+            std::launch::async,
+            [this]() {
+                _renderer.wait_until_finished();
+                this->flush_render_queue();
+            }
+        );
+    }
+
+    void flush_render_queue() {
+        _current_request.reset();
+        _current_request = nullptr;
+        if (_next_request != nullptr) {
+            _current_request = std::move(_next_request);
+            _next_request.reset();
+            submit_render_request();
+        }
+    }
+
+    void request_redraw() {
+        std::unique_lock lock(_drawing_mutex);
+        
+        if (_did_request_redraw)
+            return;
+
+        _did_request_redraw = true;
+        
+        lock.unlock();
+
+        _tag_redraw();
+    }
+
+    /** API METHODS */
+
+    void set_tag_redraw_callback(std::function<void()> tag_redraw) {
+        this->_tag_redraw = tag_redraw;
+    }
+
+    void did_begin_drawing() {
+        std::scoped_lock lock(_drawing_mutex);
+        _is_drawing = true;
+        _current_draw_request_id = _n_draw_requests;
+    }
+
+    void did_finish_drawing() {
+        std::unique_lock lock(_drawing_mutex);
+        _is_drawing = false;
+        _did_request_redraw = false;
+
+        // Is there still a draw request queued up?
+        if (_current_draw_request_id < _n_draw_requests) {
+            lock.unlock();
+            // If so, then we need to draw again
+            request_redraw();
+        } else {
+            // This is the last draw request, so we can reset the counter
+            _n_draw_requests = 0;
+        }
+    }
+
+    void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
+        RenderRequest request{
+            camera,
+            proxies,
+            &_render_surface,
+            // on_complete
+            [this]() {
+                printf("Render request complete!\n");
+            },
+            // on_progress
+            [this](float progress) {
+                // if we are already drawing, then we need to queue up another draw request
+                this->submit_draw_request();
+            },
+            // on_cancel
+            [this]() {
+                printf("Render request cancelled!\n");
+            }
+        };
+
+
+        if (_current_request == nullptr) {
+            _current_request = std::make_unique<RenderRequest>(request);
+        } else {
+            _current_request->cancel();
+            _next_request = std::make_unique<RenderRequest>(request);
+        }
+
+        submit_render_request();
+    }
+
+    void resize_render_surface(const uint32_t& width, const uint32_t& height) {
+        _render_surface.set_size(width, height);
     }
 
     /**
      * The following functionality was adapted from the Pixar RenderMan for Blender plugin.
      * https://github.com/prman-pixar/RenderManForBlender/blob/main/display_driver/d_blender.cpp#L335
      * 
+     * This will always be called from Blender's view_draw() function
      */
 
-    static void draw(OpenGLRenderSurface* render_surface)
+    void draw()
     {
-        // AFAIK this is completely undocumented by Blender.
-        // It allows us to draw into a Blender viewport, keeping all data on the GPU.
+        // copy render data
+        _renderer.write_to(&_render_surface);
 
         // These are the vertices of a quad that covers the entire viewport.
-        const float w = static_cast<float>(render_surface->width);
-        const float h = static_cast<float>(render_surface->height);
+        const float w = static_cast<float>(_render_surface.width);
+        const float h = static_cast<float>(_render_surface.height);
 
         GLfloat vertices[8] = {
             0.0f, 0.0f,
@@ -78,8 +182,6 @@ public:
             0.0f, 1.0f
         };
         
-        //glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, render_surface->width, render_surface->height, GL_RGBA, GL_FLOAT, NULL);
-
         GLint shader_program_id;
         glGetIntegerv(GL_CURRENT_PROGRAM, &shader_program_id);
 
@@ -118,7 +220,7 @@ public:
         glActiveTexture(GL_TEXTURE0);
 
         // Bind to render surface texture
-        glBindTexture(GL_TEXTURE_2D, render_surface->get_texture_id());
+        glBindTexture(GL_TEXTURE_2D, _render_surface.get_texture_id());
         glBindVertexArray(vertex_array);
 
         // Draw the triangle fan
