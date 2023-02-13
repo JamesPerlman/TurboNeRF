@@ -16,16 +16,11 @@ private:
     GLuint texture;
     cudaGraphicsResource *cuda_pbo_resource;
 
-    // openGL references
-public:
+    void allocate(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
+        this->width = width;
+        this->height = height;
+        this->stride = width * height;
 
-    using RenderTarget::RenderTarget;
-
-    GLuint get_texture_id() const {
-        return texture;
-    }
-
-    void allocate(const cudaStream_t& stream = 0) override {
         glGenBuffers(1, &pbo);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
         glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
@@ -41,15 +36,10 @@ public:
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
     }
 
-    void free(const cudaStream_t& stream = 0) override {
-        cudaGraphicsUnregisterResource(cuda_pbo_resource);
-        glDeleteBuffers(1, &pbo);
-        glDeleteTextures(1, &texture);
-    }
-
     void resize(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
         this->width = width;
         this->height = height;
+        this->stride = width * height;
 
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
         glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
@@ -58,6 +48,23 @@ public:
         glBindTexture(GL_TEXTURE_2D, 0);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
         
+    }
+    
+public:
+
+    using RenderTarget::RenderTarget;
+
+    GLuint get_texture_id() const {
+        return texture;
+    }
+
+    void free(const cudaStream_t& stream = 0) override {
+        if (width == 0 || height == 0)
+            return;
+        
+        cudaGraphicsUnregisterResource(cuda_pbo_resource);
+        glDeleteBuffers(1, &pbo);
+        glDeleteTextures(1, &texture);
     }
 
     void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) override {

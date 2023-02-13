@@ -156,36 +156,32 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<RenderTarget>(m, "RenderTarget")
         .def(
             "save_image",
-            [](CUDARenderBuffer& rb, const string& file_path) {
-                rb.save_image(file_path);
+            [](RenderTarget& rt, const string& file_path) {
+                rt.save_image(file_path);
             },
             py::arg("file_path")
         )
-        .def("get_data", [](CUDARenderBuffer& rb) { return rb.get_data(); })
-    ;
-
-    py::class_<CUDARenderBuffer, RenderTarget>(m, "CUDARenderBuffer")
+        .def("get_data", [](RenderTarget& rt) { return rt.get_data(); })
         .def(
-            py::init<const uint32_t&, const uint32_t&>(),
+            "set_size",
+            [](RenderTarget& rt, const uint32_t& width, const uint32_t& height) {
+                rt.set_size(width, height);
+            },
             py::arg("width"),
             py::arg("height")
         )
-        .def("allocate", [](CUDARenderBuffer& rb) { rb.allocate(); })
+    ;
+
+    py::class_<CUDARenderBuffer, RenderTarget>(m, "CUDARenderBuffer")
+        .def(py::init<>())
         .def("free", [](CUDARenderBuffer& rb) { rb.free(); })
-        .def("resize", [](CUDARenderBuffer& rb, const uint32_t& width, const uint32_t& height) { rb.resize(width, height); })
         .def_readonly("width", &CUDARenderBuffer::width)
         .def_readonly("height", &CUDARenderBuffer::height)
     ;
 
     py::class_<OpenGLRenderSurface, RenderTarget>(m, "OpenGLRenderSurface")
-        .def(
-            py::init<const uint32_t&, const uint32_t&>(),
-            py::arg("width"),
-            py::arg("height")
-        )
-        .def("allocate", [](OpenGLRenderSurface& rs) { rs.allocate(); })
+        .def(py::init<>())
         .def("free", [](OpenGLRenderSurface& rs) { rs.free(); })
-        .def("resize", [](OpenGLRenderSurface& rs, const uint32_t& width, const uint32_t& height) { rs.resize(width, height); })
         .def_readonly("width", &OpenGLRenderSurface::width)
         .def_readonly("height", &OpenGLRenderSurface::height)
     ;

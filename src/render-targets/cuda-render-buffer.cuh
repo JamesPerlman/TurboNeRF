@@ -13,23 +13,28 @@ class CUDARenderBuffer: public RenderTarget {
 private:
     // pointer to GPU memory to store the output data
     float* rgba = nullptr;
-
-public:
-    using RenderTarget::RenderTarget;
     
-    void allocate(const cudaStream_t& stream = 0) override {
-        CUDA_CHECK_THROW(cudaMallocAsync(&rgba, width * height * 4 * sizeof(float), stream));
-    }
+    void allocate(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
+        this->width = width;
+        this->height = height;
+        this->stride = width * height;
 
-    void free(const cudaStream_t& stream = 0) override {
-        CUDA_CHECK_THROW(cudaFreeAsync(rgba, stream));
+        CUDA_CHECK_THROW(cudaMallocAsync(&rgba, width * height * 4 * sizeof(float), stream));
     }
 
     void resize(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
         free(stream);
-        this->width = width;
-        this->height = height;
-        allocate(stream);
+        allocate(width, height, stream);
+    }
+
+public:
+    using RenderTarget::RenderTarget;
+    
+    void free(const cudaStream_t& stream = 0) override {
+        if (width == 0 || height == 0)
+            return;
+        
+        CUDA_CHECK_THROW(cudaFreeAsync(rgba, stream));
     }
 
     void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) override {

@@ -10,24 +10,32 @@
 NRC_NAMESPACE_BEGIN
 
 class RenderTarget {
-public:
-    int width;
-    int height;
-    int stride;
-
-    RenderTarget(const uint32_t& width, const uint32_t& height)
-        : width(width)
-        , height(height)
-        , stride(width * height)
-    {};
-
-    virtual void allocate(const cudaStream_t& stream = 0) = 0;
-
-    virtual void free(const cudaStream_t& stream = 0) = 0;
+private:
+    virtual void allocate(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) = 0;
 
     virtual void resize(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) = 0;
 
+public:
+    int width = 0;
+    int height = 0;
+    int stride = 0;
+
+    RenderTarget() {};
+
+    virtual void free(const cudaStream_t& stream = 0) = 0;
+
     virtual void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) = 0;
+
+    void set_size(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) {
+        if (width == 0 || height == 0)
+            return;
+        
+        if (this->width == 0 && this->height == 0) {
+            allocate(width, height, stream);
+        } else if (this->width != width || this->height != height) {
+            resize(width, height, stream);
+        }
+    }
 
     void clear(const cudaStream_t& stream = 0) {
         open_for_cuda_access([&](float* rgba) {

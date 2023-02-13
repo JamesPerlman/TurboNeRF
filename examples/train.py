@@ -25,8 +25,8 @@ trainer = tn.Trainer(dataset, nerf, batch_size=2<<21)
 
 renderer = tn.Renderer(batch_size=2<<20)
 
-render_buf = tn.CUDARenderBuffer(512, 512)
-render_buf.allocate()
+render_buf = tn.CUDARenderBuffer()
+render_buf.set_size(512, 512)
 
 # Just pull a random camera from the dataset
 cam6 = dataset.cameras[6]
