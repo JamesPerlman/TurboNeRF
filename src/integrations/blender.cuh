@@ -1,6 +1,6 @@
 #pragma once
 
-
+#include <chrono>
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include <cuda_gl_interop.h>
@@ -30,6 +30,9 @@ private:
     std::unique_ptr<RenderRequest> _next_request;
     std::function<void()> _tag_redraw;
     std::future<void> _render_flusher;
+    std::future<void> _draw_future;
+
+    std::chrono::steady_clock::time_point _last_draw_time = std::chrono::steady_clock::now();
 
 public:
 
@@ -41,15 +44,28 @@ public:
     };
 
     /** INTERNAL METHODS **/
-
-    void submit_draw_request() {
-        std::unique_lock lock(_drawing_mutex);
-        ++_n_draw_requests;
-
-        if (!_is_drawing) {
-            lock.unlock();
-            request_redraw();
+    // this has a property of throttle_time
+    void submit_draw_request(const std::chrono::milliseconds& throttle_duration) {
+        if (throttle_duration > std::chrono::seconds(0) && std::chrono::high_resolution_clock::now() - _last_draw_time < throttle_duration) {
+            return;
         }
+
+        if (_draw_future.valid() && _draw_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            return;
+        }
+
+        _draw_future = std::async(
+            std::launch::async,
+            [this]() {
+                std::unique_lock lock(_drawing_mutex);
+                ++_n_draw_requests;
+
+                if (!_is_drawing) {
+                    lock.unlock();
+                    request_redraw();
+                }
+            }
+        );
     }
 
     void submit_render_request() {
@@ -115,6 +131,8 @@ public:
             // This is the last draw request, so we can reset the counter
             _n_draw_requests = 0;
         }
+
+        _last_draw_time = std::chrono::high_resolution_clock::now();
     }
 
     void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
@@ -124,19 +142,19 @@ public:
             &_render_surface,
             // on_complete
             [this]() {
+                this->submit_draw_request(std::chrono::milliseconds(0));
                 printf("Render request complete!\n");
             },
             // on_progress
             [this](float progress) {
                 // if we are already drawing, then we need to queue up another draw request
-                this->submit_draw_request();
+                this->submit_draw_request(std::chrono::milliseconds(333));
             },
             // on_cancel
             [this]() {
                 printf("Render request cancelled!\n");
             }
         };
-
 
         if (_current_request == nullptr) {
             _current_request = std::make_unique<RenderRequest>(request);
