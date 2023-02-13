@@ -54,7 +54,7 @@ void NeRFRenderingController::submit(
 
     render_future = std::async(
         std::launch::async,
-        [this, &ctx, &request]() {
+        [this, &ctx, request]() {
             renderer.submit(ctx, request);
         }
     );
