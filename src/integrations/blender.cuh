@@ -29,7 +29,7 @@ private:
     std::unique_ptr<RenderRequest> _next_request;
     std::function<void()> _tag_redraw;
     std::future<void> _render_flusher;
-    std::future<void> _draw_future;
+    std::future<void> _redraw_future;
 
     std::chrono::steady_clock::time_point _last_draw_time = std::chrono::steady_clock::now();
 
@@ -51,20 +51,27 @@ public:
             return;
         }
 
-        if (_draw_future.valid() && _draw_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        if (_redraw_future.valid() && _redraw_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
             return;
         }
 
-        _draw_future = std::async(
+        _redraw_future = std::async(
             std::launch::async,
             [this]() {
                 std::unique_lock lock(_drawing_mutex);
                 ++_n_draw_requests;
+                bool is_drawing = _is_drawing;
+                lock.unlock();
 
-                if (!_is_drawing) {
+                // wait for _is_drawing to be false
+                while (is_drawing) {
+                    lock.lock();
+                    is_drawing = _is_drawing;
                     lock.unlock();
-                    request_redraw();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 }
+                
+                request_redraw();
             }
         );
     }
