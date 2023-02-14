@@ -6,6 +6,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <thread>
 
 NRC_NAMESPACE_BEGIN
 
@@ -16,6 +17,8 @@ private:
 
     virtual void resize(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) = 0;
 
+    std::thread writeThread;
+
 public:
     int width = 0;
     int height = 0;
@@ -23,6 +26,11 @@ public:
     size_t n_pixels() const { return width * height; }
 
     RenderTarget() {};
+    virtual ~RenderTarget() {
+        if (writeThread.joinable()) {
+            writeThread.join();
+        }
+    }
 
     virtual void free(const cudaStream_t& stream = 0) = 0;
 
@@ -50,8 +58,12 @@ public:
 
     void save_image(const std::string& filename, const cudaStream_t& stream = 0) {
         CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
+        if (writeThread.joinable()) {
+            writeThread.join();
+        }
+        auto &imgWriteThread = writeThread;
         open_for_cuda_access([&](float* rgba) {
-            save_buffer_to_image(stream, filename, rgba, width, height, 4);
+            save_buffer_to_image(stream, filename, rgba, width, height, 4, imgWriteThread);
         });
     };
 };

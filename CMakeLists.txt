@@ -169,6 +169,7 @@ set(NeRFRenderCore_LIBRARIES
 
 target_link_libraries(${PROJECT_NAME}
 	PRIVATE
+	-lpthread
 	${NeRFRenderCore_LIBRARIES}
 )
 

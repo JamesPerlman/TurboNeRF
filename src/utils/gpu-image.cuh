@@ -10,6 +10,7 @@
 
 #include <string>
 #include <vector>
+#include <thread>
 
 NRC_NAMESPACE_BEGIN
 
@@ -19,7 +20,8 @@ void save_buffer_to_image(
     const float* data,
     const uint32_t& width,
     const uint32_t& height,
-    const uint32_t& channels,
+    const uint32_t channels,
+    std::thread& imgWriteThread,
     const uint32_t& stride = 0,
     const float& scale = 1.0f
 );
