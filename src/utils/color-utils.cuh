@@ -40,12 +40,4 @@ inline __device__ float linear_to_srgb(const float& linear) {
     }
 }
 
-// float to byte
-inline __device__ uint32_t rgba32f_to_rgba8(const float& r, const float& g, const float& b, const float& a) {
-    return (uint32_t(__saturatef(a) * 255.0f) << 24) |
-           (uint32_t(__saturatef(b) * 255.0f) << 16) |
-           (uint32_t(__saturatef(g) * 255.0f) << 8) |
-           (uint32_t(__saturatef(r) * 255.0f));
-}
-
 NRC_NAMESPACE_END
