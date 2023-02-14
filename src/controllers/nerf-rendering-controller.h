@@ -27,7 +27,7 @@ struct NeRFRenderingController {
 
     bool is_rendering() const;
 
-    void NeRFRenderingController::wait_until_finished() const;
+    void wait_until_finished() const;
 
 private:
 
