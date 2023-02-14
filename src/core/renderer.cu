@@ -318,17 +318,20 @@ void Renderer::write_to(
     Renderer::Context& ctx,
     RenderTarget* target
 ) {
+    if (ctx.workspace.n_pixels != target->width * target->height) {
+        return;
+    }
+
     CUDA_CHECK_THROW(cudaStreamSynchronize(ctx.stream));
     target->open_for_cuda_access(
-        [&target, &ctx](float* rgba) {
-            CUDA_CHECK_THROW(
-                cudaMemcpyAsync(
-                    rgba,
-                    ctx.workspace.rgba,
-                    ctx.workspace.n_pixels * 4 * sizeof(float),
-                    cudaMemcpyDeviceToHost,
-                    ctx.stream
-                )
+        [target, &ctx](float* rgba) {
+            join_channels(
+                ctx.stream,
+                target->width,
+                target->height,
+                4,
+                ctx.workspace.rgba,
+                rgba
             );
         },
         ctx.stream

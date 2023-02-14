@@ -34,4 +34,13 @@ std::vector<float> save_buffer_to_memory(
     const float& scale = 1.0f
 );
 
+void join_channels(
+    const cudaStream_t& stream,
+    const uint32_t& width,
+    const uint32_t& height,
+    const uint32_t& channels,
+    const float* data,
+    float* output
+);
+
 NRC_NAMESPACE_END

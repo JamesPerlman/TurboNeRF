@@ -18,7 +18,6 @@ private:
     void allocate(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
         this->width = width;
         this->height = height;
-        this->stride = width * height;
 
         glGenBuffers(1, &pbo);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
@@ -38,7 +37,6 @@ private:
     void resize(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
         this->width = width;
         this->height = height;
-        this->stride = width * height;
 
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
         glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
@@ -46,7 +44,6 @@ private:
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
         glBindTexture(GL_TEXTURE_2D, 0);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-        
     }
     
 public:
@@ -67,7 +64,7 @@ public:
     }
 
     void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) override {
-        float *rgba;
+        float* rgba;
         CUDA_CHECK_THROW(cudaGraphicsMapResources(1, &cuda_pbo_resource, stream));
         CUDA_CHECK_THROW(cudaGraphicsResourceGetMappedPointer((void **)&rgba, nullptr, cuda_pbo_resource));
 

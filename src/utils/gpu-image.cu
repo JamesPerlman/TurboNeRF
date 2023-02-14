@@ -24,17 +24,23 @@ __global__ void buffer_to_stbi_uc(
 }
 
 template <typename T>
-__global__ void decontigify_kernel(
-    const uint32_t n_elements,
+__global__ void join_channels_kernel(
+    const uint32_t n_pixels,
+    const int n_channels,
     const T* __restrict__ input,
-    T* __restrict__ output,
-    const uint32_t stride,
-    const uint32_t n_channels
+    T* __restrict__ output
 ) {
-    const uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t pix_idx = blockDim.x * blockIdx.x + threadIdx.x;
 
-    if (idx < n_elements) {
-        output[(idx / n_channels) + (idx % n_channels) * stride] = input[idx];
+    if (pix_idx >= n_pixels) return;
+
+    const uint32_t j_idx = n_channels * pix_idx;
+    
+    uint32_t c_idx = pix_idx;
+    
+    for (int i = 0; i < n_channels; ++i) {
+        output[j_idx + i] = input[c_idx];
+        c_idx += n_pixels;
     }
 }
 
@@ -48,7 +54,8 @@ void save_buffer_to_image(
     const uint32_t& stride,
     const float& scale
 ) {
-	const uint32_t n_elements = width * height * channels;
+    const uint32_t n_pixels = width * height;
+	const uint32_t n_elements = n_pixels * channels;
 
 	tcnn::GPUMemory<stbi_uc> img_gpu(n_elements);
     tcnn::GPUMemory<float> data_float(n_elements);
@@ -65,7 +72,7 @@ void save_buffer_to_image(
 
         if (stride > 0) {
             tcnn::GPUMemory<stbi_uc> img_gpu_decontig(n_elements);
-            decontigify_kernel<<<tcnn::n_blocks_linear(n_elements), tcnn::n_threads_linear, 0, stream>>>(n_elements, img_gpu.data(), img_gpu_decontig.data(), channels, stride);
+            join_channels_kernel<<<tcnn::n_blocks_linear(n_pixels), tcnn::n_threads_linear, 0, stream>>>(n_pixels, channels, img_gpu.data(), img_gpu_decontig.data());
             img_gpu_decontig.copy_to_host(img_cpu);
         } else {
             img_gpu.copy_to_host(img_cpu);
@@ -84,20 +91,34 @@ std::vector<float> save_buffer_to_memory(
     const uint32_t& stride,
     const float& scale
 ) {
-    const uint32_t n_elements = width * height * channels;
+    const uint32_t n_pixels = width * height;
+    const uint32_t n_elements = n_pixels * channels;
 
 
     std::vector<float> img_cpu(n_elements);
 
     if (stride > 0) {
         tcnn::GPUMemory<float> img_gpu_decontig(n_elements);
-        decontigify_kernel<<<tcnn::n_blocks_linear(n_elements), tcnn::n_threads_linear, 0, stream>>>(n_elements, data, img_gpu_decontig.data(), channels, stride);
+        join_channels_kernel<<<tcnn::n_blocks_linear(n_pixels), tcnn::n_threads_linear, 0, stream>>>(n_pixels, channels, data, img_gpu_decontig.data());
         img_gpu_decontig.copy_to_host(img_cpu);
     } else {
         cudaMemcpy(img_cpu.data(), data, n_elements * sizeof(float), cudaMemcpyDeviceToHost);
     }
 
     return img_cpu;
+}
+
+void join_channels(
+    const cudaStream_t& stream,
+    const uint32_t& width,
+    const uint32_t& height,
+    const uint32_t& channels,
+    const float* data,
+    float* output
+) {
+    const uint32_t n_pixels = width * height;
+
+    join_channels_kernel<<<tcnn::n_blocks_linear(n_pixels), tcnn::n_threads_linear, 0, stream>>>(n_pixels, channels, data, output);
 }
 
 NRC_NAMESPACE_END

@@ -17,7 +17,6 @@ private:
     void allocate(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
         this->width = width;
         this->height = height;
-        this->stride = width * height;
 
         CUDA_CHECK_THROW(cudaMallocAsync(&rgba, width * height * 4 * sizeof(float), stream));
     }

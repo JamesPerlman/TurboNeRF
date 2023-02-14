@@ -9,6 +9,7 @@
 
 NRC_NAMESPACE_BEGIN
 
+// For now, all Render Targets should be in RGBA8 format
 class RenderTarget {
 private:
     virtual void allocate(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) = 0;
@@ -18,7 +19,8 @@ private:
 public:
     int width = 0;
     int height = 0;
-    int stride = 0;
+
+    size_t n_pixels() const { return width * height; }
 
     RenderTarget() {};
 
@@ -49,7 +51,7 @@ public:
     void save_image(const std::string& filename, const cudaStream_t& stream = 0) {
         CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
         open_for_cuda_access([&](float* rgba) {
-            save_buffer_to_image(stream, filename, rgba, width, height, 4, stride);
+            save_buffer_to_image(stream, filename, rgba, width, height, 4);
         });
     };
 };
