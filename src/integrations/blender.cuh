@@ -188,6 +188,8 @@ public:
 
     void draw()
     {
+        std::scoped_lock lock(_drawing_mutex);
+        
         // copy render data
         _renderer.write_to(&_render_surface);
 
