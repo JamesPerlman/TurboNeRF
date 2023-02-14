@@ -49,20 +49,18 @@ struct RenderingWorkspace: Workspace {
 
 	// output buffers
 	float* rgba;
-	uint32_t n_pixels;
+	uint32_t n_pixels = 0;
 
 	// samples
 	void enlarge(
 		const cudaStream_t& stream,
-		const uint32_t& output_width,
-		const uint32_t& output_height,
+		const uint32_t& n_pixels,
 		const uint32_t& n_elements_per_batch,
 		const uint32_t& n_network_concat_elements,
 		const uint32_t& n_network_output_elements
 	) {
 		free_allocations();
 
-		n_pixels = output_width * output_height;
 		batch_size = tcnn::next_multiple(n_elements_per_batch, tcnn::batch_size_granularity);
 		uint32_t n_output_pixel_elements = tcnn::next_multiple(4 * n_pixels, tcnn::batch_size_granularity);
 
@@ -114,6 +112,8 @@ struct RenderingWorkspace: Workspace {
 
 		// output
 		rgba			= allocate<float>(stream, n_output_pixel_elements);
+
+		this->n_pixels = n_pixels;
 	};
 };
 

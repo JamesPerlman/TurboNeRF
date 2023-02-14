@@ -24,8 +24,7 @@ void Renderer::enlarge_workspace_if_needed(
     if (ctx.workspace.n_pixels != new_render_area) {
         ctx.workspace.enlarge(
             ctx.stream,
-            request->output->width,
-            request->output->height,
+            new_render_area,
             ctx.batch_size,
             nerf.network.get_concat_buffer_width(),
             nerf.network.get_padded_output_width()
