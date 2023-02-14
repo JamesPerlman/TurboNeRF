@@ -161,7 +161,6 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             },
             py::arg("file_path")
         )
-        .def("get_data", [](RenderTarget& rt) { return rt.get_data(); })
         .def(
             "set_size",
             [](RenderTarget& rt, const uint32_t& width, const uint32_t& height) {

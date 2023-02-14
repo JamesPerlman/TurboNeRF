@@ -52,15 +52,6 @@ public:
             save_buffer_to_image(stream, filename, rgba, width, height, 4, stride);
         });
     };
-
-    std::vector<float> get_data(const cudaStream_t& stream = 0) {
-        std::vector<float> data;
-        open_for_cuda_access([&](float* rgba) {
-            CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
-            data = save_buffer_to_memory(stream, rgba, width, height, 4, stride);
-        });
-        return data;
-    };
 };
 
 NRC_NAMESPACE_END
