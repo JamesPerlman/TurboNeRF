@@ -31,10 +31,10 @@ include_directories(${CUDA_INCLUDE_DIRS})
 find_package(OpenGL REQUIRED)
 include_directories(${OPENGL_INCLUDE_DIR})
 
-# GLEW
-set(ONLY_LIBS ON)
-add_subdirectory(includes/glew-cmake)
-include_directories(includes/glew-cmake/include)
+# GLAD
+add_subdirectory(includes/glad)
+include_directories(includes/glad/include)
+
 
 # tiny-cuda-nn
 set(TCNN_BUILD_EXAMPLES OFF)
@@ -163,7 +163,7 @@ set(NeRFRenderCore_LIBRARIES
 	${CUDA_LIBRARIES}
 	curand
 	cublas
-	libglew_static
+	glad
 	tiny-cuda-nn
 )
 

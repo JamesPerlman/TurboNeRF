@@ -1,7 +1,6 @@
 #pragma once
 
-#include <GL/glew.h>
-#include <GL/gl.h>
+#include <glad/glad.h>
 #include <cuda_gl_interop.h>
 
 #include "render-target.cuh"

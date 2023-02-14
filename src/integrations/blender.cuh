@@ -1,8 +1,7 @@
 #pragma once
 
 #include <chrono>
-#include <GL/glew.h>
-#include <GL/gl.h>
+#include <glad/glad.h>
 #include <cuda_gl_interop.h>
 #include <memory>
 #include <mutex>
@@ -39,9 +38,11 @@ public:
     BlenderRenderEngine()
         : _renderer()
     {
-        if (glewInit() != GLEW_OK)
-            throw std::runtime_error("Failed to initialize GLEW.");
+        if (!gladLoadGL()) {
+            throw std::runtime_error("Failed to load OpenGL with glad.");
+        };
     };
+
 
     /** INTERNAL METHODS **/
     // this has a property of throttle_time
