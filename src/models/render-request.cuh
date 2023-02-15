@@ -26,8 +26,8 @@ public:
     RenderTarget* output;
 
     RenderRequest(
-        const Camera& camera,
-        std::vector<NeRFProxy*>& proxies,
+        const Camera camera,
+        std::vector<NeRFProxy*> proxies,
         RenderTarget* output,
         OnCompleteCallback on_complete = nullptr,
         OnProgressCallback on_progress = nullptr,
