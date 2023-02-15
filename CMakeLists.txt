@@ -48,6 +48,7 @@ set(HEADERS
 	src/controllers/nerf-training-controller.h
 
 	# core
+	src/core/adam-optimizer.cuh
 	src/core/occupancy-grid.cuh
 	src/core/nerf-network.cuh
 	src/core/renderer.cuh
