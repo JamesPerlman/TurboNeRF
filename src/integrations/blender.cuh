@@ -1,9 +1,6 @@
 #pragma once
 
-#include <chrono>
-#include <future>
 #include <glad/glad.h>
-#include <cuda_gl_interop.h>
 #include <memory>
 #include <mutex>
 
