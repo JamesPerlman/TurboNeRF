@@ -5,6 +5,7 @@
 
 #include <json/json.hpp>
 #include <set>
+#include <thread>
 #include <unordered_map>
 
 #include "common.h"
@@ -144,7 +145,10 @@ int main(int argc, char* argv[])
 			renderer.submit(render_request);
 			renderer.write_to(&render_buffer);
 			printf("Done!\n");
-			render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);
+			std::thread save_img_thread([i, &render_buffer, &OUTPUT_PATH]() {
+				render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i));
+			});
+			save_img_thread.detach();
 		}
 	}
 
