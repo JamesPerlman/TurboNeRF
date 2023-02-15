@@ -6,7 +6,7 @@
 #include <thread>
 
 #include "dataset.h"
-#include "../utils/coordinate-transformations.cuh"
+#include "../utils/linalg/transform4f.cuh"
 
 using namespace std;
 using namespace filesystem;
@@ -54,7 +54,7 @@ Dataset::Dataset(const string& file_path) {
 
         Transform4f transform_matrix(frame["transform_matrix"]);
 
-        Transform4f camera_matrix = nerf_to_nrc(transform_matrix);
+        Transform4f camera_matrix = transform_matrix.from_nerf();
 
         // TODO: per-camera dimensions
         cameras.emplace_back(image_dimensions, near, far, focal_length, view_angle, camera_matrix, dist_params);
