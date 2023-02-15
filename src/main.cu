@@ -20,7 +20,6 @@
 #include "render-targets/cuda-render-buffer.cuh"
 #include "utils/linalg/transform4f.cuh"
 
-#include "utils/coordinate-transformations.cuh"
 #include "utils/linalg/transform4f.cuh"
 
 #include <tiny-cuda-nn/common.h>
