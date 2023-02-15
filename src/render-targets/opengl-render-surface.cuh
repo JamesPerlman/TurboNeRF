@@ -38,12 +38,16 @@ private:
         this->width = width;
         this->height = height;
 
+        CUDA_CHECK_THROW(cudaGraphicsUnregisterResource(cuda_pbo_resource));
+
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
         glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
         glBindTexture(GL_TEXTURE_2D, 0);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
+        CUDA_CHECK_THROW(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, pbo, cudaGraphicsMapFlagsNone));
     }
     
 public:
