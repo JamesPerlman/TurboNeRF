@@ -27,41 +27,21 @@ NeRFRenderingController::NeRFRenderingController(
     }
 }
 
-bool NeRFRenderingController::is_rendering() const {
-    return render_future.valid() && render_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
-}
-
-void NeRFRenderingController::wait_until_finished() const {
-    if (is_rendering()) {
-        render_future.wait();
+void NeRFRenderingController::cancel() {
+    if (request != nullptr) {
+        request->cancel();
     }
 }
 
 void NeRFRenderingController::submit(
-    RenderRequest* request,
-    bool async
+    RenderRequest* request
 ) {
-    // if we are still rendering in the background...
-    if (is_rendering()) {
-        // then just ignore this request
-        return;
-    } 
-
-    // otherwise, we can start rendering
-    
     // TODO: batching/chunking/distributing requests across multiple GPUs
     auto& ctx = contexts[0];
+    
+    this->request = request;
 
-    render_future = std::async(
-        std::launch::async,
-        [this, &ctx, request]() {
-            renderer.submit(ctx, request);
-        }
-    );
-
-    if (!async) {
-        render_future.wait();
-    }
+    renderer.submit(ctx, request);
 }
 
 void NeRFRenderingController::write_to(
