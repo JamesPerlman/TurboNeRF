@@ -193,6 +193,34 @@ struct alignas(float) Transform4f
             - (m00 * (m11_x_m23_m_m13_x_m21) - m01 * (m10_x_m23_m_m13_x_m20) + m03 * (m10_x_m21_m_m11_x_m20)) * i_det,
         };
     }
+
+    // coordinate transformations
+    Transform4f from_nerf() const {
+        Transform4f nerf_matrix(*this);
+        Transform4f result = nerf_matrix;
+        // invert column 1
+        result.m01 = -nerf_matrix.m01;
+        result.m11 = -nerf_matrix.m11;
+        result.m21 = -nerf_matrix.m21;
+        // result.m31 = -nerf_matrix.m31;
+
+        // invert column 2
+        result.m02 = -nerf_matrix.m02;
+        result.m12 = -nerf_matrix.m12;
+        result.m22 = -nerf_matrix.m22;
+        // result.m32 = -nerf_matrix.m32;
+
+        // roll axes xyz -> yzx
+        const Transform4f tmp = result;
+        // x -> y
+        result.m00 = tmp.m10; result.m01 = tmp.m11; result.m02 = tmp.m12; result.m03 = tmp.m13;
+        // y -> z
+        result.m10 = tmp.m20; result.m11 = tmp.m21; result.m12 = tmp.m22; result.m13 = tmp.m23;
+        // z -> x
+        result.m20 = tmp.m00; result.m21 = tmp.m01; result.m22 = tmp.m02; result.m23 = tmp.m03;
+        
+        return result;
+    }
 };
 
 NRC_NAMESPACE_END
