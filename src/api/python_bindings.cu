@@ -84,6 +84,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
                 {sizeof(float) * 4, sizeof(float)}
             );
         })
+        .def("from_nerf", &Transform4f::from_nerf)
     ;
 
     /**
