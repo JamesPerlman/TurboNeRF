@@ -158,17 +158,13 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
 		{"l2_reg", 1e-6}
 	};
 
-	density_optimizer.reset(
-		create_optimizer<network_precision_t>(optimizer_config)
+	optimizer.reset(
+		new NGPAdamOptimizer<network_precision_t>(optimizer_config)
 	);
 
-	density_optimizer->allocate(density_network);
-
-	color_optimizer.reset(
-		create_optimizer<network_precision_t>(optimizer_config)
-	);
-	
-	color_optimizer->allocate(color_network);
+	size_t n_params = density_network->n_params() + color_network->n_params();
+	uint32_t n_grid_params = density_network->encoding()->n_params();
+	optimizer->allocate(n_params, {{n_grid_params, (uint32_t)1}});
 
 	// flag for training enabled
 	can_train = true;
@@ -599,21 +595,14 @@ void NerfNetwork::backward(
 
 void NerfNetwork::optimizer_step(const cudaStream_t& stream) {
 
-	density_optimizer->step(
+	optimizer->step(
 		stream,
 		LOSS_SCALE,
-		params_ws.density_network_params_fp,
-		params_ws.density_network_params_hp,
-		params_ws.density_network_gradients_hp
+		params_ws.params_fp,
+		params_ws.params_hp,
+		params_ws.gradients_hp
 	);
 
-	color_optimizer->step(
-		stream,
-		LOSS_SCALE,
-		params_ws.color_network_params_fp,
-		params_ws.color_network_params_hp,
-		params_ws.color_network_gradients_hp
-	);
 }
 
 // Only enlarge buffers needed for inference

@@ -6,11 +6,11 @@
 #include <tiny-cuda-nn/loss.h>
 #include <tiny-cuda-nn/network.h>
 #include <tiny-cuda-nn/network_with_input_encoding.h>
-#include <tiny-cuda-nn/optimizer.h>
 
-#include "../common.h"
+#include "../core/adam-optimizer.cuh"
 #include "../workspaces/network-workspace.cuh"
 #include "../workspaces/network-params-workspace.cuh"
+#include "../common.h"
 
 NRC_NAMESPACE_BEGIN
 
@@ -18,8 +18,7 @@ struct NerfNetwork {
 	std::shared_ptr<tcnn::Encoding<tcnn::network_precision_t>> direction_encoding;
 	std::shared_ptr<tcnn::NetworkWithInputEncoding<tcnn::network_precision_t>> density_network;
 	std::shared_ptr<tcnn::Network<tcnn::network_precision_t>> color_network;
-	std::shared_ptr<tcnn::Optimizer<tcnn::network_precision_t>> density_optimizer;
-	std::shared_ptr<tcnn::Optimizer<tcnn::network_precision_t>> color_optimizer;
+	std::shared_ptr<tcnn::NGPAdamOptimizer<tcnn::network_precision_t>> optimizer;
 	
 	NerfNetwork(
 		const int& device_id,
