@@ -108,10 +108,10 @@ public:
         };
 
         GLfloat tex_coords[8] = {
-            0.0f, 0.0f,
-            1.0f, 0.0f,
+            0.0f, 1.0f,
             1.0f, 1.0f,
-            0.0f, 1.0f
+            1.0f, 0.0f,
+            0.0f, 0.0f,
         };
         
         GLint shader_program_id;
