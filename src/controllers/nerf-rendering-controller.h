@@ -17,7 +17,7 @@ struct NeRFRenderingController {
     );
 
     void submit(
-        RenderRequest* request,
+        RenderRequest& request,
         bool async = false
     );
 

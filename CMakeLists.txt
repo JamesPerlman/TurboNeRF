@@ -35,6 +35,8 @@ include_directories(${OPENGL_INCLUDE_DIR})
 add_subdirectory(includes/glad)
 include_directories(includes/glad/include)
 
+# RxCpp
+include_directories(includes/RxCpp/Rx/v2/src)
 
 # tiny-cuda-nn
 set(TCNN_BUILD_EXAMPLES OFF)

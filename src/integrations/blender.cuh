@@ -5,6 +5,8 @@
 #include <cuda_gl_interop.h>
 #include <memory>
 #include <mutex>
+#include <tuple>
+#include <rxcpp/rx.hpp>
 
 #include "../controllers/nerf-rendering-controller.h"
 #include "../models/camera.cuh"
@@ -19,19 +21,65 @@ class BlenderRenderEngine
 {
 private:
     NeRFRenderingController _renderer;
-    bool _is_drawing = false;
-    bool _did_request_redraw = false;
-    int _current_draw_request_id = 0;
-    int _n_draw_requests = 0;
     std::mutex _drawing_mutex;
     OpenGLRenderSurface _render_surface;
-    std::unique_ptr<RenderRequest> _current_request;
-    std::unique_ptr<RenderRequest> _next_request;
     std::function<void()> _tag_redraw;
-    std::future<void> _render_flusher;
-    std::future<void> _redraw_future;
 
-    std::chrono::steady_clock::time_point _last_draw_time = std::chrono::steady_clock::now();
+    rxcpp::subjects::subject<RenderRequest> rx_draw_request;
+    rxcpp::subjects::subject<RenderRequest> rx_render_request;
+    rxcpp::subjects::subject<RenderRequest> rx_render_finish;
+
+private:
+    void rx_init() {
+        /**
+         * rx_draw_request needs to be debounced to preserve performance.
+         */
+        rx_draw_request
+            .get_observable()
+            .debounce(std::chrono::milliseconds(333))
+            .subscribe([this](RenderRequest request) {
+                this->request_redraw();
+            });
+        
+        /**
+         * rx_render_request is a stream of RenderRequest objects
+         * This subscriber launches a new render if we are not currently rendering.
+         */
+
+        rx_render_request
+            .get_observable()
+            .subscribe([this](RenderRequest request) {
+                if (!_renderer.is_rendering()) {
+                    _renderer.submit(request, true);
+                }
+            });
+
+        /**
+         * rx_render_finish is a stream of RenderRequest objects that have either canceled or completed
+         * 
+         * Here we subscribe to the finished requests, and if a new request is available we start a new render.
+         */
+
+        // rx_render_finish
+        //     .get_observable()
+        //     .with_latest_from(rx_render_request.get_observable())
+        //     .filter([this](std::tuple<RenderRequest, RenderRequest> v) {
+        //         return std::get<0>(v) != std::get<1>(v);
+        //     })
+        //     .subscribe([this](std::tuple<RenderRequest, RenderRequest> v) {
+        //         RenderRequest next_request = std::get<1>(v);
+        //         _renderer.submit(next_request, true);
+        //     });
+        auto o1 = rxcpp::observable<>::interval(std::chrono::milliseconds(2));
+        auto o2 = rxcpp::observable<>::interval(std::chrono::milliseconds(3));
+        auto o3 = rxcpp::observable<>::interval(std::chrono::milliseconds(5));
+        auto values = o1.with_latest_from(o2, o3);
+        values.
+            take(5).
+            subscribe(
+                [](std::tuple<int, int, int> v){printf("OnNext: %d, %d, %d\n", std::get<0>(v), std::get<1>(v), std::get<2>(v));},
+                [](){printf("OnCompleted\n");});
+    }
 
 public:
 
@@ -41,75 +89,11 @@ public:
         if (!gladLoadGL()) {
             throw std::runtime_error("Failed to load OpenGL with glad.");
         };
+        rx_init();
     };
 
 
-    /** INTERNAL METHODS **/
-    // this has a property of throttle_time
-    void submit_draw_request(const std::chrono::milliseconds& throttle_duration) {
-        if (throttle_duration > std::chrono::seconds(0) && std::chrono::high_resolution_clock::now() - _last_draw_time < throttle_duration) {
-            return;
-        }
-
-        if (_redraw_future.valid() && _redraw_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-            return;
-        }
-
-        _redraw_future = std::async(
-            std::launch::async,
-            [this]() {
-                std::unique_lock lock(_drawing_mutex);
-                ++_n_draw_requests;
-                bool is_drawing = _is_drawing;
-                lock.unlock();
-
-                // wait for _is_drawing to be false
-                while (is_drawing) {
-                    lock.lock();
-                    is_drawing = _is_drawing;
-                    lock.unlock();
-                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                }
-                
-                request_redraw();
-            }
-        );
-    }
-
-    void submit_render_request() {
-        if (_renderer.is_rendering()) {
-            return;
-        }
-        _renderer.submit(_current_request.get(), true);
-        _render_flusher = std::async(
-            std::launch::async,
-            [this]() {
-                _renderer.wait_until_finished();
-                this->flush_render_queue();
-            }
-        );
-    }
-
-    void flush_render_queue() {
-        _current_request.reset();
-        _current_request = nullptr;
-        if (_next_request != nullptr) {
-            _current_request = std::move(_next_request);
-            _next_request.reset();
-            submit_render_request();
-        }
-    }
-
     void request_redraw() {
-        std::unique_lock lock(_drawing_mutex);
-        
-        if (_did_request_redraw)
-            return;
-
-        _did_request_redraw = true;
-        
-        lock.unlock();
-
         _tag_redraw();
     }
 
@@ -119,60 +103,36 @@ public:
         this->_tag_redraw = tag_redraw;
     }
 
-    void did_begin_drawing() {
-        std::scoped_lock lock(_drawing_mutex);
-        _is_drawing = true;
-        _current_draw_request_id = _n_draw_requests;
-    }
-
-    void did_finish_drawing() {
-        std::unique_lock lock(_drawing_mutex);
-        _is_drawing = false;
-        _did_request_redraw = false;
-
-        // Is there still a draw request queued up?
-        if (_current_draw_request_id < _n_draw_requests) {
-            lock.unlock();
-            // If so, then we need to draw again
-            request_redraw();
-        } else {
-            // This is the last draw request, so we can reset the counter
-            _n_draw_requests = 0;
-        }
-
-        _last_draw_time = std::chrono::high_resolution_clock::now();
-    }
-
     void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
         RenderRequest request{
             camera,
             proxies,
             &_render_surface,
             // on_complete
-            [this]() {
-                this->submit_draw_request(std::chrono::milliseconds(0));
-                printf("Render request complete!\n");
+            [this](RenderRequest& request) {
+                this->rx_render_finish
+                    .get_subscriber()
+                    .on_next(request);
+                printf("Render request completed!\n");
             },
             // on_progress
-            [this](float progress) {
-                // if we are already drawing, then we need to queue up another draw request
-                this->submit_draw_request(std::chrono::milliseconds(333));
+            [this](RenderRequest& request) {
+                this->rx_draw_request
+                    .get_subscriber()
+                    .on_next(request);
             },
             // on_cancel
-            [this]() {
+            [this](RenderRequest& request) {
+                this->rx_render_finish
+                    .get_subscriber()
+                    .on_next(request);
                 printf("Render request cancelled!\n");
             }
         };
 
-        if (_current_request == nullptr) {
-            _current_request = std::make_unique<RenderRequest>(request);
-        } else {
-            _current_request->cancel();
-            _next_request.reset();
-            _next_request = std::make_unique<RenderRequest>(request);
-        }
-
-        submit_render_request();
+        rx_render_request
+            .get_subscriber()
+            .on_next(request);
     }
 
     void resize_render_surface(const uint32_t& width, const uint32_t& height) {
@@ -183,7 +143,11 @@ public:
      * The following functionality was adapted from the Pixar RenderMan for Blender plugin.
      * https://github.com/prman-pixar/RenderManForBlender/blob/main/display_driver/d_blender.cpp#L335
      * 
-     * This will always be called from Blender's view_draw() function
+     * This needs to be called from the view_draw() method of the Blender RenderEngine.
+     * view_draw does some sneaky OpenGL stuff to get the Context ready for drawing.
+     * I have not quite figured out how to get the Context ready on a background thread.
+     * Serious speed up achievable if we can figure this out.
+     * 
      */
 
     void draw()
@@ -191,7 +155,11 @@ public:
         std::scoped_lock lock(_drawing_mutex);
         
         // copy render data
+        // if this can be moved to a background thread that would be ideal.
+        // Or maybe we only write the pixels that have changed?
         _renderer.write_to(&_render_surface);
+
+        // From here on it's just OpenGL drawing code to get the rendered data onscreen.
 
         // These are the vertices of a quad that covers the entire viewport.
         const float w = static_cast<float>(_render_surface.width);

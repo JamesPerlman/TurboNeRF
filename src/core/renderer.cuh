@@ -28,7 +28,7 @@ struct Renderer {
 
     void submit(
         Context& ctx,
-        RenderRequest* request
+        RenderRequest request
     );
 
     void write_to(
@@ -38,7 +38,7 @@ struct Renderer {
 
 private:
 
-    void enlarge_workspace_if_needed(Context& ctx, RenderRequest* request);
+    void enlarge_workspace_if_needed(Context& ctx, RenderRequest& request);
 };
 
 NRC_NAMESPACE_END

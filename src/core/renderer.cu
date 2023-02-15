@@ -13,13 +13,13 @@ using namespace tcnn;
 
 void Renderer::enlarge_workspace_if_needed(
     Renderer::Context& ctx,
-    RenderRequest* request
+    RenderRequest& request
 ) {
-    const uint32_t new_render_area = request->output->width * request->output->height;
+    const uint32_t new_render_area = request.output->width * request.output->height;
 
     // TODO: NeRF network property getters could be made into static members.
     // For now we assume all NeRFs have the same network configuration.
-    NeRF& nerf = request->proxies[0]->nerfs[0];
+    NeRF& nerf = request.proxies[0]->nerfs[0];
 
     if (ctx.workspace.n_pixels != new_render_area) {
         ctx.workspace.enlarge(
@@ -34,22 +34,22 @@ void Renderer::enlarge_workspace_if_needed(
 
 void Renderer::submit(
     Renderer::Context& ctx,
-    RenderRequest* request
+    RenderRequest request
 ) {
     RenderingWorkspace& workspace = ctx.workspace;
     
     // TODO: this should happen for all NeRFs
-    NeRF& nerf = request->proxies[0]->nerfs[0];
+    NeRF& nerf = request.proxies[0]->nerfs[0];
 
     enlarge_workspace_if_needed(ctx, request);
     
     cudaStream_t stream = ctx.stream;
 
-    // workspace.camera = request->camera
+    // workspace.camera = request.camera
     CUDA_CHECK_THROW(
         cudaMemcpyAsync(
             workspace.camera,
-            &request->camera,
+            &request.camera,
             sizeof(Camera),
             cudaMemcpyHostToDevice,
             stream
@@ -163,8 +163,8 @@ void Renderer::submit(
 
         // TODO: march rays to bounding box first
         while (n_rays_alive > 0) {
-            if (request->is_canceled()) {
-                request->on_cancel();
+            if (request.is_canceled()) {
+                request.on_cancel();
                 return;
             }
 
@@ -238,8 +238,8 @@ void Renderer::submit(
 
             // We have an opportunity to render a partial result here
             // this progress is not very accurate, but it is fast.
-            float progress = (float)(n_rays - n_rays_alive) / (float)n_rays;
-            request->on_progress(progress);
+            // float progress = (float)(n_rays - n_rays_alive) / (float)n_rays;
+            request.on_progress();
 
             n_steps += n_steps_per_ray;
             if (n_steps < NeRFConstants::n_steps_per_render_compaction) {
@@ -311,7 +311,7 @@ void Renderer::submit(
         n_pixels_filled += n_pixels_to_fill;
     }
 
-    request->on_complete();
+    request.on_complete();
 };
 
 void Renderer::write_to(

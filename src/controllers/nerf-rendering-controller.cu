@@ -38,7 +38,7 @@ void NeRFRenderingController::wait_until_finished() const {
 }
 
 void NeRFRenderingController::submit(
-    RenderRequest* request,
+    RenderRequest& request,
     bool async
 ) {
     // if we are still rendering in the background...

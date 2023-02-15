@@ -23,6 +23,22 @@ struct DistortionParams {
 	// constructor
 	DistortionParams(float k1 = 0.0f, float k2 = 0.0f, float k3 = 0.0f, float k4 = 0.0f, float p1 = 0.0f, float p2 = 0.0f)
 		: k1(k1), k2(k2), k3(k3), k4(k4), p1(p1), p2(p2) { }
+
+	// equality operator
+	inline __host__ bool operator==(const DistortionParams& other) const {
+		return
+			k1 == other.k1 &&
+			k2 == other.k2 &&
+			k3 == other.k3 &&
+			k4 == other.k4 &&
+			p1 == other.p1 &&
+			p2 == other.p2;
+	}
+
+	// inequality operator
+	inline __host__ bool operator!=(const DistortionParams& other) const {
+		return !(*this == other);
+	}
 };
 
 struct Camera {
@@ -57,6 +73,17 @@ struct Camera {
 		, dist_params(dist_params)
 	{ };
 
+	Camera()
+		: Camera(
+			int2{ 0, 0 },
+			0.0f,
+			0.0f,
+			float2{ 0.0f, 0.0f },
+			float2{ 0.0f, 0.0f },
+			Transform4f()
+		)
+	{ };
+
 	// returns a ray in the camera's local coordinate system
 
 	inline __device__ Ray local_ray_at_pixel_xy_index(
@@ -86,6 +113,26 @@ struct Camera {
 		float3 ray_o = pix_pos;
 
 		return Ray{ ray_o, ray_d };
+	}
+
+	// equality operator
+	inline __host__ bool operator==(const Camera& other) const {
+		return
+			resolution.x == other.resolution.x &&
+			resolution.y == other.resolution.y &&
+			near == other.near &&
+			far == other.far &&
+			focal_length.x == other.focal_length.x &&
+			focal_length.y == other.focal_length.y &&
+			view_angle.x == other.view_angle.x &&
+			view_angle.y == other.view_angle.y &&
+			transform == other.transform &&
+			dist_params == other.dist_params;
+	}
+
+	// inequality operator
+	inline __host__ bool operator!=(const Camera& other) const {
+		return !(*this == other);
 	}
 };
 
