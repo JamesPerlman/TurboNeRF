@@ -135,13 +135,13 @@ int main(int argc, char* argv[])
 				cam0.dist_params
 			);
 
-			auto render_request = nrc::RenderRequest(
+			auto render_request = std::make_shared<RenderRequest>(
 				render_cam,
 				proxy_ptrs,
 				&render_buffer
 			);
 
-			renderer.submit(&render_request);
+			renderer.submit(render_request);
 			renderer.write_to(&render_buffer);
 			printf("Done!\n");
 			render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);

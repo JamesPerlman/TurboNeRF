@@ -54,9 +54,9 @@ public:
 
     void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
         _renderer.cancel();
-        
+
         _render_queue.push([this, camera, proxies]() {
-            RenderRequest request{
+            auto request = std::make_shared<RenderRequest>(
                 camera,
                 proxies,
                 &_render_surface,
@@ -74,9 +74,9 @@ public:
                 [this]() {
                     printf("Render request cancelled!\n");
                 }
-            };
+            );
 
-            _renderer.submit(&request);
+            _renderer.submit(request);
         });
     }
 

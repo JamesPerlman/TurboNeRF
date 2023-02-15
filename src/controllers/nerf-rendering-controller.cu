@@ -28,20 +28,19 @@ NeRFRenderingController::NeRFRenderingController(
 }
 
 void NeRFRenderingController::cancel() {
-    if (request != nullptr) {
+    if (request != nullptr)
         request->cancel();
-    }
 }
 
 void NeRFRenderingController::submit(
-    RenderRequest* request
+    std::shared_ptr<RenderRequest> request
 ) {
     // TODO: batching/chunking/distributing requests across multiple GPUs
     auto& ctx = contexts[0];
     
     this->request = request;
 
-    renderer.submit(ctx, request);
+    renderer.submit(ctx, request.get());
 }
 
 void NeRFRenderingController::write_to(

@@ -18,14 +18,16 @@ private:
 
     std::vector<Renderer::Context> contexts;
 
-    RenderRequest* request = nullptr;
+    std::shared_ptr<RenderRequest> request = nullptr;
 
     Renderer renderer = Renderer();
 
 public:
     NeRFRenderingController(const uint32_t& batch_size = 0);
 
-    void submit(RenderRequest* request);
+    void submit(
+        std::shared_ptr<RenderRequest> request
+    );
 
     void write_to(RenderTarget* target);
 
