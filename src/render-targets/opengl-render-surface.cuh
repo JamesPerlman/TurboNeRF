@@ -13,7 +13,7 @@ class OpenGLRenderSurface: public RenderTarget {
 private:
     GLuint pbo;
     GLuint texture;
-    cudaGraphicsResource *cuda_pbo_resource;
+    cudaGraphicsResource* cuda_pbo_res;
 
     void allocate(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
         
@@ -31,12 +31,12 @@ private:
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
         glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
 
+        CUDA_CHECK_THROW(cudaGraphicsGLRegisterBuffer(&cuda_pbo_res, pbo, cudaGraphicsRegisterFlagsWriteDiscard));
+
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-
-        CUDA_CHECK_THROW(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, pbo, cudaGraphicsMapFlagsNone));
 
         // reset to previous state
         glBindTexture(GL_TEXTURE_2D, prev_texture);
@@ -55,7 +55,7 @@ private:
         this->width = width;
         this->height = height;
 
-        CUDA_CHECK_THROW(cudaGraphicsUnregisterResource(cuda_pbo_resource));
+        CUDA_CHECK_THROW(cudaGraphicsUnregisterResource(cuda_pbo_res));
 
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
         glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
@@ -63,7 +63,7 @@ private:
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 
-        CUDA_CHECK_THROW(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, pbo, cudaGraphicsRegisterFlagsWriteDiscard));
+        CUDA_CHECK_THROW(cudaGraphicsGLRegisterBuffer(&cuda_pbo_res, pbo, cudaGraphicsRegisterFlagsWriteDiscard));
         
         // reset to previous state
         glBindTexture(GL_TEXTURE_2D, prev_texture);
@@ -82,7 +82,7 @@ public:
         if (width == 0 || height == 0)
             return;
         
-        cudaGraphicsUnregisterResource(cuda_pbo_resource);
+        cudaGraphicsUnregisterResource(cuda_pbo_res);
         glDeleteBuffers(1, &pbo);
         glDeleteTextures(1, &texture);
     }
@@ -99,12 +99,12 @@ public:
 
         // prepare for cuda access
         float* rgba;
-        CUDA_CHECK_THROW(cudaGraphicsMapResources(1, &cuda_pbo_resource, stream));
-        CUDA_CHECK_THROW(cudaGraphicsResourceGetMappedPointer((void **)&rgba, nullptr, cuda_pbo_resource));
+        CUDA_CHECK_THROW(cudaGraphicsMapResources(1, &cuda_pbo_res, stream));
+        CUDA_CHECK_THROW(cudaGraphicsResourceGetMappedPointer((void **)&rgba, nullptr, cuda_pbo_res));
 
         handle(rgba);
 
-        CUDA_CHECK_THROW(cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0));
+        CUDA_CHECK_THROW(cudaGraphicsUnmapResources(1, &cuda_pbo_res, stream));
 
         // upload to texture
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
