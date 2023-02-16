@@ -88,7 +88,7 @@ __global__ void ngp_adam_step(
 
 	const float effective_learning_rate = learning_rate / (sqrtf(second_moment) + epsilon);
 
-	float new_weight = weight_fp - effective_learning_rate * first_moment;
+	const float new_weight = weight_fp - effective_learning_rate * first_moment;
 
 	weights_full_precision[i] = new_weight;
 	weights[i] = (T)new_weight;
