@@ -16,6 +16,14 @@ private:
     cudaGraphicsResource *cuda_pbo_resource;
 
     void allocate(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
+        
+        // get previous state
+        GLint prev_buffer, prev_texture;
+        glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &prev_buffer);
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_texture);
+
+        // allocate
+
         this->width = width;
         this->height = height;
 
@@ -30,11 +38,20 @@ private:
 
         CUDA_CHECK_THROW(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, pbo, cudaGraphicsMapFlagsNone));
 
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        // reset to previous state
+        glBindTexture(GL_TEXTURE_2D, prev_texture);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, prev_buffer);
     }
 
     void resize(const uint32_t& width, const uint32_t& height, const cudaStream_t& stream = 0) override {
+
+        // get previous state
+        GLint prev_buffer, prev_texture;
+        glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &prev_buffer);
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_texture);
+
+        // resize
+
         this->width = width;
         this->height = height;
 
@@ -42,12 +59,15 @@ private:
 
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
         glBufferData(GL_PIXEL_UNPACK_BUFFER, width * height * 4 * sizeof(GLfloat), 0, GL_DYNAMIC_DRAW);
+
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
-        CUDA_CHECK_THROW(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, pbo, cudaGraphicsMapFlagsNone));
+        CUDA_CHECK_THROW(cudaGraphicsGLRegisterBuffer(&cuda_pbo_resource, pbo, cudaGraphicsRegisterFlagsWriteDiscard));
+        
+        // reset to previous state
+        glBindTexture(GL_TEXTURE_2D, prev_texture);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, prev_buffer);
     }
     
 public:
@@ -98,3 +118,22 @@ public:
 };
 
 NRC_NAMESPACE_END
+
+
+/**
+ * Some discussion on the "stickiness" of the UI.
+ * 
+ * I'm trying to figure this out.  For some reason there is lag when mapping/unmapping any opengl resource.
+ * I tried mapping a texture instead of a pixel buffer, and I tried mapping an array and writing to a surface,
+ * all to no avail.
+ * 
+ * cudaCreateTextureObject? cudaCreateSurfaceObject? surf2Dwrite? For now we will just write to the pixel buffer.
+ * I suspect the lag might be coming from a roundtrip to the CPU, but I'm not sure where it is.
+ * 
+ * Research:
+ * https://www.informit.com/articles/article.aspx?p=2455391&seqNum=2
+ * https://github.dev/ndd314/cuda_examples/blob/master/3_Imaging/postProcessGL
+ * https://github.dev/Hello100blog/gl_cuda_interop_pingpong_st
+ * https://stackoverflow.com/questions/15053444/modifying-opengl-fbo-texture-attachment-in-cuda
+ * https://forums.developer.nvidia.com/t/cudabindtexturetoarray-deprecated/176713/
+ */
