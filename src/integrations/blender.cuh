@@ -2,7 +2,6 @@
 
 #include <glad/glad.h>
 #include <memory>
-#include <mutex>
 
 #include "../controllers/nerf-rendering-controller.h"
 #include "../models/camera.cuh"
