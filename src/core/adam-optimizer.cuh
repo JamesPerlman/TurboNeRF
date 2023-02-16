@@ -24,8 +24,9 @@
 
 /** @file   adam.h
  *  @author Thomas Müller, NVIDIA
- *  @brief  Implementation of the adam optimizer with support for
- *          the AdaBound paper: https://openreview.net/pdf?id=Bkg3g2R9FX
+ *  @author Modified by James Perlman on 2023-02-15, copied from tiny-cuda-nn
+ *  @brief  Implementation of the adam optimizer according to the Instant-NGP paper.
+ *  With minor optimizations and no L2 regularization for hash grid parameters.
  */
 
 #pragma once
@@ -48,7 +49,6 @@ template <typename T>
 __global__ void ngp_adam_step(
 	const uint32_t n_elements,
 	const uint32_t n_hash_grid_weights,
-	const float weight_clipping_magnitude,
 	const float loss_scale,
 	float learning_rate,
 	const float beta1,
@@ -123,7 +123,6 @@ public:
 		linear_kernel(ngp_adam_step<T>, 0, stream,
 			n_weights_to_optimize,
 			m_n_hash_grid_weights,
-			m_weight_clipping_magnitude,
 			loss_scale,
 			m_base_learning_rate,
 			m_beta1,
@@ -184,10 +183,6 @@ public:
 			m_l2_reg = params["l2_reg"];
 		}
 
-		if (params.contains("clipping_magnitude")) {
-			m_weight_clipping_magnitude = params["clipping_magnitude"];
-		}
-
 	}
 
 	json hyperparams() const override {
@@ -198,7 +193,6 @@ public:
 			{"epsilon", m_epsilon},
 			{"learning_rate", m_base_learning_rate},
 			{"l2_reg", m_l2_reg},
-			{"clipping_magnitude", m_weight_clipping_magnitude},
 		};
 	}
 
@@ -241,8 +235,6 @@ private:
 	float m_beta2 = 0.999f;
 	float m_epsilon = 1e-8f;
 	float m_l2_reg = 1e-8f;
-
-	float m_weight_clipping_magnitude = 0.0f;
 
 };
 
