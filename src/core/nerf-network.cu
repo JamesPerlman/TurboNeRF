@@ -164,7 +164,7 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
 
 	size_t n_params = density_network->n_params() + color_network->n_params();
 	uint32_t n_grid_params = density_network->encoding()->n_params();
-	optimizer->allocate(n_params, {{n_grid_params, (uint32_t)1}});
+	optimizer->allocate(n_params, {{n_grid_params, 1}});
 
 	// flag for training enabled
 	can_train = true;
