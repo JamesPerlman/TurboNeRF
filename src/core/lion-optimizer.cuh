@@ -41,8 +41,6 @@
 #include <string>
 #include <vector>
 
-#include "../common.h"
-
 TCNN_NAMESPACE_BEGIN
 
 template <typename T>
@@ -202,7 +200,7 @@ private:
     // Page 13-14, "Hyperparameter Tuning"
 
 	float m_base_learning_rate = 1e-4f;
-    float m_weight_decay = 10.0f;
+    float m_weight_decay = 0.0f;
 	float m_beta1 = 0.9f;
 	float m_beta2 = 0.99f;
 };
