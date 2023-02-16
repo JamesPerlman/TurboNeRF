@@ -87,6 +87,10 @@ public:
 
     void draw()
     {
+        // For some reason these calls make rendering a little bit smoother
+        glFlush();
+        glFinish();
+
         // copy render data
         _renderer.write_to(&_render_surface);
 
