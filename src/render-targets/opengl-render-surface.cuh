@@ -68,6 +68,16 @@ public:
     }
 
     void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) override {
+
+        // get previously bound buffer
+        GLint prev_buffer;
+        glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &prev_buffer);
+
+        // previous texture
+        GLint prev_texture;
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_texture);
+
+        // prepare for cuda access
         float* rgba;
         CUDA_CHECK_THROW(cudaGraphicsMapResources(1, &cuda_pbo_resource, stream));
         CUDA_CHECK_THROW(cudaGraphicsResourceGetMappedPointer((void **)&rgba, nullptr, cuda_pbo_resource));
@@ -76,12 +86,14 @@ public:
 
         CUDA_CHECK_THROW(cudaGraphicsUnmapResources(1, &cuda_pbo_resource, 0));
 
+        // upload to texture
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_FLOAT, NULL);
 
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        // restore previous state
+        glBindTexture(GL_TEXTURE_2D, prev_texture);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, prev_buffer);
     }
 };
 
