@@ -60,16 +60,14 @@ public:
                 // on_complete
                 [this]() {
                     this->request_redraw();
-                    printf("Render complete!\n");
                 },
                 // on_progress
                 [this](float progress) {
                     this->request_redraw();
-                    printf("Render progress: %f\n", progress);
                 },
                 // on_cancel
                 [this]() {
-                    printf("Render request cancelled!\n");
+                    // no-op
                 }
             );
 
