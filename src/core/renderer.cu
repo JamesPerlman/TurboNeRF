@@ -158,10 +158,8 @@ void Renderer::submit(
 
         // ray marching loop
         uint32_t n_rays_alive = n_rays;
-
         int n_steps = 0;
 
-        // TODO: march rays to bounding box first
         while (n_rays_alive > 0) {
             if (request->is_canceled()) {
                 request->on_cancel();
