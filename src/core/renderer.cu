@@ -321,12 +321,12 @@ void Renderer::write_to(
     if (ctx.workspace.n_pixels != target->width * target->height) {
         return;
     }
+    cudaStream_t stream = ctx.stream;
 
-    CUDA_CHECK_THROW(cudaStreamSynchronize(ctx.stream));
     target->open_for_cuda_access(
-        [target, &ctx](float* rgba) {
+        [target, &ctx, &stream](float* rgba) {
             join_channels(
-                ctx.stream,
+                stream,
                 target->width,
                 target->height,
                 4,
@@ -334,7 +334,7 @@ void Renderer::write_to(
                 rgba
             );
         },
-        ctx.stream
+        stream
     );
-    CUDA_CHECK_THROW(cudaStreamSynchronize(ctx.stream));
+
 }
