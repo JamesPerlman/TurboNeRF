@@ -49,8 +49,9 @@ set(HEADERS
 
 	# core
 	src/core/adam-optimizer.cuh
-	src/core/occupancy-grid.cuh
+	src/core/lion-optimizer.cuh
 	src/core/nerf-network.cuh
+	src/core/occupancy-grid.cuh
 	src/core/renderer.cuh
 	src/core/trainer.cuh
 
