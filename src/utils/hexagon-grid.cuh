@@ -120,7 +120,7 @@ inline __device__ int hex_row_x_offset(const int& y, const int& H) {
  * 
  */
 
-inline __device__ void hex_xy_from_buf_idx(
+inline __device__ void hex_pix_xy_from_buf_idx(
     const int& buf_idx,
     const int& cw,
     const int& H,
@@ -148,7 +148,7 @@ inline __device__ void hex_xy_from_buf_idx(
     int idx_in_row = idx - rect_offset;
 
     // both branches share this value as a base
-    int _y = rect_idx + idx_in_row / n_pix_per_row;
+    int _y = rect_idx + (int)(idx_in_row >= n_pix_per_row);
 
     // tiny bit of branch divergence, could be a fun to-do to eliminate it :)
     if (buf_idx < n_pix / 2) {
