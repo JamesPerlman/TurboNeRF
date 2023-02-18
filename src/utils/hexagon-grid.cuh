@@ -150,11 +150,7 @@ inline __device__ void hex_get_pix_xy_from_buf_idx(
     const float& fw1_2,
     const float& fw1_sq_4,
     int& x,
-    int& y,
-    int* p_rect_idx,
-    int* p_n_rect_pix,
-    int* p_rect_offset,
-    int* p_n_pix_per_row
+    int& y
 ) {
 
     // adjusted buffer index (avoids some branching)
@@ -182,11 +178,6 @@ inline __device__ void hex_get_pix_xy_from_buf_idx(
 
     x = _x;
     y = _y;
-
-    *p_rect_idx = rect_idx;
-    *p_n_rect_pix = n_rect_pix;
-    *p_rect_offset = rect_offset;
-    *p_n_pix_per_row = n_pix_per_row;
 }
 
 NRC_NAMESPACE_END
