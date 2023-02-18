@@ -1,3 +1,8 @@
+#pragma once
+#include "../common.h"
+
+NRC_NAMESPACE_BEGIN
+
 /**
  * This is a pseudo-regular hexagon.  The slope of the sides is 0.5 instead of 1/sqrt(3),
  * therefore it is not a perfect regular hexagon. But it looks close enough and has the
@@ -33,6 +38,20 @@
  * https://www.desmos.com/calculator/bvoqmkivjc
  */
 
+/**
+ * This just gets the width of the central rectangular portion of the hexagon.
+ * 
+ */
+inline __host__ void hex_get_W_and_cw(
+    const int& H, // height (should be a multiple of 4)
+    const float& a, // aspect ratio (recommended to be 1.1)
+    int& W,
+    int& cw
+) {
+    W = (int)(a * (float)H);
+    cw = W - H / 2 + 2;
+}
+
 
 /**
  * Due to the angle of the slope chosen, our hexagon can be broken into dual-row rectangular segments.
@@ -47,10 +66,10 @@ inline __device__ int hex_rect_idx_from_buf_idx(
     const float& fw1_sq_4 // 0.25 * fw1 * fw1
 ) {
 
-    float fx = (buf_idx / 2);
+    float fx = (float)buf_idx / 2.0f;
     float a = fx - fw + fw1_sq_4;
-    float y = sqrtf(a) - fw1_2;
-    return 1 + (int)y;
+    float y = 1.0f + sqrtf(a) - fw1_2;
+    return (int)y;
 }
 
 /**
@@ -58,17 +77,17 @@ inline __device__ int hex_rect_idx_from_buf_idx(
  * 
  */
 
-inline __device__ int buf_offset_from_hex_rect_idx(
+inline __device__ __host__ int buf_offset_from_hex_rect_idx(
     const float& rect_idx,
     const float& fw,
     const float& fw1_2, // 0.5 * fw1
     const float& fw1_sq_4 // 0.25 * fw1 * fw1
 ) {
-    float x = rect_idx - 1;
+    float x = rect_idx - 1.0f;
     float a = x + fw1_2;
-    int half_offset = a * a + fw - fw1_sq_4;
+    float offset = 2.0f * (a * a + fw - fw1_sq_4);
 
-    return 2 * half_offset;
+    return (int)offset;
 }
 
 /**
@@ -85,11 +104,11 @@ inline __device__ int n_pix_for_hex_rect_at_idx(const int& rect_idx, const int& 
  * 
  */
 
-inline __device__ int n_pix_total_in_hex(
+inline __host__ int n_pix_total_in_hex(
     const int& h,
-    const int& fw,
-    const int& fw1_2,
-    const int& fw1_sq_4
+    const float& fw,
+    const float& fw1_2,
+    const float& fw1_sq_4
 ) {
     const int rect_idx = h / 4;
     return 2 * buf_offset_from_hex_rect_idx(rect_idx, fw, fw1_2, fw1_sq_4);
@@ -120,46 +139,54 @@ inline __device__ int hex_row_x_offset(const int& y, const int& H) {
  * 
  */
 
-inline __device__ void hex_pix_xy_from_buf_idx(
+inline __device__ void hex_get_pix_xy_from_buf_idx(
     const int& buf_idx,
-    const int& cw,
     const int& H,
+    const int& n_pix,
+    const float& fnp1_2, // ((float)n_pix - 1.0f) / 2.0f
+    const int& cw,
+    const float& fw,
+    const float& fw1,
+    const float& fw1_2,
+    const float& fw1_sq_4,
     int& x,
-    int& y
+    int& y,
+    int* p_rect_idx,
+    int* p_n_rect_pix,
+    int* p_rect_offset,
+    int* p_n_pix_per_row
 ) {
-    const float fw = cw;
-    const float fw1 = (fw + 1);
-    const float fw1_2 = 0.5f * fw1;
-    const float fw1_sq_4 = 0.25f * fw1 * fw1;
-
-    const int n_pix = n_pix_total_in_hex(H, fw, fw1_2, fw1_sq_4);
-    const float fnp1_2 = ((float)n_pix - 1.0f) / 2.0f;
 
     // adjusted buffer index (avoids some branching)
     const float idx = fnp1_2 - fabsf((float)buf_idx - fnp1_2);
 
     // calculate necessary properties
-    const int rect_idx = hex_rect_idx_from_buf_idx(buf_idx, fw, fw1, fw1_2, fw1_sq_4);
+    const int rect_idx = hex_rect_idx_from_buf_idx(idx, fw, fw1, fw1_2, fw1_sq_4);
     const int n_rect_pix = n_pix_for_hex_rect_at_idx(rect_idx, cw);
     const int rect_offset = buf_offset_from_hex_rect_idx(rect_idx, fw, fw1_2, fw1_sq_4);
 
     const int n_pix_per_row = n_rect_pix / 2;
-    
-    int idx_in_row = idx - rect_offset;
+
+    int idx_in_rect = idx - rect_offset;
 
     // both branches share this value as a base
-    int _y = rect_idx + (int)(idx_in_row >= n_pix_per_row);
+    int _y = 2 * rect_idx + (int)(idx_in_rect >= n_pix_per_row);
 
     // tiny bit of branch divergence, could be a fun to-do to eliminate it :)
-    if (buf_idx < n_pix / 2) {
-        _y = _y + rect_idx;
-    } else {
-        idx_in_row = n_rect_pix - idx_in_row - 1;
+    if (buf_idx >= n_pix / 2) {
+        idx_in_rect = n_rect_pix - idx_in_rect - 1;
         _y = H - _y - 1;
     }
 
-    const int _x = hex_row_x_offset(_y, H) + idx_in_row % n_pix_per_row;
+    const int _x = hex_row_x_offset(_y, H) + idx_in_rect % n_pix_per_row;
 
     x = _x;
     y = _y;
+
+    *p_rect_idx = rect_idx;
+    *p_n_rect_pix = n_rect_pix;
+    *p_rect_offset = rect_offset;
+    *p_n_pix_per_row = n_pix_per_row;
 }
+
+NRC_NAMESPACE_END
