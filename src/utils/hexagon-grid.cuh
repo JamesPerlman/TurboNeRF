@@ -52,6 +52,15 @@ inline __host__ void hex_get_W_and_cw(
     cw = W - H / 2 + 2;
 }
 
+/**
+ * This gets the height of the hexagon given a requested number of pixels and an aspect ratio.
+ * 
+ */
+
+inline __host__ int hex_height_for_npix_and_aspect(const float& n, const float& a) {
+    const float b = 4.0f * a - 1.0f;
+    return (int)(2.0f * (sqrtf(n * b) - 1.0f) / b);
+}
 
 /**
  * Due to the angle of the slope chosen, our hexagon can be broken into dual-row rectangular segments.
@@ -106,13 +115,11 @@ inline __device__ int n_pix_for_hex_rect_at_idx(const int& rect_idx, const int& 
 
 inline __host__ int n_pix_total_in_hex(
     const int& h,
-    const float& fw,
-    const float& fw1_2,
-    const float& fw1_sq_4
+    const int& c
 ) {
-    const int rect_idx = h / 4;
-    return 2 * buf_offset_from_hex_rect_idx(rect_idx, fw, fw1_2, fw1_sq_4);
+    return h * (h / 4 + c - 1);
 }
+
 
 /**
  * Each row is offset by some amount in the x-dimension.  This function returns that offset.
@@ -127,7 +134,7 @@ inline __device__ int hex_row_x_offset(const int& y, const int& H) {
 
 /**
  * This function assigns the x and y coordinates of the pixel at the given index in the buffer.
- * Pixels are indexed by scanning the hexagon row-by-row, 0 to x+, 0 to y+.
+ * Pixels are indexed by scanning the hexagon row-by-row, 0 to W in x+, 0 to H in y+.
  * Imagine the hexagon is aligned such that the left corner is at x=0, and the bottom edge is at y=0
  * The hexagon exists in the first quadrant.  The assigned x and y coordinates are relative to the origin:
  * 
@@ -178,6 +185,32 @@ inline __device__ void hex_get_pix_xy_from_buf_idx(
 
     x = _x;
     y = _y;
+}
+
+/**
+ * Grid position getter -> given (i,j) in hexagonal grid coordinate, return (x,y) in cartesian coordinates.
+ * 
+ * If the aspect ratio 1.1 is used, it's recommended to keep the width at a multiple of 20.
+ * This way, the hexagon will never be centered on a subpixel.
+ * 
+ */
+
+inline __device__ void hex_get_xy_from_ij(
+    const int& i,
+    const int& j,
+    const int& H,
+    const int& W,
+    const int& cw,
+    const float& a,
+    int& x,
+    int& y
+) {
+    x = i * (cw + H / 4 - 2);
+
+    // if i is odd, shift y up by half a hexagon
+    // doing this without branching, otherwise we will have (threadIdx % 2) divergence (which is bad I hear...)
+    int k = (int)(i & 1) * (H / 2);
+    y = j * H + k;
 }
 
 NRC_NAMESPACE_END
