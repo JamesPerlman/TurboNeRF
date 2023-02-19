@@ -214,6 +214,16 @@ inline __device__ void hex_get_xy_from_ij(
 }
 
 /**
+ * This is an attempt at reducing the cost of integer division in the hex_get_ij_from_xy function.
+ * It seems to work fine for this application.  An alternative approach: https://github.com/milakov/int_fastdiv 
+ * 
+ */
+
+inline __device__ int divide(const int& a, const int& b) {
+    return (int)(__fdividef((float)a, (float)b));
+}
+
+/**
  * Grid position getter: given (x,y) in cartesian coordinates, assign (i,j) in hexagonal grid coordinate.
  * https://www.shadertoy.com/view/dtBSDt
  * 
