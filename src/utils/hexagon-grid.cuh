@@ -240,7 +240,7 @@ inline __device__ void hex_get_ij_from_xy(
 ) {
     
     // subtile width and height
-    const int tw = cw + (W - cw) / 2;
+    const int tw = (W + cw) / 2;
     const int th = H / 2;
 
     // tile x and y indices
