@@ -240,50 +240,47 @@ inline __device__ void hex_get_ij_from_xy(
 ) {
     
     // subtile width and height
-    const int wc = cw + (W - cw) / 2;
-    const int hc = H / 2;
-
-    const int xh = x;
-    const int yh = y;
+    const int tw = cw + (W - cw) / 2;
+    const int th = H / 2;
 
     // tile x and y indices
-    const int ig = divide(xh, wc);
-    const int jg = divide(yh, hc);
+    const int ti = divide(x, tw);
+    const int tj = divide(y, th);
 
     // x and y-offset relative to start of tile
-    const int ui = xh - wc * ig;
-    const int vj = yh - hc * jg;
-
-    // tile x isOdd and y isOdd
-    const bool uo = ig & 1;
-    const bool vo = jg & 1;
+    const int tu = x - tw * ti;
+    const int tv = y - th * tj;
 
     // y-offset is below the lower-left slope of hexagon in this tile
     // the -1 here aligns these hexagons to the pixel, the same way the hexagon buffers are aligned above
-    const bool ao = ui < ((hc - vj - 1) / 2);
+    const bool al = tu < ((th - tv - 1) / 2);
 
     // y-offset is below the upper-left slope of hexagon in this tile
-    const bool bo = ui < (vj / 2);
+    const bool bl = tu < (tv / 2);
+
+    // tile x isOdd and y isOdd
+    const bool uo = ti & 1;
+    const bool vo = tj & 1;
 
     // hexagon x-index is even
     bool xeven = vo
-        ? (  (uo & ao) | !(uo | bo) )
-        : ( !(uo | ao) |  (uo & bo) );
+        ? (  (uo & al) | !(uo | bl) )
+        : ( !(uo | al) |  (uo & bl) );
 
     
     // width of two tiles (column period)
-    const int rw = 2 * wc;
+    const int rw = 2 * tw;
 
     // height of two tiles is just the height of hexagon    
     const int rh = H;
 
     // branch divergence here, hope this isn't too bad
     if (xeven) {
-        i = 2 * divide(xh, rw);
-        j = yh / rh;
+        i = 2 * divide(x, rw);
+        j = divide(y, rh);
     } else {
-        i = 2 * divide(xh + wc, rw) - 1;
-        j = divide(yh + hc, rh);
+        i = 2 * divide(x + tw, rw) - 1;
+        j = divide(y + th, rh);
     }
 }
 
