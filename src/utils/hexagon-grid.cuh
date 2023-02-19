@@ -225,7 +225,7 @@ inline __device__ int divide(const int& a, const int& b) {
 
 /**
  * Grid position getter: given (x,y) in cartesian coordinates, assign (i,j) in hexagonal grid coordinate.
- * https://www.shadertoy.com/view/dtBSDt
+ * Scratchpad: https://www.shadertoy.com/view/dtBSDt
  * 
  */
 
@@ -235,7 +235,6 @@ inline __device__ void hex_get_ij_from_xy(
     const int& H,
     const int& W,
     const int& cw,
-    const float& a,
     int& i,
     int& j
 ) {
@@ -248,8 +247,8 @@ inline __device__ void hex_get_ij_from_xy(
     const int yh = y;
 
     // tile x and y indices
-    const int ig = xh / wc; // integer division = :(
-    const int jg = yh / hc; // please forgive me
+    const int ig = divide(xh, wc);
+    const int jg = divide(yh, hc);
 
     // x and y-offset relative to start of tile
     const int ui = xh - wc * ig;
@@ -260,15 +259,17 @@ inline __device__ void hex_get_ij_from_xy(
     const bool vo = jg & 1;
 
     // y-offset is below the lower-left slope of hexagon in this tile
-    const bool ao = (int)(ui < ((hc - vj) / 2));
+    // the -1 here aligns these hexagons to the pixel, the same way the hexagon buffers are aligned above
+    const bool ao = ui < ((hc - vj - 1) / 2);
 
     // y-offset is below the upper-left slope of hexagon in this tile
-    const bool bo = (int)(ui < (vj / 2));
+    const bool bo = ui < (vj / 2);
 
     // hexagon x-index is even
-    const bool xeven = vo
+    bool xeven = vo
         ? (  (uo & ao) | !(uo | bo) )
         : ( !(uo | ao) |  (uo & bo) );
+
     
     // width of two tiles (column period)
     const int rw = 2 * wc;
@@ -278,11 +279,11 @@ inline __device__ void hex_get_ij_from_xy(
 
     // branch divergence here, hope this isn't too bad
     if (xeven) {
-        i = 2 * xh / rw;
+        i = 2 * divide(xh, rw);
         j = yh / rh;
     } else {
-        i = 2 * (xh + wc) / rw - 1;
-        j = (yh + hc) / rh;
+        i = 2 * divide(xh + wc, rw) - 1;
+        j = divide(yh + hc, rh);
     }
 }
 
