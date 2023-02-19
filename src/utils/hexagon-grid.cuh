@@ -213,4 +213,67 @@ inline __device__ void hex_get_xy_from_ij(
     y = j * H + k;
 }
 
+/**
+ * Grid position getter: given (x,y) in cartesian coordinates, assign (i,j) in hexagonal grid coordinate.
+ * https://www.shadertoy.com/view/dtBSDt
+ * 
+ */
+
+inline __device__ void hex_get_ij_from_xy(
+    const int& x,
+    const int& y,
+    const int& H,
+    const int& W,
+    const int& cw,
+    const float& a,
+    int& i,
+    int& j
+) {
+    
+    // subtile width and height
+    const int wc = cw + (W - cw) / 2;
+    const int hc = H / 2;
+
+    const int xh = x;
+    const int yh = y;
+
+    // tile x and y indices
+    const int ig = xh / wc; // integer division = :(
+    const int jg = yh / hc; // please forgive me
+
+    // x and y-offset relative to start of tile
+    const int ui = xh - wc * ig;
+    const int vj = yh - hc * jg;
+
+    // tile x isOdd and y isOdd
+    const bool uo = ig & 1;
+    const bool vo = jg & 1;
+
+    // y-offset is below the lower-left slope of hexagon in this tile
+    const bool ao = (int)(ui < ((hc - vj) / 2));
+
+    // y-offset is below the upper-left slope of hexagon in this tile
+    const bool bo = (int)(ui < (vj / 2));
+
+    // hexagon x-index is even
+    const bool xeven = vo
+        ? (  (uo & ao) | !(uo | bo) )
+        : ( !(uo | ao) |  (uo & bo) );
+    
+    // width of two tiles (column period)
+    const int rw = 2 * wc;
+
+    // height of two tiles is just the height of hexagon    
+    const int rh = H;
+
+    // branch divergence here, hope this isn't too bad
+    if (xeven) {
+        i = 2 * xh / rw;
+        j = yh / rh;
+    } else {
+        i = 2 * (xh + wc) / rw - 1;
+        j = (yh + hc) / rh;
+    }
+}
+
 NRC_NAMESPACE_END
