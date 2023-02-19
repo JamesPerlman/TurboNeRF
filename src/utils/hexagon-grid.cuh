@@ -191,7 +191,7 @@ inline __device__ void hex_get_pix_xy_from_buf_idx(
  * Grid position getter -> given (i,j) in hexagonal grid coordinate, return (x,y) in cartesian coordinates.
  * 
  * If the aspect ratio 1.1 is used, it's recommended to keep the width at a multiple of 20.
- * This way, the hexagon will never be centered on a subpixel.
+ * This way, the hexagon will always be centered on the pixel grid, and never off by a subpixel amount.
  * 
  */
 
@@ -205,7 +205,7 @@ inline __device__ void hex_get_xy_from_ij(
     int& x,
     int& y
 ) {
-    x = i * (cw + H / 4 - 2);
+    x = i * (W - cw) / 2;
 
     // if i is odd, shift y up by half a hexagon
     // doing this without branching, otherwise we will have (threadIdx % 2) divergence (which is bad I hear...)
