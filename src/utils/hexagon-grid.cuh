@@ -266,7 +266,6 @@ inline __device__ void hex_get_ij_from_xy(
     bool xeven = vo
         ? (  (uo & al) | !(uo | bl) )
         : ( !(uo | al) |  (uo & bl) );
-
     
     // width of two tiles (column period)
     const int rw = 2 * tw;
