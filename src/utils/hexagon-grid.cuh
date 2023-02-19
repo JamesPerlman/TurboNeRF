@@ -259,13 +259,13 @@ inline __device__ void hex_get_ij_from_xy(
     const bool bl = tu < (tv / 2);
 
     // tile x isOdd and y isOdd
-    const bool uo = ti & 1;
-    const bool vo = tj & 1;
+    const bool io = ti & 1;
+    const bool jo = tj & 1;
 
     // hexagon x-index is even
-    bool xeven = vo
-        ? (  (uo & al) | !(uo | bl) )
-        : ( !(uo | al) |  (uo & bl) );
+    bool xeven = jo
+        ? (  (io & al) | !(io | bl) )
+        : ( !(io | al) |  (io & bl) );
     
     // width of two tiles (column period)
     const int rw = 2 * tw;
