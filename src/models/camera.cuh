@@ -87,7 +87,15 @@ struct Camera {
 
 		return Ray{ ray_o, ray_d };
 	}
-};
 
+	inline __device__ Ray global_ray_from_local_ray(const Ray& local_ray) const {
+		float3 global_origin = transform * local_ray.o;
+		float3 global_direction = transform.mmul_ul3x3(local_ray.d);
+
+		// normalize ray directions
+		const float n = rnorm3df(global_direction.x, global_direction.y, global_direction.z);
+		return Ray{ global_origin, n * global_direction };
+	}
+};
 
 NRC_NAMESPACE_END
