@@ -111,38 +111,37 @@ int main(int argc, char* argv[])
 	auto proxy_ptrs = nerf_manager.get_proxies();
 
     const float tau = 2.0f * 3.14159f;
-    trainer.train_step(); // first step to save work in loop -> i = 1 in the following loop
-	for (int i = 1; i < 1024 * 10; ++i) {
-        trainer.train_step();
+	for (int i = 0; i < 1024 * 10; i+=16) {
+        for (int j = 0; j < 16; ++j) {
+            trainer.train_step();
+        }
 		// every 16 training steps, update the occupancy grid
-		if (i % 16 == 0) {
-			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
-			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
-			trainer.update_occupancy_grid(cell_selection_threshold);
+        // only threshold to 50% after 256 training steps, otherwise select 100% of the cells
+        const float cell_selection_threshold = i > 255 ? 0.5f : 1.0f;
+        trainer.update_occupancy_grid(cell_selection_threshold);
 
-			float progress = (float)i / (360.f * 16.0f);
-			auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
-			auto render_cam = nrc::Camera(
-				make_int2(IMG_SIZE, IMG_SIZE),
-				cam0.near,
-				cam0.far,
-				cam0.focal_length,
-				cam0.view_angle,
-				tform,
-				cam0.dist_params
-			);
+        float progress = (float)(i + 16) / (360.f * 16.0f);
+        auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
+        auto render_cam = nrc::Camera(
+            make_int2(IMG_SIZE, IMG_SIZE),
+            cam0.near,
+            cam0.far,
+            cam0.focal_length,
+            cam0.view_angle,
+            tform,
+            cam0.dist_params
+        );
 
-			auto render_request = std::make_shared<RenderRequest>(
-				render_cam,
-				proxy_ptrs,
-				&render_buffer
-			);
+        auto render_request = std::make_shared<RenderRequest>(
+            render_cam,
+            proxy_ptrs,
+            &render_buffer
+        );
 
-			renderer.submit(render_request);
-			renderer.write_to(&render_buffer);
-			printf("Done!\n");
-			render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);
-		}
+        renderer.submit(render_request);
+        renderer.write_to(&render_buffer);
+        printf("Done!\n");
+        render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);
 	}
 
 	// Wait for the kernel to finish executing
