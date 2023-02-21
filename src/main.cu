@@ -110,17 +110,19 @@ int main(int argc, char* argv[])
 	// fetch nerfs as pointers
 	auto proxy_ptrs = nerf_manager.get_proxies();
 
-    const float tau = 2.0f * 3.14159f;
-	for (int i = 0; i < 1024 * 10; i+=16) {
-        for (int j = 0; j < 16; ++j) {
+    // shift variables to BSS only guaranteed by static keyword
+    static const float tau = 2.0f * 3.14159f;
+    static const int iter_count  = 16;
+	for (int i = 0; i < 1024 * 10; i+=iter_count) {
+        for (int j = 0; j < iter_count; ++j) {
             trainer.train_step();
         }
-		// every 16 training steps, update the occupancy grid
+		// every iter_count training steps, update the occupancy grid
         // only threshold to 50% after 256 training steps, otherwise select 100% of the cells
         const float cell_selection_threshold = i > 255 ? 0.5f : 1.0f;
         trainer.update_occupancy_grid(cell_selection_threshold);
 
-        float progress = (float)(i + 16) / (360.f * 16.0f);
+        float progress = (float)(i + iter_count) / (360.f * iter_count);
         auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
         auto render_cam = nrc::Camera(
             make_int2(IMG_SIZE, IMG_SIZE),
