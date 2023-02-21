@@ -17,8 +17,8 @@ struct RayBatch {
 };
 
 enum class RayFlags: uint8_t {
-    Alive = 0,
-    Active = 1
+    Alive   = 1 << 0,
+    Active  = 1 << 1,
 };
 
 NRC_NAMESPACE_END
