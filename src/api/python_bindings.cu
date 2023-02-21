@@ -154,6 +154,11 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("get_bounding_box", &NeRFProxy::get_bounding_box)
     ;
 
+    py::enum_<RenderPattern>(m, "RenderPattern")
+        .value("HexagonalGrid", RenderPattern::HexagonalGrid)
+        .value("RectangularGrid", RenderPattern::RectangularGrid)
+    ;
+
     py::class_<RenderTarget>(m, "RenderTarget")
         .def(
             "save_image",
@@ -211,7 +216,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     py::class_<NeRFRenderingController>(m, "Renderer")
         .def(
-           py::init<const uint32_t&>(),
+           py::init<const RenderPattern&, const uint32_t&>(),
+           py::arg("pattern"),
            py::arg("batch_size") 
         )
         .def(
