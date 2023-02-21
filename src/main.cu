@@ -110,19 +110,17 @@ int main(int argc, char* argv[])
 	// fetch nerfs as pointers
 	auto proxy_ptrs = nerf_manager.get_proxies();
 
-	for (int i = 0; i < 1024 * 10; ++i) {
-		trainer.train_step();
+    const float tau = 2.0f * 3.14159f;
+    trainer.train_step(); // first step to save work in loop -> i = 1 in the following loop
+	for (int i = 1; i < 1024 * 10; ++i) {
+        trainer.train_step();
 		// every 16 training steps, update the occupancy grid
-
-		if (i % 16 == 0 && i > 0) {
+		if (i % 16 == 0) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
 			trainer.update_occupancy_grid(cell_selection_threshold);
-		}
 
-		if (i % 16 == 0 && i > 0) {
 			float progress = (float)i / (360.f * 16.0f);
-			float tau = 2.0f * 3.14159f;
 			auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = nrc::Camera(
 				make_int2(IMG_SIZE, IMG_SIZE),
