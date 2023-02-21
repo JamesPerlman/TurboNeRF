@@ -1,5 +1,6 @@
 #pragma once
 #include "../common.h"
+#include "device-math.cuh"
 
 NRC_NAMESPACE_BEGIN
 
@@ -211,16 +212,6 @@ inline __device__ void hex_get_xy_from_ij(
     // doing this without branching, otherwise we will have (threadIdx % 2) divergence (which is bad I hear...)
     int k = (int)(i & 1) * (H / 2);
     y = j * H + k;
-}
-
-/**
- * This is an attempt at reducing the cost of integer division in the hex_get_ij_from_xy function.
- * It seems to work fine for this application.  An alternative approach: https://github.com/milakov/int_fastdiv 
- * 
- */
-
-inline __device__ int divide(const int& a, const int& b) {
-    return (int)(__fdividef((float)a, (float)b));
 }
 
 /**

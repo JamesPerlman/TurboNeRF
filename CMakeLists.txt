@@ -76,6 +76,7 @@ set(HEADERS
 	src/utils/camera-kernels.cuh
 	src/utils/color-utils.cuh
 	src/utils/common-network-kernels.cuh
+	src/utils/device-math.cuh
 	src/utils/gpu-image.cuh
 	src/utils/linalg/transform4f.cuh
 	src/utils/linalg.cuh
