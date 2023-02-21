@@ -62,6 +62,7 @@ set(HEADERS
 	src/models/nerf.cuh
 	src/models/nerf-proxy.cuh
 	src/models/ray.h
+	src/models/ray-batch.cuh
 	src/models/render-pattern.cuh
 	src/models/render-request.cuh
 	src/models/training-image.cuh
