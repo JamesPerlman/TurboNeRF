@@ -135,22 +135,20 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	pix_rgba[i_offset_2] = __srgb_to_linear((float)b / 255.0f);
 	pix_rgba[i_offset_3] = (float)a / 255.0f;
 	
-	// TODO: optimize
+	// TODO: optimize (we can likely eliminate some allocations here)
 	Ray local_ray = cam.local_ray_at_pixel_xy_normalized(x, y);
+	Ray global_ray = cam.global_ray_from_local_ray(local_ray);
 
-	float3 global_origin = cam.transform * local_ray.o;
-	float3 global_direction = cam.transform.mmul_ul3x3(local_ray.d);
-	
+	const float3 global_origin = global_ray.o;
+	const float3 global_direction = global_ray.d;
+
 	ori_xyz[i_offset_0] = global_origin.x;
 	ori_xyz[i_offset_1] = global_origin.y;
 	ori_xyz[i_offset_2] = global_origin.z;
 
-	// normalize ray directions
-	const float n = rnorm3df(global_direction.x, global_direction.y, global_direction.z);
-
-	const float dir_x = n * global_direction.x;
-	const float dir_y = n * global_direction.y;
-	const float dir_z = n * global_direction.z;
+	const float dir_x = global_direction.x;
+	const float dir_y = global_direction.y;
+	const float dir_z = global_direction.z;
 	
 	const float idir_x = 1.0f / dir_x;
 	const float idir_y = 1.0f / dir_y;
