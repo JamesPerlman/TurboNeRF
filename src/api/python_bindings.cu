@@ -191,7 +191,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("height", &OpenGLRenderSurface::height)
     ;
 
-    py::class_<RenderRequest>(m, "RenderRequest")
+    py::class_<RenderRequest, std::shared_ptr<RenderRequest>>(m, "RenderRequest")
         .def(
             py::init<
                 const Camera&,
