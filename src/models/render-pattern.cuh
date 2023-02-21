@@ -3,8 +3,8 @@
 NRC_NAMESPACE_BEGIN
 
 enum class RenderPattern {
-    RectangularGrid,
-    HexagonalGrid
+    HexagonalGrid,
+    RectangularGrid
 };
 
 NRC_NAMESPACE_END
