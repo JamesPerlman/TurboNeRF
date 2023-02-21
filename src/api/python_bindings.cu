@@ -217,8 +217,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<NeRFRenderingController>(m, "Renderer")
         .def(
            py::init<const RenderPattern&, const uint32_t&>(),
-           py::arg("pattern"),
-           py::arg("batch_size") 
+           py::arg("pattern") = RenderPattern::RectangularGrid,
+           py::arg("batch_size") = 0
         )
         .def(
             "submit",
