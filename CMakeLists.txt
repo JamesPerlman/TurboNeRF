@@ -1,4 +1,4 @@
-﻿# CMakeList.txt : Top-level CMake project file, do global configuration
+# CMakeList.txt : Top-level CMake project file, do global configuration
 # and include sub-projects here.
 #
 cmake_minimum_required (VERSION 3.24)
@@ -62,6 +62,7 @@ set(HEADERS
 	src/models/nerf.cuh
 	src/models/nerf-proxy.cuh
 	src/models/ray.h
+	src/models/render-pattern.cuh
 	src/models/render-request.cuh
 	src/models/training-image.cuh
 

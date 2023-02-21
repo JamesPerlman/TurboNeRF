@@ -9,6 +9,7 @@ using namespace tcnn;
 void render_thread_fn(NeRFRenderingController* controller, RenderRequest& request);
 
 NeRFRenderingController::NeRFRenderingController(
+    const RenderPattern& pattern,
     const uint32_t& batch_size
 ) {
     if (batch_size == 0) {
