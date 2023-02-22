@@ -202,7 +202,6 @@ inline __device__ void hex_get_xy_from_ij(
     const int& H,
     const int& W,
     const int& cw,
-    const float& a,
     int& x,
     int& y
 ) {
