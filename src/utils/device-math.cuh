@@ -22,4 +22,17 @@ inline __device__ int divide(const int& a, const int& b) {
 inline __device__ int modulo(const int& a, const int& b) {
     return a - (b * divide(a, b));
 }
+
+/**
+ * A little convenience bitwise setter function
+ * 
+ */
+
+template <typename T, typename U>
+inline __device__ __host__ T set_bit(const T& bitmask, const U bit, const bool value) {
+    return value
+        ? (bitmask |  bit)
+        : (bitmask & ~bit);
+}
+
 NRC_NAMESPACE_END
