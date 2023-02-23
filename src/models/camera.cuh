@@ -57,6 +57,17 @@ struct Camera {
 		, dist_params(dist_params)
 	{ };
 
+	// default constructor
+	Camera()
+		: Camera(
+			int2{ 0, 0 },
+			0.0f,
+			0.0f,
+			float2{ 0.0f, 0.0f },
+			float2{ 0.0f, 0.0f },
+			Transform4f::Identity()
+		) {};
+
 	// returns a ray in the camera's local coordinate system
 
 	inline __device__ Ray local_ray_at_pixel_xy_index(
