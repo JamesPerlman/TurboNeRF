@@ -14,4 +14,12 @@ inline __device__ int divide(const int& a, const int& b) {
     return (int)(__fdividef((float)a, (float)b));
 }
 
+/**
+ * A modulo function that sacrifices some accuracy for speed.
+ * 
+ */
+
+inline __device__ int modulo(const int& a, const int& b) {
+    return a - (b * divide(a, b));
+}
 NRC_NAMESPACE_END
