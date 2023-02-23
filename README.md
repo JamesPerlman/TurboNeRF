@@ -2,7 +2,8 @@
 
 Python API is working! Check examples/ folder.  
 Workin on the Blender integration now.
-Estimated ETA on the Blender plugin is ~March 1, 2022  
+Estimated ETA on the Blender plugin is ~March 14, 2022  
+Still a lot to do...  
 After the Blender integration is complete, I will release a binary along with the [addon codebase](https://github.com/JamesPerlman/blender_nerf_tools)
 
 ## INTRODUCTION
