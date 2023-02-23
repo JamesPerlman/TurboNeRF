@@ -17,6 +17,8 @@ private:
     bool _canceled = false;
 
 public:
+    const int n_rays;
+
     const Camera camera;
     
     std::vector<NeRF*> nerfs;
@@ -25,16 +27,18 @@ public:
     std::unique_ptr<RayBatchCoordinator> batch_coordinator;
 
     RenderTask(
+        const int& n_rays,
         const Camera& camera,
         const std::vector<NeRF*>& nerfs,
         std::unique_ptr<RayBatchCoordinator> batch_coordinator
     )
-        : camera(camera)
+        : n_rays(n_rays)
+        , camera(camera)
         , nerfs(nerfs)
         , batch_coordinator(std::move(batch_coordinator))
     { };
 
-    RenderTask() : camera(), nerfs(), batch_coordinator(nullptr) { };
+    RenderTask() : n_rays(0), camera(), nerfs(), batch_coordinator(nullptr) { };
 
     void cancel() {
         _canceled = true;

@@ -23,7 +23,10 @@ nerf = manager.create_trainable(dataset.bounding_box)
 
 trainer = tn.Trainer(dataset, nerf, batch_size=2<<21)
 
-renderer = tn.Renderer(batch_size=2<<20)
+renderer = tn.Renderer(
+    pattern=tn.RenderPattern.RectangularGrid,
+    batch_size=2<<20
+)
 
 render_buf = tn.CUDARenderBuffer()
 render_buf.set_size(512, 512)
@@ -61,7 +64,6 @@ for i in range(1024):
         )
 
         renderer.submit(request)
-        renderer.write_to(render_buf)
         render_buf.save_image(f"H:\\render_{i:05d}.png")
         print(f"Saved render_{i:05d}.png!")
 

@@ -87,7 +87,7 @@ __global__ void compact_rays_kernel(
     const int* __restrict__ indices,
 
 	// input buffers (read-only)
-	const uint32_t* __restrict__ in_idx, // this is the ray-pixel index
+	const int* __restrict__ in_idx, // this is the ray-pixel index
 	const bool* __restrict__ in_active,
 	const float* __restrict__ in_t,
 	const float* __restrict__ in_origin,
@@ -96,7 +96,7 @@ __global__ void compact_rays_kernel(
 	const float* __restrict__ in_trans,
 
 	// compacted output buffers (write-only)
-	uint32_t* __restrict__ out_idx,
+	int* __restrict__ out_idx,
 	bool* __restrict__ out_active,
 	float* __restrict__ out_t,
 	float* __restrict__ out_origin,
@@ -113,7 +113,7 @@ __global__ void composite_samples_kernel(
     // read-only
 	const bool* __restrict__ ray_active,
 	const uint32_t* __restrict__ n_ray_steps,
-    const uint32_t* __restrict__ ray_idx,
+    const int* __restrict__ ray_idx,
 	const tcnn::network_precision_t* __restrict__ network_output,
 	const float* __restrict__ sample_alpha,
 

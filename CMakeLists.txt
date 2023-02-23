@@ -1,4 +1,4 @@
-# CMakeList.txt : Top-level CMake project file, do global configuration
+﻿# CMakeList.txt : Top-level CMake project file, do global configuration
 # and include sub-projects here.
 #
 cmake_minimum_required (VERSION 3.24)
@@ -65,12 +65,22 @@ set(HEADERS
 	src/models/ray-batch.cuh
 	src/models/render-pattern.cuh
 	src/models/render-request.cuh
+	src/models/render-task.cuh
 	src/models/training-image.cuh
 
 	# render-targets
 	src/render-targets/cuda-render-buffer.cuh
 	src/render-targets/opengl-render-surface.cuh
 	src/render-targets/render-target.cuh
+
+	# rendering
+	src/rendering/ray-batch-coordinators/hexagonal-grid-ray-batch-coordinator.cuh
+	src/rendering/ray-batch-coordinators/hexagonal-tile-ray-batch-coordinator.cuh
+	src/rendering/ray-batch-coordinators/ray-batch-coordinator.cuh
+	src/rendering/ray-batch-coordinators/rectangular-grid-ray-batch-coordinator.cuh
+	src/rendering/render-task-factories/hexagonal-grid-render-task-factory.cuh
+	src/rendering/render-task-factories/rectangular-grid-render-task-factory.cuh
+	src/rendering/render-task-factories/render-task-factory.cuh
 
 	# utils
 	src/utils/bit-utils.cuh
@@ -79,6 +89,7 @@ set(HEADERS
 	src/utils/common-network-kernels.cuh
 	src/utils/device-math.cuh
 	src/utils/gpu-image.cuh
+	src/utils/hexagon-grid.cuh
 	src/utils/linalg/transform4f.cuh
 	src/utils/linalg.cuh
 	src/utils/nerf-constants.cuh
@@ -120,6 +131,12 @@ set(SOURCES
 	# models
 	src/models/dataset.cu
 	src/models/training-image.cu
+
+	# rendering
+	src/rendering/ray-batch-coordinators/hexagonal-grid-ray-batch-coordinator.cu
+	src/rendering/ray-batch-coordinators/hexagonal-tile-ray-batch-coordinator.cu
+	src/rendering/ray-batch-coordinators/rectangular-grid-ray-batch-coordinator.cu
+	src/rendering/render-task-factories/render-task-factory.cu
 
 	# utils
 	src/utils/gpu-image.cu

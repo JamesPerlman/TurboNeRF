@@ -92,7 +92,7 @@ public:
         glFinish();
 
         // copy render data
-        _renderer.write_to(&_render_surface);
+        // _renderer.write_to(&_render_surface);
 
         // These are the vertices of a quad that covers the entire viewport.
         const float w = static_cast<float>(_render_surface.width);

@@ -35,7 +35,7 @@ struct RenderingWorkspace: Workspace {
 	uint32_t* ray_steps[2];
 
 	// 2D ray index (x + y * width)
-	uint32_t* ray_idx[2]; 
+	int* ray_idx[2]; 
 	
 	// samples
 	float* network_pos;
@@ -49,7 +49,7 @@ struct RenderingWorkspace: Workspace {
 
 	// output buffers
 	float* rgba;
-	uint32_t n_pixels = 0;
+	uint32_t n_rays = 0;
 
 	// samples
 	void enlarge(
@@ -63,6 +63,7 @@ struct RenderingWorkspace: Workspace {
 
 		batch_size = tcnn::next_multiple(n_elements_per_batch, tcnn::batch_size_granularity);
 		uint32_t n_output_pixel_elements = tcnn::next_multiple(4 * n_pixels, tcnn::batch_size_granularity);
+		uint32_t n_rays = n_pixels;
 
 		// camera
 		camera			= allocate<Camera>(stream, 1);
@@ -70,35 +71,35 @@ struct RenderingWorkspace: Workspace {
 		occupancy_grid	= allocate<OccupancyGrid>(stream, 1);
 
 		// compaction
-		compact_idx		= allocate<int>(stream, batch_size);
+		compact_idx		= allocate<int>(stream, n_rays);
 
 		// rays
-		ray_alive		= allocate<bool>(stream, batch_size); // no need to double buffer
+		ray_alive		= allocate<bool>(stream, n_rays); // no need to double buffer
 
 		// double buffers
-		ray_active[0]	= allocate<bool>(stream, batch_size);
-		ray_active[1]	= allocate<bool>(stream, batch_size);
+		ray_active[0]	= allocate<bool>(stream, n_rays);
+		ray_active[1]	= allocate<bool>(stream, n_rays);
 
-		ray_origin[0]	= allocate<float>(stream, 3 * batch_size);
-		ray_origin[1]	= allocate<float>(stream, 3 * batch_size);
+		ray_origin[0]	= allocate<float>(stream, 3 * n_rays);
+		ray_origin[1]	= allocate<float>(stream, 3 * n_rays);
 		
-		ray_dir[0]		= allocate<float>(stream, 3 * batch_size);
-		ray_dir[1]		= allocate<float>(stream, 3 * batch_size);
+		ray_dir[0]		= allocate<float>(stream, 3 * n_rays);
+		ray_dir[1]		= allocate<float>(stream, 3 * n_rays);
 
-		ray_idir[0]		= allocate<float>(stream, 3 * batch_size);
-		ray_idir[1]		= allocate<float>(stream, 3 * batch_size);
+		ray_idir[0]		= allocate<float>(stream, 3 * n_rays);
+		ray_idir[1]		= allocate<float>(stream, 3 * n_rays);
 
-		ray_t[0]		= allocate<float>(stream, batch_size);
-		ray_t[1]		= allocate<float>(stream, batch_size);
+		ray_t[0]		= allocate<float>(stream, n_rays);
+		ray_t[1]		= allocate<float>(stream, n_rays);
 
-		ray_idx[0]		= allocate<uint32_t>(stream, batch_size);
-		ray_idx[1]		= allocate<uint32_t>(stream, batch_size);
+		ray_idx[0]		= allocate<int>(stream, n_rays);
+		ray_idx[1]		= allocate<int>(stream, n_rays);
 
-		ray_trans[0]	= allocate<float>(stream, batch_size);
-		ray_trans[1]	= allocate<float>(stream, batch_size);
+		ray_trans[0]	= allocate<float>(stream, n_rays);
+		ray_trans[1]	= allocate<float>(stream, n_rays);
 
-		ray_steps[0]	= allocate<uint32_t>(stream, batch_size);
-		ray_steps[1]	= allocate<uint32_t>(stream, batch_size);
+		ray_steps[0]	= allocate<uint32_t>(stream, n_rays);
+		ray_steps[1]	= allocate<uint32_t>(stream, n_rays);
 
 		// samples
 		network_pos		= allocate<float>(stream, 3 * batch_size);
@@ -113,7 +114,7 @@ struct RenderingWorkspace: Workspace {
 		// output
 		rgba			= allocate<float>(stream, n_output_pixel_elements);
 
-		this->n_pixels = n_pixels;
+		this->n_rays = n_rays;
 	};
 };
 

@@ -23,14 +23,14 @@ private:
 
     Renderer renderer = Renderer();
 
+    RenderPattern pattern;
+
 public:
-    NeRFRenderingController(const RenderPattern& pattern = RenderPattern::RectangularGrid, const uint32_t& batch_size = 0);
+    NeRFRenderingController(const RenderPattern& pattern = RenderPattern::HexagonalGrid, const uint32_t& batch_size = 0);
 
     void submit(
         std::shared_ptr<RenderRequest> request
     );
-
-    void write_to(RenderTarget* target);
 
     void cancel();
 };

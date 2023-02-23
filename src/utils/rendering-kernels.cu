@@ -295,7 +295,7 @@ __global__ void compact_rays_kernel(
     const int* __restrict__ indices,
 
 	// input buffers (read-only)
-	const uint32_t* __restrict__ in_idx, // this is the ray-pixel index
+	const int* __restrict__ in_idx, // this is the ray-pixel index
 	const bool* __restrict__ in_active,
 	const float* __restrict__ in_t,
 	const float* __restrict__ in_origin,
@@ -304,7 +304,7 @@ __global__ void compact_rays_kernel(
 	const float* __restrict__ in_trans,
 
 	// compacted output buffers (write-only)
-	uint32_t* __restrict__ out_idx,
+	int* __restrict__ out_idx,
 	bool* __restrict__ out_active,
 	float* __restrict__ out_t,
 	float* __restrict__ out_origin,
@@ -359,7 +359,7 @@ __global__ void composite_samples_kernel(
     // read-only
 	const bool* __restrict__ ray_active,
 	const uint32_t* __restrict__ n_ray_steps,
-    const uint32_t* __restrict__ ray_idx,
+    const int* __restrict__ ray_idx,
 	const network_precision_t* __restrict__ network_output,
     const float* __restrict__ sample_alpha,
 
@@ -376,10 +376,10 @@ __global__ void composite_samples_kernel(
     if (!ray_alive[idx] || !ray_active[idx]) return;
 
 	// pixel indices
-	const uint32_t idx_offset_0 = ray_idx[idx];
-	const uint32_t idx_offset_1 = idx_offset_0 + output_stride;
-	const uint32_t idx_offset_2 = idx_offset_1 + output_stride;
-	const uint32_t idx_offset_3 = idx_offset_2 + output_stride;
+	const int idx_offset_0 = ray_idx[idx];
+	const int idx_offset_1 = idx_offset_0 + (int)output_stride;
+	const int idx_offset_2 = idx_offset_1 + (int)output_stride;
+	const int idx_offset_3 = idx_offset_2 + (int)output_stride;
 
 	// accumulated pixel colors
 	float out_r = output_rgba[idx_offset_0];

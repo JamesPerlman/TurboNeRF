@@ -116,9 +116,9 @@ inline __device__ int n_pix_for_hex_rect_at_idx(const int& rect_idx, const int& 
 
 inline __host__ int n_pix_total_in_hex(
     const int& h,
-    const int& c
+    const int& cw
 ) {
-    return h * (h / 4 + c - 1);
+    return h * (h / 4 + cw - 1);
 }
 
 
@@ -196,7 +196,7 @@ inline __device__ void hex_get_pix_xy_from_buf_idx(
  * 
  */
 
-inline __device__ void hex_get_xy_from_ij(
+inline __device__ __host__ void hex_get_xy_from_ij(
     const int& i,
     const int& j,
     const int& H,
@@ -205,11 +205,11 @@ inline __device__ void hex_get_xy_from_ij(
     int& x,
     int& y
 ) {
-    x = i * (W - cw) / 2;
+    x = i * (W + cw) / 2;
 
     // if i is odd, shift y up by half a hexagon
     // doing this without branching, otherwise we will have (threadIdx % 2) divergence (which is bad I hear...)
-    int k = (int)(i & 1) * (H / 2);
+    int k = (i & 1) * (H / 2);
     y = j * H + k;
 }
 

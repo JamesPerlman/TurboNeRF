@@ -1,6 +1,7 @@
 #include <tiny-cuda-nn/common.h>
 
 #include "../models/camera.cuh"
+#include "../models/ray-batch.cuh"
 #include "../utils/nerf-constants.cuh"
 #include "../utils/parallel-utils.cuh"
 #include "../utils/rendering-kernels.cuh"
@@ -11,45 +12,35 @@
 using namespace nrc;
 using namespace tcnn;
 
-void Renderer::enlarge_workspace_if_needed(
+#define CHECK_IS_CANCELED(task) \
+    if (task.is_canceled()) { \
+        return; \
+    }
+
+void Renderer::prepare_for_rendering(
     Renderer::Context& ctx,
-    RenderRequest* request
+    const Camera& camera,
+    const NeRF& nerf,
+    const uint32_t& n_rays
 ) {
-    const uint32_t new_render_area = request->output->width * request->output->height;
+    cudaStream_t stream = ctx.stream;
+    auto& workspace = ctx.workspace;
 
-    // TODO: NeRF network property getters could be made into static members.
-    // For now we assume all NeRFs have the same network configuration.
-    NeRF& nerf = request->proxies[0]->nerfs[0];
-
-    if (ctx.workspace.n_pixels != new_render_area) {
+    if (ctx.workspace.n_rays != n_rays) {
         ctx.workspace.enlarge(
-            ctx.stream,
-            new_render_area,
+            stream,
+            n_rays,
             ctx.batch_size,
             nerf.network.get_concat_buffer_width(),
             nerf.network.get_padded_output_width()
         );
     }
-}
-
-void Renderer::submit(
-    Renderer::Context& ctx,
-    RenderRequest* request
-) {
-    RenderingWorkspace& workspace = ctx.workspace;
-    
-    // TODO: this should happen for all NeRFs
-    NeRF& nerf = request->proxies[0]->nerfs[0];
-
-    enlarge_workspace_if_needed(ctx, request);
-    
-    cudaStream_t stream = ctx.stream;
 
     // workspace.camera = request->camera
     CUDA_CHECK_THROW(
         cudaMemcpyAsync(
             workspace.camera,
-            &request->camera,
+            &camera,
             sizeof(Camera),
             cudaMemcpyHostToDevice,
             stream
@@ -77,64 +68,79 @@ void Renderer::submit(
             stream
         )
     );
+}
+
+void Renderer::perform_task(
+    Renderer::Context& ctx,
+    RenderTask& task
+) {
+    RenderingWorkspace& workspace = ctx.workspace;
+    
+    // TODO: this should happen for all NeRFs
+    NeRF* nerf = task.nerfs[0];
+    
+    cudaStream_t stream = ctx.stream;
+
+    // double buffer indices
+    int active_buf_idx = 0;
+    int compact_buf_idx = 1;
+
+    const int n_rays = task.n_rays;
 
     // clear workspace.rgba
     CUDA_CHECK_THROW(
         cudaMemsetAsync(
             workspace.rgba,
             0,
-            4 * workspace.n_pixels * sizeof(float),
+            4 * n_rays * sizeof(float),
             stream
         )
     );
 
-    // calculate the number of pixels we need to fill
-    uint32_t n_pixels = workspace.n_pixels;
+    // ray.active = true
+    CUDA_CHECK_THROW(
+        cudaMemsetAsync(
+            workspace.ray_active[active_buf_idx],
+            true,
+            n_rays * sizeof(bool),
+            stream
+        )
+    );
 
-    // double buffer indices
-    int active_buf_idx = 0;
-    int compact_buf_idx = 1;
-
-    // loop over all pixels, chunked by batch size
-    uint32_t n_pixels_filled = 0;
-    while (n_pixels_filled < n_pixels) {
-        // TODO:
-        // for (auto& n in nerfs) { ... 
-        // calculate the number of pixels to fill in this batch
-        uint32_t n_pixels_to_fill = std::min(
-            ctx.batch_size,
-            n_pixels - n_pixels_filled
-        );
-
-        uint32_t n_rays = n_pixels_to_fill;
-
-        // calculate the pixel indices to fill in this batch
-        uint32_t pixel_start = n_pixels_filled;
+    // ray.transmittance = 1.0
+    float* __restrict__ T = workspace.ray_trans[active_buf_idx];
+    parallel_for_gpu(stream, n_rays, [T] __device__ (uint32_t i) {
+        T[i] = 1.0f;
+    });
 
         // generate rays for the pixels in this batch
-        generate_rays_pinhole_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
-            n_rays,
-            ctx.batch_size,
-            workspace.bounding_box,
-            workspace.camera,
-            pixel_start,
+         RayBatch ray_batch{
+            0,
+            (int)n_rays,
             workspace.ray_origin[active_buf_idx],
             workspace.ray_dir[active_buf_idx],
             workspace.ray_idir[active_buf_idx],
             workspace.ray_t[active_buf_idx],
             workspace.ray_trans[active_buf_idx],
             workspace.ray_idx[active_buf_idx],
-            workspace.ray_alive,
-            workspace.ray_active[active_buf_idx]
+            workspace.ray_active[active_buf_idx],
+            workspace.ray_alive
+        };
+        
+        task.batch_coordinator->generate_rays(
+            workspace.camera,
+            workspace.bounding_box,
+            ray_batch,
+            stream
         );
 
         const float dt_min = NeRFConstants::min_step_size;
-        const float dt_max = nerf.bounding_box.size_x * dt_min;
+        const float dt_max = nerf->bounding_box.size_x * dt_min;
         const float cone_angle = NeRFConstants::cone_angle;
 
         march_rays_to_first_occupied_cell_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
             n_rays,
-            ctx.batch_size,
+            n_rays,
             workspace.occupancy_grid,
             workspace.bounding_box,
             dt_min,
@@ -161,10 +167,7 @@ void Renderer::submit(
         int n_steps = 0;
 
         while (n_rays_alive > 0) {
-            if (request->is_canceled()) {
-                request->on_cancel();
-                return;
-            }
+            CHECK_IS_CANCELED(task);
 
             // need to figure out how many rays can fit in this batch
             const uint32_t n_steps_per_ray = std::max(ctx.batch_size / n_rays_alive, (uint32_t)1);
@@ -172,12 +175,12 @@ void Renderer::submit(
 
             march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
-                ctx.batch_size,
+                n_rays,
                 n_steps_per_ray,
                 network_batch,
                 workspace.occupancy_grid,
                 workspace.bounding_box,
-                1.0f / nerf.bounding_box.size_x,
+                1.0f / nerf->bounding_box.size_x,
                 dt_min,
                 dt_max,
                 cone_angle,
@@ -198,7 +201,7 @@ void Renderer::submit(
             );
 
             // query the NeRF network for the samples
-            nerf.network.inference(
+            nerf->network.inference(
                 stream,
                 network_batch,
                 workspace.network_pos,
@@ -207,7 +210,7 @@ void Renderer::submit(
                 workspace.network_output
             );
 
-            // save alpha in an buffer
+            // save alpha in a buffer
             sigma_to_alpha_forward_kernel<<<n_blocks_linear(network_batch), n_threads_linear, 0, stream>>>(
                 network_batch,
                 workspace.network_output + 3 * network_batch,
@@ -219,7 +222,7 @@ void Renderer::submit(
             composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
                 network_batch,
-                workspace.n_pixels,
+                n_rays,
 
                 // input buffers
                 workspace.ray_active[active_buf_idx],
@@ -234,10 +237,10 @@ void Renderer::submit(
                 workspace.rgba
             );
 
-            // We have an opportunity to render a partial result here
+            // We *could* render a partial result here
             // this progress is not very accurate, but it is fast.
-            float progress = (float)(n_rays - n_rays_alive) / (float)n_rays;
-            request->on_progress(progress);
+            // float progress = (float)(n_rays - n_rays_alive) / (float)n_rays;
+            // task.on_progress(progress);
 
             n_steps += n_steps_per_ray;
             if (n_steps < NeRFConstants::n_steps_per_render_compaction) {
@@ -245,19 +248,21 @@ void Renderer::submit(
             }
 
             // update how many rays are still alive
-            const int n_rays_to_compact = count_true_elements(
+            const int n_rays_to_keep = count_true_elements(
                 stream,
                 n_rays_alive,
                 workspace.ray_alive
             );
 
             // if no rays are alive, we can skip compositing
-            if (n_rays_to_compact == 0) {
+            if (n_rays_to_keep == 0) {
                 break;
             }
             
             // check if compaction is required
-            if (n_rays_to_compact < n_rays_alive / 2) {
+            if (n_rays_to_keep < n_rays_alive / 2) {
+                CHECK_IS_CANCELED(task);
+                
                 // get compacted ray indices
                 generate_compaction_indices(
                     stream,
@@ -267,9 +272,9 @@ void Renderer::submit(
                 );
 
                 // compact ray properties via the indices
-                compact_rays_kernel<<<n_blocks_linear(n_rays_to_compact), n_threads_linear, 0, stream>>>(
-                    n_rays_to_compact,
-                    ctx.batch_size,
+                compact_rays_kernel<<<n_blocks_linear(n_rays_to_keep), n_threads_linear, 0, stream>>>(
+                    n_rays_to_keep,
+                    n_rays,
                     workspace.compact_idx,
 
                     // input
@@ -292,47 +297,37 @@ void Renderer::submit(
                 );
 
                 // all compacted rays are alive
-                CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_compact * sizeof(bool), stream));
+                CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_keep * sizeof(bool), stream));
 
                 // swap the active and compact buffer indices
                 std::swap(active_buf_idx, compact_buf_idx);
 
-                printf("compacted %d rays to %d rays\n", n_rays_alive, n_rays_to_compact);
+                printf("compacted %d rays to %d rays\n", n_rays_alive, n_rays_to_keep);
 
                 // update n_rays_alive
-                n_rays_alive = n_rays_to_compact;
+                n_rays_alive = n_rays_to_keep;
 
                 n_steps = 0;
             }                                                                                                                                                                                                                                                                                                              
         }
-        // increment the number of pixels filled
-        n_pixels_filled += n_pixels_to_fill;
-    }
-
-    request->on_complete();
 };
 
-void Renderer::write_to(
+void Renderer::write_to_target(
     Renderer::Context& ctx,
+    RenderTask& task,
     RenderTarget* target
 ) {
-    if (ctx.workspace.n_pixels != target->width * target->height) {
-        return;
-    }
-    cudaStream_t stream = ctx.stream;
-
     target->open_for_cuda_access(
-        [target, &ctx, &stream](float* rgba) {
-            join_channels(
-                stream,
-                target->width,
-                target->height,
-                4,
+        [&ctx, &task, target](float* rgba) {
+            task.batch_coordinator->copy_packed(
+                task.n_rays,
+                task.n_rays,
+                {target->width, target->height},
                 ctx.workspace.rgba,
                 rgba
             );
         },
-        stream
+        ctx.stream
     );
 
 }

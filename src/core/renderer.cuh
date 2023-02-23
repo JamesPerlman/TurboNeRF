@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 #include <tiny-cuda-nn/common.h>
 
-#include "../models/render-request.cuh"
+#include "../models/render-task.cuh"
 #include "../workspaces/rendering-workspace.cuh"
 #include "../common.h"
 
@@ -26,19 +26,23 @@ struct Renderer {
         {};
     };
 
-    void submit(
+    void perform_task(
         Context& ctx,
-        RenderRequest* request
+        RenderTask& task
     );
 
-    void write_to(
+    void write_to_target(
         Context& ctx,
+        RenderTask& task,
         RenderTarget* target
     );
 
-private:
-
-    void enlarge_workspace_if_needed(Context& ctx, RenderRequest* request);
+    void prepare_for_rendering(
+        Context& ctx,
+        const Camera& camera,
+        const NeRF& nerf,
+        const uint32_t& n_rays
+    );
 };
 
 NRC_NAMESPACE_END
