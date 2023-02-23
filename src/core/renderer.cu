@@ -113,203 +113,203 @@ void Renderer::perform_task(
         T[i] = 1.0f;
     });
 
-        // generate rays for the pixels in this batch
-         RayBatch ray_batch{
-            0,
-            (int)n_rays,
-            workspace.ray_origin[active_buf_idx],
-            workspace.ray_dir[active_buf_idx],
-            workspace.ray_idir[active_buf_idx],
-            workspace.ray_t[active_buf_idx],
-            workspace.ray_trans[active_buf_idx],
-            workspace.ray_idx[active_buf_idx],
-            workspace.ray_active[active_buf_idx],
-            workspace.ray_alive
-        };
-        
-        task.batch_coordinator->generate_rays(
-            workspace.camera,
-            workspace.bounding_box,
-            ray_batch,
-            stream
-        );
+    // generate rays for the pixels in this batch
+    RayBatch ray_batch{
+        0,
+        (int)n_rays,
+        workspace.ray_origin[active_buf_idx],
+        workspace.ray_dir[active_buf_idx],
+        workspace.ray_idir[active_buf_idx],
+        workspace.ray_t[active_buf_idx],
+        workspace.ray_trans[active_buf_idx],
+        workspace.ray_idx[active_buf_idx],
+        workspace.ray_active[active_buf_idx],
+        workspace.ray_alive
+    };
+    
+    task.batch_coordinator->generate_rays(
+        workspace.camera,
+        workspace.bounding_box,
+        ray_batch,
+        stream
+    );
 
-        const float dt_min = NeRFConstants::min_step_size;
-        const float dt_max = nerf->bounding_box.size_x * dt_min;
-        const float cone_angle = NeRFConstants::cone_angle;
+    const float dt_min = NeRFConstants::min_step_size;
+    const float dt_max = nerf->bounding_box.size_x * dt_min;
+    const float cone_angle = NeRFConstants::cone_angle;
 
-        march_rays_to_first_occupied_cell_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+    march_rays_to_first_occupied_cell_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+        n_rays,
+        n_rays,
+        workspace.occupancy_grid,
+        workspace.bounding_box,
+        dt_min,
+        dt_max,
+        cone_angle,
+
+        // input buffers
+        workspace.ray_dir[active_buf_idx],
+        workspace.ray_idir[active_buf_idx],
+
+        // dual-use buffers
+        workspace.ray_alive,
+        workspace.ray_origin[active_buf_idx],
+        workspace.ray_t[active_buf_idx],
+
+        // output buffers
+        workspace.network_pos,
+        workspace.network_dir,
+        workspace.network_dt
+    );
+
+    // ray marching loop
+    uint32_t n_rays_alive = n_rays;
+    int n_steps = 0;
+
+    while (n_rays_alive > 0) {
+        CHECK_IS_CANCELED(task);
+
+        // need to figure out how many rays can fit in this batch
+        const uint32_t n_steps_per_ray = std::max(ctx.batch_size / n_rays_alive, (uint32_t)1);
+        const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_rays_alive, tcnn::batch_size_granularity);
+
+        march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+            n_rays_alive,
             n_rays,
-            n_rays,
+            n_steps_per_ray,
+            network_batch,
             workspace.occupancy_grid,
             workspace.bounding_box,
+            1.0f / nerf->bounding_box.size_x,
             dt_min,
             dt_max,
             cone_angle,
 
             // input buffers
+            workspace.ray_origin[active_buf_idx],
             workspace.ray_dir[active_buf_idx],
             workspace.ray_idir[active_buf_idx],
-
-            // dual-use buffers
             workspace.ray_alive,
-            workspace.ray_origin[active_buf_idx],
+            workspace.ray_active[active_buf_idx],
             workspace.ray_t[active_buf_idx],
 
             // output buffers
+            workspace.ray_steps[active_buf_idx],
             workspace.network_pos,
             workspace.network_dir,
             workspace.network_dt
         );
 
-        // ray marching loop
-        uint32_t n_rays_alive = n_rays;
-        int n_steps = 0;
+        // query the NeRF network for the samples
+        nerf->network.inference(
+            stream,
+            network_batch,
+            workspace.network_pos,
+            workspace.network_dir,
+            workspace.network_concat,
+            workspace.network_output
+        );
 
-        while (n_rays_alive > 0) {
+        // save alpha in a buffer
+        sigma_to_alpha_forward_kernel<<<n_blocks_linear(network_batch), n_threads_linear, 0, stream>>>(
+            network_batch,
+            workspace.network_output + 3 * network_batch,
+            workspace.network_dt,
+            workspace.sample_alpha
+        );
+
+        // accumulate these samples into the pixel colors
+        composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+            n_rays_alive,
+            network_batch,
+            n_rays,
+
+            // input buffers
+            workspace.ray_active[active_buf_idx],
+            workspace.ray_steps[active_buf_idx],
+            workspace.ray_idx[active_buf_idx],
+            workspace.network_output,
+            workspace.sample_alpha,
+            
+            // output buffers
+            workspace.ray_alive,
+            workspace.ray_trans[active_buf_idx],
+            workspace.rgba
+        );
+
+        // We *could* render a partial result here
+        // this progress is not very accurate, but it is fast.
+        // float progress = (float)(n_rays - n_rays_alive) / (float)n_rays;
+        // task.on_progress(progress);
+
+        n_steps += n_steps_per_ray;
+        if (n_steps < NeRFConstants::n_steps_per_render_compaction) {
+            continue;
+        }
+
+        // update how many rays are still alive
+        const int n_rays_to_keep = count_true_elements(
+            stream,
+            n_rays_alive,
+            workspace.ray_alive
+        );
+
+        // if no rays are alive, we can skip compositing
+        if (n_rays_to_keep == 0) {
+            break;
+        }
+        
+        // check if compaction is required
+        if (n_rays_to_keep < n_rays_alive / 2) {
             CHECK_IS_CANCELED(task);
-
-            // need to figure out how many rays can fit in this batch
-            const uint32_t n_steps_per_ray = std::max(ctx.batch_size / n_rays_alive, (uint32_t)1);
-            const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_rays_alive, tcnn::batch_size_granularity);
-
-            march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+            
+            // get compacted ray indices
+            generate_compaction_indices(
+                stream,
                 n_rays_alive,
-                n_rays,
-                n_steps_per_ray,
-                network_batch,
-                workspace.occupancy_grid,
-                workspace.bounding_box,
-                1.0f / nerf->bounding_box.size_x,
-                dt_min,
-                dt_max,
-                cone_angle,
+                workspace.ray_alive,
+                workspace.compact_idx
+            );
 
-                // input buffers
+            // compact ray properties via the indices
+            compact_rays_kernel<<<n_blocks_linear(n_rays_to_keep), n_threads_linear, 0, stream>>>(
+                n_rays_to_keep,
+                n_rays,
+                workspace.compact_idx,
+
+                // input
+                workspace.ray_idx[active_buf_idx],
+                workspace.ray_active[active_buf_idx],
+                workspace.ray_t[active_buf_idx],
                 workspace.ray_origin[active_buf_idx],
                 workspace.ray_dir[active_buf_idx],
                 workspace.ray_idir[active_buf_idx],
-                workspace.ray_alive,
-                workspace.ray_active[active_buf_idx],
-                workspace.ray_t[active_buf_idx],
-
-                // output buffers
-                workspace.ray_steps[active_buf_idx],
-                workspace.network_pos,
-                workspace.network_dir,
-                workspace.network_dt
-            );
-
-            // query the NeRF network for the samples
-            nerf->network.inference(
-                stream,
-                network_batch,
-                workspace.network_pos,
-                workspace.network_dir,
-                workspace.network_concat,
-                workspace.network_output
-            );
-
-            // save alpha in a buffer
-            sigma_to_alpha_forward_kernel<<<n_blocks_linear(network_batch), n_threads_linear, 0, stream>>>(
-                network_batch,
-                workspace.network_output + 3 * network_batch,
-                workspace.network_dt,
-                workspace.sample_alpha
-            );
-
-            // accumulate these samples into the pixel colors
-            composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
-                n_rays_alive,
-                network_batch,
-                n_rays,
-
-                // input buffers
-                workspace.ray_active[active_buf_idx],
-                workspace.ray_steps[active_buf_idx],
-                workspace.ray_idx[active_buf_idx],
-                workspace.network_output,
-                workspace.sample_alpha,
-                
-                // output buffers
-                workspace.ray_alive,
                 workspace.ray_trans[active_buf_idx],
-                workspace.rgba
+
+                // output
+                workspace.ray_idx[compact_buf_idx],
+                workspace.ray_active[compact_buf_idx],
+                workspace.ray_t[compact_buf_idx],
+                workspace.ray_origin[compact_buf_idx],
+                workspace.ray_dir[compact_buf_idx],
+                workspace.ray_idir[compact_buf_idx],
+                workspace.ray_trans[compact_buf_idx]
             );
 
-            // We *could* render a partial result here
-            // this progress is not very accurate, but it is fast.
-            // float progress = (float)(n_rays - n_rays_alive) / (float)n_rays;
-            // task.on_progress(progress);
+            // all compacted rays are alive
+            CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_keep * sizeof(bool), stream));
 
-            n_steps += n_steps_per_ray;
-            if (n_steps < NeRFConstants::n_steps_per_render_compaction) {
-                continue;
-            }
+            // swap the active and compact buffer indices
+            std::swap(active_buf_idx, compact_buf_idx);
 
-            // update how many rays are still alive
-            const int n_rays_to_keep = count_true_elements(
-                stream,
-                n_rays_alive,
-                workspace.ray_alive
-            );
+            printf("compacted %d rays to %d rays\n", n_rays_alive, n_rays_to_keep);
 
-            // if no rays are alive, we can skip compositing
-            if (n_rays_to_keep == 0) {
-                break;
-            }
-            
-            // check if compaction is required
-            if (n_rays_to_keep < n_rays_alive / 2) {
-                CHECK_IS_CANCELED(task);
-                
-                // get compacted ray indices
-                generate_compaction_indices(
-                    stream,
-                    n_rays_alive,
-                    workspace.ray_alive,
-                    workspace.compact_idx
-                );
+            // update n_rays_alive
+            n_rays_alive = n_rays_to_keep;
 
-                // compact ray properties via the indices
-                compact_rays_kernel<<<n_blocks_linear(n_rays_to_keep), n_threads_linear, 0, stream>>>(
-                    n_rays_to_keep,
-                    n_rays,
-                    workspace.compact_idx,
-
-                    // input
-                    workspace.ray_idx[active_buf_idx],
-                    workspace.ray_active[active_buf_idx],
-                    workspace.ray_t[active_buf_idx],
-                    workspace.ray_origin[active_buf_idx],
-                    workspace.ray_dir[active_buf_idx],
-                    workspace.ray_idir[active_buf_idx],
-                    workspace.ray_trans[active_buf_idx],
-
-                    // output
-                    workspace.ray_idx[compact_buf_idx],
-                    workspace.ray_active[compact_buf_idx],
-                    workspace.ray_t[compact_buf_idx],
-                    workspace.ray_origin[compact_buf_idx],
-                    workspace.ray_dir[compact_buf_idx],
-                    workspace.ray_idir[compact_buf_idx],
-                    workspace.ray_trans[compact_buf_idx]
-                );
-
-                // all compacted rays are alive
-                CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_keep * sizeof(bool), stream));
-
-                // swap the active and compact buffer indices
-                std::swap(active_buf_idx, compact_buf_idx);
-
-                printf("compacted %d rays to %d rays\n", n_rays_alive, n_rays_to_keep);
-
-                // update n_rays_alive
-                n_rays_alive = n_rays_to_keep;
-
-                n_steps = 0;
-            }                                                                                                                                                                                                                                                                                                              
-        }
+            n_steps = 0;
+        }                                                                                                                                                                                                                                                                                                              
+    }
 };
 
 void Renderer::write_to_target(
