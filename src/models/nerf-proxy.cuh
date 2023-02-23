@@ -21,6 +21,15 @@ struct NeRFProxy {
     BoundingBox get_bounding_box() const {
         return nerfs[0].bounding_box;
     }
+
+    std::vector<NeRF*> get_nerf_ptrs() {
+        std::vector<NeRF*> ptrs;
+        ptrs.reserve(nerfs.size());
+        for (auto& nerf : nerfs) {
+            ptrs.emplace_back(&nerf);
+        }
+        return ptrs;
+    }
 };
 
 NRC_NAMESPACE_END
