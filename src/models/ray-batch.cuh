@@ -13,12 +13,8 @@ struct RayBatch {
     float* t;
     float* transmittance;
     int* index;
-    uint8_t* flags; // optimization to avoid multiple global memory accesses
-};
-
-enum class RayFlags: uint8_t {
-    Alive   = 1 << 0,
-    Active  = 1 << 1,
+    bool* active;
+    bool* alive;
 };
 
 NRC_NAMESPACE_END
