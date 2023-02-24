@@ -4,7 +4,6 @@
 #include <string>
 
 #include "../common.h"
-#include "../utils/gpu-image.cuh"
 #include "render-target.cuh"
 
 NRC_NAMESPACE_BEGIN
