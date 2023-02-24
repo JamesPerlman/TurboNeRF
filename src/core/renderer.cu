@@ -216,14 +216,7 @@ void Renderer::perform_task(
 
         if (!rgba_cleared) {
             // clear workspace.rgba
-            CUDA_CHECK_THROW(
-                cudaMemsetAsync(
-                    workspace.rgba,
-                    0,
-                    4 * n_rays * sizeof(float),
-                    stream
-                )
-            );
+            CUDA_CHECK_THROW(cudaMemsetAsync(workspace.rgba, 0, 4 * n_rays * sizeof(float), stream));
             rgba_cleared = true;
         }
 
