@@ -10,7 +10,6 @@ NRC_NAMESPACE_BEGIN
 
 class CPURenderBuffer: public RenderTarget {
 private:
-    // pointer to GPU memory to store the output data
     float* rgba_cpu = nullptr;
     float* rgba_gpu = nullptr;
     bool _dirty = false;
@@ -40,9 +39,9 @@ public:
     }
 
     void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) override {
-        _dirty = true;
         // allow writing to device memory
         handle(rgba_gpu);
+        _dirty = true;
     }
 
     void synchronize() {
