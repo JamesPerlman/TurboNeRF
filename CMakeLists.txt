@@ -69,6 +69,7 @@ set(HEADERS
 	src/models/training-image.cuh
 
 	# render-targets
+	src/render-targets/cpu-render-buffer.cuh
 	src/render-targets/cuda-render-buffer.cuh
 	src/render-targets/opengl-render-surface.cuh
 	src/render-targets/render-target.cuh
