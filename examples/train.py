@@ -23,10 +23,7 @@ nerf = manager.create_trainable(dataset.bounding_box)
 
 trainer = tn.Trainer(dataset, nerf, batch_size=2<<21)
 
-renderer = tn.Renderer(
-    pattern=tn.RenderPattern.RectangularGrid,
-    batch_size=2<<20
-)
+renderer = tn.Renderer()
 
 render_buf = tn.CUDARenderBuffer()
 render_buf.set_size(512, 512)
