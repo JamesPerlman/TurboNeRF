@@ -136,4 +136,6 @@ NRC_NAMESPACE_END
  * https://github.dev/Hello100blog/gl_cuda_interop_pingpong_st
  * https://stackoverflow.com/questions/15053444/modifying-opengl-fbo-texture-attachment-in-cuda
  * https://forums.developer.nvidia.com/t/cudabindtexturetoarray-deprecated/176713/
+ * 
+ * Update: it is fixed. https://github.com/JamesPerlman/NeRFRenderCore/discussions/16#discussioncomment-5095071
  */
