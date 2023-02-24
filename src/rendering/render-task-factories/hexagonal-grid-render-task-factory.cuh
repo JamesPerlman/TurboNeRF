@@ -84,7 +84,7 @@ public:
 
         // create tasks
         std::vector<RenderTask> tasks;
-        tasks.reserve(1);
+        tasks.reserve(n_hexagons + 1);
 
         // the fist task is a hexagonal grid for a low-resolution preview.
         tasks.emplace_back(
