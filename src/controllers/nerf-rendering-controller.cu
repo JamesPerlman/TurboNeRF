@@ -34,12 +34,12 @@ NeRFRenderingController::NeRFRenderingController(
 }
 
 void NeRFRenderingController::cancel() {
-    if (request != nullptr)
-        request->cancel();
-
-    if (tasks.size() > 0)
-        for (auto& task : tasks)
-            task.cancel();
+    if (request != nullptr) {
+        if (request->is_canceled())
+            return;
+        else
+            request->cancel();
+    }
 }
 
 void NeRFRenderingController::submit(
@@ -75,17 +75,15 @@ void NeRFRenderingController::submit(
     
     int i = 0;
     for (auto& task : tasks) {
-        if (request->is_canceled())
-            break;
-        
         renderer.perform_task(ctx, task);
-        
-        if (task.is_canceled())
-            continue;
-
         renderer.write_to_target(ctx, task, request->output);
         request->on_progress((float)i / (float)tasks.size());
         ++i;
+        
+        if (request->is_canceled()) {
+            request->on_cancel();
+            return;
+        }
     }
 
     request->on_complete();
