@@ -20,6 +20,7 @@ private:
     std::vector<Renderer::Context> contexts;
 
     std::shared_ptr<RenderRequest> request = nullptr;
+    std::vector<RenderTask> tasks;
 
     Renderer renderer = Renderer();
 

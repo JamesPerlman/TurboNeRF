@@ -36,6 +36,10 @@ NeRFRenderingController::NeRFRenderingController(
 void NeRFRenderingController::cancel() {
     if (request != nullptr)
         request->cancel();
+
+    if (tasks.size() > 0)
+        for (auto& task : tasks)
+            task.cancel();
 }
 
 void NeRFRenderingController::submit(
@@ -57,7 +61,7 @@ void NeRFRenderingController::submit(
         )
     );
 
-    vector<RenderTask> tasks = factory->create_tasks(request.get());
+    this->tasks = factory->create_tasks(request.get());
 
     // prepare for rendering and dispatch tasks
     renderer.prepare_for_rendering(ctx, request->camera, request->proxies[0]->nerfs[0], n_rays_per_batch);
