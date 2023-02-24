@@ -51,7 +51,7 @@ void NeRFRenderingController::submit(
     this->request = request;
 
     // split this request into batches
-    uint32_t n_rays_per_batch = batch_size / 64;
+    uint32_t n_rays_per_batch = batch_size / 256;
 
     unique_ptr<RenderTaskFactory> factory(
         create_render_task_factory(
@@ -63,8 +63,15 @@ void NeRFRenderingController::submit(
 
     this->tasks = factory->create_tasks(request.get());
 
+    // get actual number of rays per batch
+    int n_rays_max = 0;
+    for (auto& task : tasks) {
+        if (task.n_rays > n_rays_max)
+            n_rays_max = task.n_rays;
+    }
+
     // prepare for rendering and dispatch tasks
-    renderer.prepare_for_rendering(ctx, request->camera, request->proxies[0]->nerfs[0], n_rays_per_batch);
+    renderer.prepare_for_rendering(ctx, request->camera, request->proxies[0]->nerfs[0], n_rays_max);
     
     int i = 0;
     for (auto& task : tasks) {

@@ -22,7 +22,7 @@ public:
         int H = hex_height_for_npix_and_aspect(n_rays_per_task, a);
 
         // we want H to be the highest multiple of 40 where npix <= n_rays_per_task
-        H = (H / 40) * 40;
+        H = (std::max(H, 40) / 40) * 40;
 
         // get width of hexagon and width of rectangular central region
         int W, cw;
