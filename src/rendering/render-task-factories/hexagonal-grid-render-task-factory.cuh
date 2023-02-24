@@ -72,7 +72,7 @@ public:
         std::sort(
             hex_coords.begin(),
             hex_coords.end(),
-            [&cx, &cy, &o](const int2& a, const int2& b) {
+            [&cx, &cy](const int2& a, const int2& b) {
                 int ax = a.x - cx;
                 int ay = a.y - cy;
                 int bx = b.x - cx;
@@ -82,9 +82,27 @@ public:
             }
         );
 
-        // TODO: prepend a task for the preview hexagon grid
+        // create tasks
         std::vector<RenderTask> tasks;
-        tasks.reserve(n_hexagons);
+        tasks.reserve(1);
+
+        // the fist task is a hexagonal grid for a low-resolution preview.
+        tasks.emplace_back(
+            n_w * n_h,
+            request->camera,
+            request->proxies[0]->get_nerf_ptrs(),
+            std::unique_ptr<RayBatchCoordinator>(
+                new HexagonalGridRayBatchCoordinator(
+                    { n_w, n_h },
+                    { o.x + cw / 2, o.y }, // ???
+                    W,
+                    H,
+                    cw
+                )
+            )
+        );
+
+        // next we create a task for each hexagonal tile to fill it in with higher detail.
         for (const auto& coords : hex_coords) {
             tasks.emplace_back(
                 n_rays,

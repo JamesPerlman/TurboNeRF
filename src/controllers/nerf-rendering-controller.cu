@@ -51,7 +51,7 @@ void NeRFRenderingController::submit(
     this->request = request;
 
     // split this request into batches
-    uint32_t n_rays_per_batch = batch_size / 8;
+    uint32_t n_rays_per_batch = batch_size / 64;
 
     unique_ptr<RenderTaskFactory> factory(
         create_render_task_factory(
@@ -68,7 +68,14 @@ void NeRFRenderingController::submit(
     
     int i = 0;
     for (auto& task : tasks) {
+        if (request->is_canceled())
+            break;
+        
         renderer.perform_task(ctx, task);
+        
+        if (task.is_canceled())
+            continue;
+
         renderer.write_to_target(ctx, task, request->output);
         request->on_progress((float)i / (float)tasks.size());
         ++i;

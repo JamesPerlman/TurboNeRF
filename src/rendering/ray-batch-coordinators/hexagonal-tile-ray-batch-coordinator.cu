@@ -86,7 +86,7 @@ void HexagonalTileRayBatchCoordinator::generate_rays(
 
 __global__ void copy_packed_rgba_hexagonal_tile_kernel(
     const int n_pixels,
-    const int stride,
+    const int input_stride,
     const int2 output_size,
     const HexagonTile tile,
     const float* __restrict__ rgba_in,
@@ -133,14 +133,14 @@ __global__ void copy_packed_rgba_hexagonal_tile_kernel(
     for (int j = 0; j < 4; ++j) {
         rgba_out[i_out] = rgba_in[i_in];
         i_out += 1;
-        i_in += stride;
+        i_in += input_stride;
     }
 }
 
 void HexagonalTileRayBatchCoordinator::copy_packed(
-    const int& n_pixels,
-    const int& stride,
+    const int& n_rays,
     const int2& output_size,
+    const int& output_stride,
     float* rgba_in,
     float* rgba_out,
     const cudaStream_t& stream
@@ -148,7 +148,7 @@ void HexagonalTileRayBatchCoordinator::copy_packed(
     const int n_hexagon_pixels = tile.n_rays;
     copy_packed_rgba_hexagonal_tile_kernel<<<n_blocks_linear(n_hexagon_pixels), n_threads_linear, 0, stream>>>(
         n_hexagon_pixels,
-        stride,
+        n_hexagon_pixels,
         output_size,
         tile,
         rgba_in,

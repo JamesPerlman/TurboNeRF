@@ -114,16 +114,17 @@ __global__ void copy_packed_rgba_rectangular_grid_kernel(
 }
 
 void RectangularGridRayBatchCoordinator::copy_packed(
-    const int& n_pixels,
-    const int& stride,
+    const int& n_rays,
     const int2& output_size,
+    const int& output_stride,
     float* rgba_in,
     float* rgba_out,
     const cudaStream_t& stream
 ) {
-    copy_packed_rgba_rectangular_grid_kernel<<<n_blocks_linear(n_pixels), n_threads_linear, 0, stream>>>(
-        n_pixels,
-        stride,
+    const int n_output_pixels = output_size.x * output_size.y;
+    copy_packed_rgba_rectangular_grid_kernel<<<n_blocks_linear(n_output_pixels), n_threads_linear, 0, stream>>>(
+        n_output_pixels,
+        output_stride,
         output_size.x,
         grid_offset,
         grid_size,

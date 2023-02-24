@@ -65,8 +65,8 @@ public:
 
     void copy_packed(
         const int& n_pixels,
-        const int& stride,
         const int2& output_size,
+        const int& output_stride,
         float* rgba_in,
         float* rgba_out,
         const cudaStream_t& stream = 0

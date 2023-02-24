@@ -87,16 +87,6 @@ void Renderer::perform_task(
 
     const int n_rays = task.n_rays;
 
-    // clear workspace.rgba
-    CUDA_CHECK_THROW(
-        cudaMemsetAsync(
-            workspace.rgba,
-            0,
-            4 * n_rays * sizeof(float),
-            stream
-        )
-    );
-
     // ray.active = true
     CUDA_CHECK_THROW(
         cudaMemsetAsync(
@@ -165,6 +155,7 @@ void Renderer::perform_task(
     // ray marching loop
     uint32_t n_rays_alive = n_rays;
     int n_steps = 0;
+    bool rgba_cleared = false;
 
     while (n_rays_alive > 0) {
         CHECK_IS_CANCELED(task);
@@ -217,6 +208,24 @@ void Renderer::perform_task(
             workspace.network_dt,
             workspace.sample_alpha
         );
+
+        /**
+         * It is best to clear RGBA right before we composite the first sample.
+         * Just in case the task is canceled before we get a chance to draw anything.
+         */
+
+        if (!rgba_cleared) {
+            // clear workspace.rgba
+            CUDA_CHECK_THROW(
+                cudaMemsetAsync(
+                    workspace.rgba,
+                    0,
+                    4 * n_rays * sizeof(float),
+                    stream
+                )
+            );
+            rgba_cleared = true;
+        }
 
         // accumulate these samples into the pixel colors
         composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
@@ -321,13 +330,12 @@ void Renderer::write_to_target(
         [&ctx, &task, target](float* rgba) {
             task.batch_coordinator->copy_packed(
                 task.n_rays,
-                task.n_rays,
                 {target->width, target->height},
+                target->n_pixels(),
                 ctx.workspace.rgba,
                 rgba
             );
         },
         ctx.stream
     );
-
 }

@@ -37,7 +37,7 @@ public:
     BlenderRenderEngine()
         : _renderer()
         , _render_queue()
-        , _draw_queue(333)
+        , _draw_queue(1)
     {
         if (!gladLoadGL()) {
             throw std::runtime_error("Failed to load OpenGL with glad.");

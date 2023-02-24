@@ -71,8 +71,8 @@ struct Camera {
 	// returns a ray in the camera's local coordinate system
 
 	inline __device__ Ray local_ray_at_pixel_xy_index(
-		const uint32_t& x,
-		const uint32_t& y
+		const int& x,
+		const int& y
 	) const {
 		// sx and sy are the corresponding x and y in the sensor rect's 2D coordinate system
 		// this will put rays at pixel centers
