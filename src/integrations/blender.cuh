@@ -7,7 +7,7 @@
 #include "../models/camera.cuh"
 #include "../models/nerf-proxy.cuh"
 #include "../models/render-request.cuh"
-#include "../render-targets/opengl-render-surface.cuh"
+#include "../render-targets/cpu-render-buffer.cuh"
 #include "../utils/queues.h"
 #include "../common.h"
 
@@ -17,14 +17,17 @@ class BlenderRenderEngine
 {
 private:
     NeRFRenderingController _renderer;
-    OpenGLRenderSurface _render_surface;
+    CPURenderBuffer _render_target;
     std::function<void()> _tag_redraw;
 
     TwoItemQueue _render_queue;
     DebounceQueue _draw_queue;
+
+    GLuint _render_tex_id = 0;
     
     void request_redraw() {
         _draw_queue.push([this]() {
+            this->_render_target.synchronize();
             _tag_redraw();
         });
     }
@@ -55,7 +58,7 @@ public:
             auto request = std::make_shared<RenderRequest>(
                 camera,
                 proxies,
-                &_render_surface,
+                &_render_target,
                 // on_complete
                 [this]() {
                     this->request_redraw();
@@ -75,9 +78,33 @@ public:
     }
 
     void resize_render_surface(const uint32_t& width, const uint32_t& height) {
-        _render_surface.set_size(width, height);
+        _render_target.set_size(width, height);
     }
 
+    // create or resize render texture
+    void update_render_texture() {
+        // if texture is not created, create it
+        if (_render_tex_id == 0) {
+            glGenTextures(1, &_render_tex_id);
+            glBindTexture(GL_TEXTURE_2D, _render_tex_id);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        }
+
+        // fetch texture size
+        int width, height;
+        glBindTexture(GL_TEXTURE_2D, _render_tex_id);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
+
+        // if texture size is not correct, resize it
+        if (width != _render_target.width || height != _render_target.height) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, _render_target.width, _render_target.height, 0, GL_RGBA, GL_FLOAT, _render_target.get_rgba());
+        } else {
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _render_target.width, _render_target.height, GL_RGBA, GL_FLOAT, _render_target.get_rgba());
+        }
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
     /**
      * The following functionality was adapted from the Pixar RenderMan for Blender plugin.
      * https://github.com/prman-pixar/RenderManForBlender/blob/main/display_driver/d_blender.cpp#L335
@@ -88,15 +115,17 @@ public:
     void draw()
     {
         // For some reason these calls make rendering a little bit smoother
-        glFlush();
-        glFinish();
+        // glFlush();
+        // glFinish();
+
+        update_render_texture();
 
         // copy render data
-        // _renderer.write_to(&_render_surface);
+        // _renderer.write_to(&_render_target);
 
         // These are the vertices of a quad that covers the entire viewport.
-        const float w = static_cast<float>(_render_surface.width);
-        const float h = static_cast<float>(_render_surface.height);
+        const float w = static_cast<float>(_render_target.width);
+        const float h = static_cast<float>(_render_target.height);
 
         GLfloat vertices[8] = {
             0.0f, 0.0f,
@@ -149,8 +178,8 @@ public:
         // Activate texture unit 0
         glActiveTexture(GL_TEXTURE0);
 
-        // Bind to render surface texture
-        glBindTexture(GL_TEXTURE_2D, _render_surface.get_texture_id());
+        // Upload render target to GPU
+        glBindTexture(GL_TEXTURE_2D, _render_tex_id);
         glBindVertexArray(vertex_array);
 
         // Draw the triangle fan
