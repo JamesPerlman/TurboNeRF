@@ -34,16 +34,13 @@ __global__ void generate_rectangular_grid_of_rays_kernel(
     int ix = i - iy * grid_resolution.x;    // (i % grid_resolution.x) 
 
     // calculate x and y in grid space
-    float x = (float)grid_size.x * (float)ix / (float)grid_resolution.x;
-    float y = (float)grid_size.y * (float)iy / (float)grid_resolution.y;
+    int x = (float)grid_size.x * (float)ix / (float)grid_resolution.x;
+    int y = (float)grid_size.y * (float)iy / (float)grid_resolution.y;
 
     // normalize to camera space
     const Camera cam = *camera;
-    
-    x = ((float)grid_offset.x + x) / (float)cam.resolution.x;
-    y = ((float)grid_offset.y + y) / (float)cam.resolution.y;
 
-    Ray local_ray = cam.local_ray_at_pixel_xy_normalized(x, y);
+    Ray local_ray = cam.local_ray_at_pixel_xy_index(x + grid_offset.x, y + grid_offset.y);
     Ray global_ray = cam.global_ray_from_local_ray(local_ray);
 
     fill_ray_buffers(i, stride, global_ray, bbox, pos, dir, idir, t, index, alive);
