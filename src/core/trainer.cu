@@ -141,8 +141,7 @@ void Trainer::generate_next_training_batch(
 		const float mean_rays_per_sample = static_cast<float>(ctx.n_rays_in_batch) / static_cast<float>(ctx.n_samples_in_batch);
 		n_estimated_rays = static_cast<uint32_t>(mean_rays_per_sample * static_cast<float>(ctx.workspace.batch_size));
 	} else {
-		// just use last batch's number of rays
-		n_estimated_rays = ctx.n_rays_in_batch;
+		n_estimated_rays = 16384;
 	}
 
 	// Grab some references to the n_steps arrays
@@ -187,7 +186,7 @@ void Trainer::generate_next_training_batch(
 	if (ctx.n_samples_in_batch < 1) {
 		throw std::runtime_error("No samples were generated for this training batch!\n");
 	}
-	
+
 	// Generate sample positions
 	march_and_generate_network_positions_kernel<<<n_blocks_linear(ctx.n_rays_in_batch), n_threads_linear, 0, ctx.stream>>>(
 		ctx.n_rays_in_batch,
