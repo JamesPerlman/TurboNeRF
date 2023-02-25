@@ -12,16 +12,19 @@ struct Renderer {
     struct Context {
         const cudaStream_t& stream;
         RenderingWorkspace workspace;
+        NerfNetwork network;
 
         const uint32_t batch_size;
 
         Context(
             const cudaStream_t& stream,
             RenderingWorkspace workspace,
+            NerfNetwork network,
             uint32_t batch_size
         )
             : stream(stream)
             , workspace(std::move(workspace))
+            , network(std::move(network))
             , batch_size(std::move(batch_size))
         {};
     };

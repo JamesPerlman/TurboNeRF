@@ -27,14 +27,9 @@ using json = nlohmann::json;
 
 // Constructor
 
-NerfNetwork::NerfNetwork(
-	const int& device_id,
-	const float& aabb_size
-)
+NerfNetwork::NerfNetwork(const int& device_id)
 	: network_ws(device_id)
-	, params_ws(device_id)
 {
-	this->aabb_size = aabb_size;
 
 	// These values are from the Instant-NGP paper, page 4. "Multiresolution Hash Encoding"
 	double n_levels = 16.0;
@@ -64,7 +59,7 @@ NerfNetwork::NerfNetwork(
 		{"base_resolution", 16},
 		{"per_level_scale", b},
 		// used by recommendation of Müller et al (instant-NGP paper, page 13 "Smooth Interpolation")
-		{"interpolation", "Smoothstep"},
+		{"interpolation", "Linear"},
 	};
 
 	json density_network_config = {
@@ -104,7 +99,7 @@ NerfNetwork::NerfNetwork(
 }
 
 // initialize params and gradients for the networks (I have no idea if this is correct)
-void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
+void NerfNetwork::prepare_for_training(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
 
 	size_t rng_seed = 72791;
 	pcg32 rng(rng_seed);
@@ -135,20 +130,6 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
 		params_ws.color_network_params_fp
 	);
 
-	// assign params pointers
-
-	density_network->set_params(
-		params_ws.density_network_params_hp,
-		params_ws.density_network_params_hp,
-		params_ws.density_network_gradients_hp
-	);
-
-	color_network->set_params(
-		params_ws.color_network_params_hp,
-		params_ws.color_network_params_hp,
-		params_ws.color_network_gradients_hp
-	);
-
 	// initialize optimizers
 	
 	json optimizer_config = {
@@ -170,8 +151,25 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream) {
 	can_train = true;
 }
 
+void NerfNetwork::set_params(NetworkParamsWorkspace& params_ws) {
+	// assign params pointers
+
+	density_network->set_params(
+		params_ws.density_network_params_hp,
+		params_ws.density_network_params_hp,
+		params_ws.density_network_gradients_hp
+	);
+
+	color_network->set_params(
+		params_ws.color_network_params_hp,
+		params_ws.color_network_params_hp,
+		params_ws.color_network_gradients_hp
+	);
+}
+
 void NerfNetwork::train(
 	const cudaStream_t& stream,
+	NetworkParamsWorkspace& params_ws,
 	const uint32_t& batch_size,
 	const uint32_t& n_rays,
 	const uint32_t& n_samples,
@@ -184,7 +182,8 @@ void NerfNetwork::train(
 	network_precision_t* concat_buffer,
 	network_precision_t* output_buffer
 ) {
-	
+	set_params(params_ws);
+
 	enlarge_workspace_if_needed(stream, batch_size);
 
 	// Forward
@@ -234,11 +233,12 @@ void NerfNetwork::train(
 	);
 
 	// Optimizer
-	optimizer_step(stream);
+	optimizer_step(stream, params_ws);
 }
 
 void NerfNetwork::inference(
 	const cudaStream_t& stream,
+	NetworkParamsWorkspace& params_ws,
 	const uint32_t& batch_size,
 	float* pos_batch,
 	float* dir_batch,
@@ -249,6 +249,8 @@ void NerfNetwork::inference(
 	// if this flag is false, we only run inference on the density network
 	const bool& use_color_network
 ) {
+	set_params(params_ws);
+	
 	// Inference (density network)
 	GPUMatrixDynamic density_network_input_matrix(
 		pos_batch,
@@ -593,7 +595,7 @@ void NerfNetwork::backward(
 
 }
 
-void NerfNetwork::optimizer_step(const cudaStream_t& stream) {
+void NerfNetwork::optimizer_step(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
 
 	optimizer->step(
 		stream,

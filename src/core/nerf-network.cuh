@@ -20,15 +20,15 @@ struct NerfNetwork {
 	std::shared_ptr<tcnn::Network<tcnn::network_precision_t>> color_network;
 	std::shared_ptr<tcnn::NGPAdamOptimizer<tcnn::network_precision_t>> optimizer;
 	
-	NerfNetwork(
-		const int& device_id,
-		const float& aabb_size
-	);
+	NerfNetwork(const int& device_id);
 
-	void prepare_for_training(const cudaStream_t& stream);
+	void prepare_for_training(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws);
+	
+	void set_params(NetworkParamsWorkspace& params_ws);
 
 	void train(
 		const cudaStream_t& stream,
+		NetworkParamsWorkspace& params_ws,
 		const uint32_t& batch_size,
 		const uint32_t& n_rays,
 		const uint32_t& n_samples,
@@ -44,6 +44,7 @@ struct NerfNetwork {
 
 	void inference(
 		const cudaStream_t& stream,
+		NetworkParamsWorkspace& params_ws,
 		const uint32_t& batch_size,
 		float* pos_batch,
 		float* dir_batch,
@@ -67,7 +68,6 @@ private:
 	bool can_train = false;
 	
 	NetworkWorkspace network_ws;
-	NetworkParamsWorkspace params_ws;
 
 	// Helper context
 	struct ForwardContext : public tcnn::Context {
@@ -109,7 +109,10 @@ private:
 		const uint32_t& n_rays
 	);
 
-	void optimizer_step(const cudaStream_t& stream);
+	void optimizer_step(
+		const cudaStream_t& stream,
+		NetworkParamsWorkspace& params_ws
+	);
 
 	void backward(
 		const cudaStream_t& stream,

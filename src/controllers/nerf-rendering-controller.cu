@@ -24,13 +24,16 @@ NeRFRenderingController::NeRFRenderingController(
         this->batch_size = batch_size;
     }
 
-    for (int i = 0; i < DeviceManager::get_device_count(); ++i) {
-        contexts.emplace_back(
-            DeviceManager::get_stream(i),
-            RenderingWorkspace(i),
-            this->batch_size
-        );
-    }
+    DeviceManager::foreach_device(
+        [this](const int& device_id, const cudaStream_t& stream) {
+            contexts.emplace_back(
+                stream,
+                RenderingWorkspace(device_id),
+                NerfNetwork(device_id),
+                this->batch_size
+            );
+        }
+    );
 }
 
 void NeRFRenderingController::cancel() {

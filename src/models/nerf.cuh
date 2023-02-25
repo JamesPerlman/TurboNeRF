@@ -9,7 +9,7 @@
 NRC_NAMESPACE_BEGIN
 
 struct NeRF {
-    NerfNetwork network;
+    NetworkParamsWorkspace params;
     OccupancyGrid occupancy_grid;
     BoundingBox bounding_box;
 
@@ -18,7 +18,7 @@ struct NeRF {
     NeRF(const int& device_id, BoundingBox bounding_box)
         : device_id(device_id)
         , bounding_box(bounding_box)
-        , network(device_id, bounding_box.size_x)
+        , params(device_id)
         , occupancy_grid(device_id, OccupancyGrid::get_max_n_levels(bounding_box.size_x), 128)
     { };
     

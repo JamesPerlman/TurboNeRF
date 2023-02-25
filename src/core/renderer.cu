@@ -26,13 +26,13 @@ void Renderer::prepare_for_rendering(
     cudaStream_t stream = ctx.stream;
     auto& workspace = ctx.workspace;
 
-    if (ctx.workspace.n_rays != n_rays) {
-        ctx.workspace.enlarge(
+    if (workspace.n_rays != n_rays) {
+        workspace.enlarge(
             stream,
             n_rays,
             ctx.batch_size,
-            nerf.network.get_concat_buffer_width(),
-            nerf.network.get_padded_output_width()
+            ctx.network.get_concat_buffer_width(),
+            ctx.network.get_padded_output_width()
         );
     }
 
@@ -192,8 +192,9 @@ void Renderer::perform_task(
         );
 
         // query the NeRF network for the samples
-        nerf->network.inference(
+        ctx.network.inference(
             stream,
+            nerf->params,
             network_batch,
             workspace.network_pos,
             workspace.network_dir,

@@ -260,8 +260,9 @@ void Trainer::update_occupancy_grid(
 			CHECK_DATA(sample_pos_cpu, float, ctx.workspace.sample_pos, 100, ctx.stream);
 
 			// query the density network
-			ctx.nerf->network.inference(
+			ctx.network.inference(
 				ctx.stream,
+				ctx.nerf->params,
 				batch_size,
 				ctx.workspace.sample_pos,
 				nullptr,
@@ -327,8 +328,9 @@ void Trainer::train_step(
 	// Generate training batch
 	generate_next_training_batch(ctx);
 
-	ctx.nerf->network.train(
+	ctx.network.train(
 		ctx.stream,
+		ctx.nerf->params,
 		ctx.workspace.batch_size,
 		ctx.n_rays_in_batch,
 		ctx.n_samples_in_batch,

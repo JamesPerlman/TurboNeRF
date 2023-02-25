@@ -20,16 +20,19 @@ NeRFTrainingController::NeRFTrainingController(Dataset& dataset, NeRFProxy* nerf
 	: dataset(dataset)
 {
 	contexts.reserve(DeviceManager::get_device_count());
-	for (int i = 0; i < DeviceManager::get_device_count(); ++i) {
-		
-		contexts.emplace_back(
-			DeviceManager::get_stream(i), 
-			TrainingWorkspace(i), 
-			&this->dataset,
-			&nerf_proxy->nerfs[i],
-			batch_size
-		);
-	}
+	DeviceManager::foreach_device(
+		[this, &nerf_proxy, &batch_size](const int& device_id, const cudaStream_t& stream) {
+			NeRF* nerf = &nerf_proxy->nerfs[device_id];
+			contexts.emplace_back(
+				stream,
+				TrainingWorkspace(device_id),
+				&this->dataset,
+				nerf,
+				NerfNetwork(device_id),
+				batch_size
+			);
+		}
+	);
 }
 
 // NeRFTrainingController member functions
@@ -48,8 +51,8 @@ void NeRFTrainingController::prepare_for_training() {
 		ctx.batch_size,
 		ctx.nerf->occupancy_grid.n_levels,
 		ctx.nerf->occupancy_grid.resolution_i,
-		ctx.nerf->network.get_concat_buffer_width(),
-		ctx.nerf->network.get_padded_output_width()
+		ctx.network.get_concat_buffer_width(),
+		ctx.network.get_padded_output_width()
 	);
 
 	// Copy dataset's BoundingBox to the GPU
@@ -86,7 +89,7 @@ void NeRFTrainingController::prepare_for_training() {
 	training_step = 0;
 
 	// Initialize the network
-	ctx.nerf->network.prepare_for_training(ctx.stream);
+	ctx.network.prepare_for_training(ctx.stream, ctx.nerf->params);
 }
 
 void NeRFTrainingController::load_images(const cudaStream_t& stream, TrainingWorkspace& workspace) {
