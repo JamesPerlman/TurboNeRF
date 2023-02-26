@@ -18,17 +18,17 @@ class BlenderRenderEngine
 private:
     NeRFRenderingController _renderer;
     CPURenderBuffer _render_target;
-    std::function<void()> _tag_redraw;
+    std::function<void()> _request_redraw;
 
     TwoItemQueue _render_queue;
     DebounceQueue _draw_queue;
 
     GLuint _render_tex_id = 0;
     
-    void request_redraw() {
+    void enqueue_redraw() {
         _draw_queue.push([this]() {
             this->_render_target.synchronize();
-            _tag_redraw();
+            _request_redraw();
         });
     }
     
@@ -47,8 +47,8 @@ public:
 
     /** API METHODS */
 
-    void set_tag_redraw_callback(std::function<void()> tag_redraw) {
-        this->_tag_redraw = tag_redraw;
+    void set_request_redraw_callback(std::function<void()> callback) {
+        this->_request_redraw = callback;
     }
 
     void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
@@ -61,11 +61,11 @@ public:
                 &_render_target,
                 // on_complete
                 [this]() {
-                    this->request_redraw();
+                    this->enqueue_redraw();
                 },
                 // on_progress
                 [this](float progress) {
-                    this->request_redraw();
+                    this->enqueue_redraw();
                 },
                 // on_cancel
                 [this]() {

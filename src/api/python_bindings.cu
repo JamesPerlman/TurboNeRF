@@ -258,7 +258,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     py::class_<BlenderRenderEngine>(m, "BlenderRenderEngine")
         .def(py::init<>())
-        .def("set_tag_redraw_callback", &BlenderRenderEngine::set_tag_redraw_callback)
+        .def("set_request_redraw_callback", &BlenderRenderEngine::set_request_redraw_callback)
         .def(
             "request_render",
             &BlenderRenderEngine::request_render,
