@@ -14,6 +14,9 @@ public:
         const int& n_tasks_per_batch
     ) : RenderTaskFactory(n_rays_per_task, n_tasks_per_batch) {}
 
+    bool can_preview() const override {
+        return true;
+    }
 
     // TODO: this needs some revision/optimization.  It could be better at optimizing hexagon tiling.
     std::vector<RenderTask> create_tasks(const RenderRequest* request) override {
@@ -88,16 +91,16 @@ public:
 
         // the fist task is a hexagonal grid for a low-resolution preview.
         tasks.emplace_back(
-            n_w * n_h,
+            4 * n_w * n_h,
             request->camera,
             request->proxies[0]->get_nerf_ptrs(),
             std::unique_ptr<RayBatchCoordinator>(
                 new HexagonalGridRayBatchCoordinator(
-                    { n_w, n_h },
-                    { o.x + cw / 2, o.y }, // ???
-                    W,
-                    H,
-                    cw
+                    { 2 * n_w, 2 * n_h },
+                    { o.x + cw / 4, o.y }, // ???
+                    W / 2,
+                    H / 2,
+                    cw / 2
                 )
             )
         );
