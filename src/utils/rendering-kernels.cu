@@ -81,7 +81,7 @@ __global__ void generate_rays_pinhole_kernel(
 		t
 	);
 
-	ray_t[i] = intersects_bbox ? fmaxf(0.0f, t + 1e-5f) : 0.0f;
+	ray_t[i] = intersects_bbox ? fmaxf(0.0f, t) + 1e-5f : 0.0f;
 
 	ray_alive[i] = intersects_bbox;
 
@@ -255,7 +255,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 
 		if (grid->is_occupied_at(grid_level, x, y, z)) {
 
-			const uint32_t step_offset_0 = n_steps * n_rays + i; // coalesced!
+			const uint32_t step_offset_0 = n_steps * n_rays + i;
 			const uint32_t step_offset_1 = step_offset_0 + network_stride;
 			const uint32_t step_offset_2 = step_offset_1 + network_stride;
 
