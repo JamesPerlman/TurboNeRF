@@ -305,8 +305,6 @@ void Renderer::perform_task(
             // swap the active and compact buffer indices
             std::swap(active_buf_idx, compact_buf_idx);
 
-            printf("compacted %d rays to %d rays\n", n_rays_alive, n_rays_to_keep);
-
             // update n_rays_alive
             n_rays_alive = n_rays_to_keep;
 
