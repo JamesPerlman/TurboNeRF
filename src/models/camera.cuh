@@ -75,14 +75,11 @@ struct Camera {
 		const int& y
 	) const {
 		// sx and sy are the corresponding x and y in the sensor rect's 2D coordinate system
-		// this will put rays at pixel centers
 		const float sx = sensor_size.x * ((float(x) + 0.5f) / (resolution_f.x) - 0.5f);
 		const float sy = sensor_size.y * ((float(y) + 0.5f) / (resolution_f.y) - 0.5f);
 
-		float3 pix_pos = make_float3(sx, sy, near);
-
-		float3 ray_d = pix_pos;
-		float3 ray_o = pix_pos;
+		float3 ray_o = make_float3(sx, sy, near);
+		float3 ray_d = ray_o;
 
 		return Ray{ ray_o, ray_d };
 	}
@@ -91,10 +88,8 @@ struct Camera {
 		const float sx = sensor_size.x * x;
 		const float sy = sensor_size.y * y;
 
-		float3 pix_pos = make_float3(sx, sy, near);
-
-		float3 ray_d = pix_pos;
-		float3 ray_o = pix_pos;
+		float3 ray_o = make_float3(sx, sy, near);
+		float3 ray_d = ray_o;
 
 		return Ray{ ray_o, ray_d };
 	}
