@@ -1,5 +1,6 @@
 #include <pybind11/functional.h>
 #include <pybind11/numpy.h>
+#include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <string>
@@ -191,12 +192,20 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("height", &OpenGLRenderSurface::height)
     ;
 
+    py::enum_<RenderFlags>(m, "RenderFlags")
+        .value("Preview", RenderFlags::Preview)
+        .value("Final", RenderFlags::Final)
+        .def(py::self | py::self)
+        .def(py::self & py::self)
+    ;
+
     py::class_<RenderRequest, std::shared_ptr<RenderRequest>>(m, "RenderRequest")
         .def(
             py::init<
                 const Camera&,
                 std::vector<NeRFProxy*>&,
                 RenderTarget*,
+                RenderFlags,
                 OnCompleteCallback,
                 OnProgressCallback,
                 OnCancelCallback
@@ -204,6 +213,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("camera"),
             py::arg("nerfs"),
             py::arg("output"),
+            py::arg("flags"),
             py::arg("on_complete") = nullptr,
             py::arg("on_progress") = nullptr,
             py::arg("on_cancel") = nullptr
@@ -263,7 +273,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             "request_render",
             &BlenderRenderEngine::request_render,
             py::arg("camera"),
-            py::arg("nerfs")
+            py::arg("nerfs"),
+            py::arg("flags")
         )
         .def(
             "resize_render_surface",

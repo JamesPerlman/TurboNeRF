@@ -19,6 +19,10 @@ public:
     ) : n_rays_per_task(n_rays_per_task), n_samples_per_task(n_samples_per_task) {};
     
     virtual std::vector<RenderTask> create_tasks(const RenderRequest* request) = 0;
+
+    virtual bool can_preview() const {
+        return false;
+    }
 };
 
 RenderTaskFactory* create_render_task_factory(

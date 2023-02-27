@@ -14,6 +14,19 @@ typedef std::function<void()> OnCancelCallback;
 typedef std::function<void()> OnCompleteCallback;
 typedef std::function<void(float)> OnProgressCallback;
 
+enum class RenderFlags: int {
+    Preview = 1 << 0,
+    Final = 1 << 1,
+};
+
+inline RenderFlags operator|(RenderFlags a, RenderFlags b) {
+    return static_cast<RenderFlags>(static_cast<int>(a) | static_cast<int>(b));
+}
+
+inline RenderFlags operator&(RenderFlags a, RenderFlags b) {
+    return static_cast<RenderFlags>(static_cast<int>(a) & static_cast<int>(b));
+}
+
 struct RenderRequest {
 private:
     bool _canceled = false;
@@ -24,11 +37,13 @@ public:
     const Camera camera;
     std::vector<NeRFProxy*> proxies;
     RenderTarget* output;
+    const RenderFlags flags;
 
     RenderRequest(
         const Camera camera,
         std::vector<NeRFProxy*> proxies,
         RenderTarget* output,
+        const RenderFlags& flags = RenderFlags::Final,
         OnCompleteCallback on_complete = nullptr,
         OnProgressCallback on_progress = nullptr,
         OnCancelCallback on_cancel = nullptr
@@ -36,6 +51,7 @@ public:
         : camera(camera)
         , proxies(proxies)
         , output(output)
+        , flags(flags)
         , _on_complete(on_complete)
         , _on_progress(on_progress)
         , _on_cancel(on_cancel)

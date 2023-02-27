@@ -54,7 +54,7 @@ void NeRFRenderingController::submit(
     this->request = request;
 
     // split this request into batches
-    uint32_t n_rays_per_batch = batch_size / 256;
+    uint32_t n_rays_per_batch = batch_size / 8;
 
     unique_ptr<RenderTaskFactory> factory(
         create_render_task_factory(
@@ -75,17 +75,31 @@ void NeRFRenderingController::submit(
 
     // prepare for rendering and dispatch tasks
     renderer.prepare_for_rendering(ctx, request->camera, request->proxies[0]->nerfs[0], n_rays_max);
-    
-    int i = 0;
-    for (auto& task : tasks) {
-        renderer.perform_task(ctx, task);
-        renderer.write_to_target(ctx, task, request->output);
-        request->on_progress((float)i / (float)tasks.size());
-        ++i;
+
+    // preview task cannot be canceled
+    bool requested_preview = (bool)(request->flags & RenderFlags::Preview);
+    if (factory->can_preview() && requested_preview) {
+        auto& preview_task = tasks[0];
+        renderer.perform_task(ctx, preview_task);
+        renderer.write_to_target(ctx, preview_task, request->output);
+        request->on_progress(1.0f / (float)tasks.size());
+    }
+
+    // final_tasks are all other tasks after the optional first one
+    bool requested_final = (bool)(request->flags & RenderFlags::Final);
+    if (requested_final) {
+        const int final_tasks_start = factory->can_preview() ? 1 : 0;
         
-        if (request->is_canceled()) {
-            request->on_cancel();
-            return;
+        for (int i = final_tasks_start; i < tasks.size(); ++i) {
+            auto& task = tasks[i];
+            renderer.perform_task(ctx, task);
+            renderer.write_to_target(ctx, task, request->output);
+            request->on_progress((float)i / (float)tasks.size());
+            
+            if (request->is_canceled()) {
+                request->on_cancel();
+                return;
+            }
         }
     }
 

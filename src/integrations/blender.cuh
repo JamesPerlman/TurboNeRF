@@ -51,14 +51,15 @@ public:
         this->_request_redraw = callback;
     }
 
-    void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
+    void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies, const RenderFlags& flags) {
         _renderer.cancel();
 
-        _render_queue.push([this, camera, proxies]() {
+        _render_queue.push([this, camera, proxies, flags]() {
             auto request = std::make_shared<RenderRequest>(
                 camera,
                 proxies,
                 &_render_target,
+                flags,
                 // on_complete
                 [this]() {
                     this->enqueue_redraw();
