@@ -22,11 +22,6 @@ struct NeRF {
         , occupancy_grid(device_id, OccupancyGrid::get_max_n_levels(bounding_box.size_x), 128)
     { };
     
-    // TODO:
-    // transform
-    // bounding box (training, rendering)
-    // masks
-    // distortions :D
 };
 
 NRC_NAMESPACE_END

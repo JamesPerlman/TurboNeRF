@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "../common.h"
-
+#include "dataset.h"
 #include "nerf.cuh"
 
 NRC_NAMESPACE_BEGIN
@@ -17,6 +17,13 @@ NRC_NAMESPACE_BEGIN
 
 struct NeRFProxy {
     std::vector<NeRF> nerfs;
+    bool visible = true;
+    
+    // TODO:
+    // transform
+    // bounding box (training, rendering)
+    // masks
+    // distortions
 
     BoundingBox get_bounding_box() const {
         return nerfs[0].bounding_box;
