@@ -97,6 +97,7 @@ set(HEADERS
 	src/utils/occupancy-grid-kernels.cuh
 	src/utils/parallel-utils.cuh
 	src/utils/queues.h
+	src/utils/render-flags.cuh
 	src/utils/rendering-kernels.cuh
 	src/utils/stream-compaction.cuh
 	src/utils/training-batch-kernels.cuh

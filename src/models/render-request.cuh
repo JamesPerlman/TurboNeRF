@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "../render-targets/render-target.cuh"
+#include "../utils/render-flags.cuh"
 #include "../common.h"
 #include "camera.cuh"
 #include "nerf-proxy.cuh"
@@ -13,19 +14,6 @@ NRC_NAMESPACE_BEGIN
 typedef std::function<void()> OnCancelCallback;
 typedef std::function<void()> OnCompleteCallback;
 typedef std::function<void(float)> OnProgressCallback;
-
-enum class RenderFlags: int {
-    Preview = 1 << 0,
-    Final = 1 << 1,
-};
-
-inline RenderFlags operator|(RenderFlags a, RenderFlags b) {
-    return static_cast<RenderFlags>(static_cast<int>(a) | static_cast<int>(b));
-}
-
-inline RenderFlags operator&(RenderFlags a, RenderFlags b) {
-    return static_cast<RenderFlags>(static_cast<int>(a) & static_cast<int>(b));
-}
 
 struct RenderRequest {
 private:
