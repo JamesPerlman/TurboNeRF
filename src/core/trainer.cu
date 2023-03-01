@@ -256,8 +256,6 @@ void Trainer::update_occupancy_grid(
 				ctx.workspace.sample_pos
 			);
 
-			CHECK_DATA(sample_pos_cpu, float, ctx.workspace.sample_pos, 100, ctx.stream);
-
 			// query the density network
 			ctx.network.inference(
 				ctx.stream,
