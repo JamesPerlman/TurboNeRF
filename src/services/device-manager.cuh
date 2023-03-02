@@ -34,7 +34,7 @@ private:
     const cudaStream_t& _get_stream(int device) {
         const int n_devices = _get_device_count();
 
-        if (_streams.size() <= n_devices) {
+        if (_streams.size() < n_devices) {
             // if this is the first call, we need to create streams for each device
             
             int prev_device;
