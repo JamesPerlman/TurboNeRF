@@ -91,15 +91,15 @@ void NeRFRenderingController::submit(
         const int final_tasks_start = factory->can_preview() ? 1 : 0;
         
         for (int i = final_tasks_start; i < tasks.size(); ++i) {
-            auto& task = tasks[i];
-            renderer.perform_task(ctx, task);
-            renderer.write_to_target(ctx, task, request->output);
-            request->on_progress((float)i / (float)tasks.size());
-            
             if (request->is_canceled()) {
                 request->on_cancel();
                 return;
             }
+
+            auto& task = tasks[i];
+            renderer.perform_task(ctx, task);
+            renderer.write_to_target(ctx, task, request->output);
+            request->on_progress((float)i / (float)tasks.size());
         }
     }
 
