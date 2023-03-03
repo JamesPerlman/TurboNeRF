@@ -54,6 +54,19 @@ inline __host__ void hex_get_W_and_cw(
 }
 
 /**
+ * Gets the number of pixels covered by the hexagon (area)
+ * 
+ */
+
+inline __host__ int hex_get_npix(
+    const int& H,
+    const int& W,
+    const int& cw
+) {
+    return H * (W + cw) / 2;
+}
+
+/**
  * This gets the height of the hexagon given a requested number of pixels and an aspect ratio.
  * 
  */
