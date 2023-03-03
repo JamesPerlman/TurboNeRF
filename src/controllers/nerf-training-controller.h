@@ -21,7 +21,7 @@ NRC_NAMESPACE_BEGIN
 
 struct NeRFTrainingController {
 	// constructor
-	NeRFTrainingController(Dataset& dataset, NeRFProxy* nerf_proxy, const uint32_t batch_size);
+	NeRFTrainingController(Dataset* dataset, NeRFProxy* nerf_proxy, const uint32_t batch_size);
 
 	// public properties
 
@@ -38,14 +38,12 @@ private:
 	// private properties
 	std::vector<Trainer::Context> contexts;
 
-	Dataset dataset;
-
 	Trainer trainer;
 
 	uint32_t training_step;
 	
 	// private methods
-	void load_images(const cudaStream_t& stream, TrainingWorkspace& workspace);
+	void load_images(Trainer::Context& ctx);
 };
 
 NRC_NAMESPACE_END

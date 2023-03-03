@@ -77,7 +77,7 @@ void NeRFRenderingController::submit(
     renderer.prepare_for_rendering(ctx, request->camera, request->proxies[0]->nerfs[0], n_rays_max);
 
     // preview task cannot be canceled
-    bool requested_preview = (bool)(request->flags & RenderFlags::Preview);
+    bool requested_preview = (request->flags & RenderFlags::Preview) == RenderFlags::Preview;
     if (factory->can_preview() && requested_preview) {
         auto& preview_task = tasks[0];
         renderer.perform_task(ctx, preview_task);
@@ -86,7 +86,7 @@ void NeRFRenderingController::submit(
     }
 
     // final_tasks are all other tasks after the optional first one
-    bool requested_final = (bool)(request->flags & RenderFlags::Final);
+    bool requested_final = (request->flags & RenderFlags::Final) == RenderFlags::Final;
     if (requested_final) {
         const int final_tasks_start = factory->can_preview() ? 1 : 0;
         

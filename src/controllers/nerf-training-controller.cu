@@ -16,17 +16,16 @@ using namespace nrc;
 using namespace tcnn;
 using namespace nlohmann;
 
-NeRFTrainingController::NeRFTrainingController(Dataset& dataset, NeRFProxy* nerf_proxy, const uint32_t batch_size)
-	: dataset(dataset)
+NeRFTrainingController::NeRFTrainingController(Dataset* dataset, NeRFProxy* nerf_proxy, const uint32_t batch_size)
 {
 	contexts.reserve(DeviceManager::get_device_count());
 	DeviceManager::foreach_device(
-		[this, &nerf_proxy, &batch_size](const int& device_id, const cudaStream_t& stream) {
+		[this, nerf_proxy, batch_size, dataset](const int& device_id, const cudaStream_t& stream) {
 			NeRF* nerf = &nerf_proxy->nerfs[device_id];
 			contexts.emplace_back(
 				stream,
 				TrainingWorkspace(device_id),
-				&this->dataset,
+				dataset,
 				nerf,
 				NerfNetwork(device_id),
 				batch_size
@@ -41,7 +40,16 @@ void NeRFTrainingController::prepare_for_training() {
 
 	// we only prepare the first NeRF (for the first device) - the rest we will copy data to
 	auto& ctx = contexts[0];
+	
+	// TODO: we should not initialize an occupancy grid if one already exists (aka if we loaded the nerf from a file)
+	ctx.nerf->occupancy_grid.initialize(ctx.stream, true);
 
+	// Initialize occupancy grid bitfield (all bits set to 1)
+	ctx.nerf->occupancy_grid.set_bitfield(ctx.stream, 0b11111111);
+	
+	// Density can be set to zero, but probably doesn't need to be set at all
+	ctx.nerf->occupancy_grid.set_density(ctx.stream, 0);
+	
 	// This allocates memory for all the elements we need during training
 	ctx.workspace.enlarge(
 		ctx.stream,
@@ -78,10 +86,10 @@ void NeRFTrainingController::prepare_for_training() {
 	);
 
 	// Copy training cameras to the GPU
-	ctx.workspace.cameras.resize_and_copy_from_host(dataset.cameras);
+	ctx.workspace.cameras.resize_and_copy_from_host(ctx.dataset->cameras);
 
 	// Load all images into GPU memory!
-	load_images(ctx.stream, ctx.workspace);
+	load_images(ctx);
 
 	// create the undistort map for camera 0 - assumption: all cameras have identical dist_params params
 	trainer.create_pixel_undistort_map(ctx);
@@ -92,20 +100,20 @@ void NeRFTrainingController::prepare_for_training() {
 	ctx.network.prepare_for_training(ctx.stream, ctx.nerf->params);
 }
 
-void NeRFTrainingController::load_images(const cudaStream_t& stream, TrainingWorkspace& workspace) {
+void NeRFTrainingController::load_images(Trainer::Context& ctx) {
 	// make sure images are all loaded into CPU and GPU
 	// TODO: can we read images from a stream and load them directly into GPU memory? Probably!
-	size_t n_image_elements = dataset.n_channels_per_image * dataset.n_pixels_per_image;
+	size_t n_image_elements = ctx.dataset->n_channels_per_image * ctx.dataset->n_pixels_per_image;
 	size_t image_size = n_image_elements * sizeof(stbi_uc);
 
-	dataset.load_images_in_parallel(
-		[this, &image_size, &n_image_elements, &workspace, &stream](const size_t& image_index, const TrainingImage& image) {
+	ctx.dataset->load_images_in_parallel(
+		[this, &image_size, &n_image_elements, &ctx](const size_t& image_index, const TrainingImage& image) {
 			CUDA_CHECK_THROW(cudaMemcpyAsync(
-				workspace.image_data + image_index * n_image_elements,
+				ctx.workspace.image_data + image_index * n_image_elements,
 				image.data_cpu.get(),
 				image_size,
 				cudaMemcpyHostToDevice,
-				stream
+				ctx.stream
 			));
 		}
 	);

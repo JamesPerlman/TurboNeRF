@@ -91,10 +91,10 @@ int main(int argc, char* argv[])
 
 	auto nerf_manager = nrc::NeRFManager();
 
-	auto nerf = nerf_manager.create_trainable(dataset.bounding_box);
+	auto nerf = nerf_manager.create(dataset.bounding_box);
 
 	// set up training controller
-	auto trainer = nrc::NeRFTrainingController(dataset, nerf, NeRFConstants::batch_size);
+	auto trainer = nrc::NeRFTrainingController(&dataset, nerf, NeRFConstants::batch_size);
 	trainer.prepare_for_training();
 
 	// set up rendering controller
@@ -137,7 +137,14 @@ int main(int argc, char* argv[])
 			auto render_request = std::make_shared<RenderRequest>(
 				render_cam,
 				proxy_ptrs,
-				&render_buffer
+				&render_buffer,
+				RenderFlags::Final,
+				// on_complete
+				[]() {},
+				// on_progress, save image
+				[&](float progress) {
+					// render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}-{}.png", progress, i), stream);
+				}
 			);
 
 			renderer.submit(render_request);

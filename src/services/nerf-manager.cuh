@@ -33,7 +33,7 @@ public:
 	}
 
 	// create a new nerf
-	NeRFProxy* create_trainable(
+	NeRFProxy* create(
 		const BoundingBox& bbox
 	) {
 		proxies.emplace_back();
@@ -44,15 +44,6 @@ public:
 		DeviceManager::foreach_device([&](const int& device_id, const cudaStream_t& stream) {
 			proxy.nerfs.emplace_back(device_id, bbox);
 			NeRF& nerf = proxy.nerfs.back();
-			
-			// for now we will initialize the occupancy grid here, but it should probably done somewhere else
-			nerf.occupancy_grid.initialize(stream, true);
-
-			// Initialize occupancy grid bitfield (all bits set to 1)
-			nerf.occupancy_grid.set_bitfield(stream, 0b11111111);
-			
-			// Density can be set to zero, but probably doesn't need to be set at all
-			nerf.occupancy_grid.set_density(stream, 0);
 		});
 
 		return &proxy;

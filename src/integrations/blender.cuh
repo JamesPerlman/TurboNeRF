@@ -2,8 +2,10 @@
 
 #include <glad/glad.h>
 #include <memory>
+#include <optional>
 
 #include "../controllers/nerf-rendering-controller.h"
+#include "../controllers/nerf-training-controller.h"
 #include "../models/camera.cuh"
 #include "../models/nerf-proxy.cuh"
 #include "../models/render-request.cuh"
@@ -13,15 +15,21 @@
 
 NRC_NAMESPACE_BEGIN
 
-class BlenderRenderEngine 
+class BlenderBridge 
 {
 private:
     NeRFRenderingController _renderer;
+    std::optional<NeRFTrainingController> _trainer;
     CPURenderBuffer _render_target;
     std::function<void()> _request_redraw;
+    std::function<void(uint32_t)> _training_callback;
 
     TwoItemQueue _render_queue;
     DebounceQueue _draw_queue;
+
+    std::future<void> _runloop_future;
+    bool _keep_runloop_alive = false;
+    bool _is_training = false;
 
     GLuint _render_tex_id = 0;
     
@@ -30,11 +38,12 @@ private:
             this->_render_target.synchronize();
             _request_redraw();
         });
+        _draw_queue.work();
     }
     
 public:
 
-    BlenderRenderEngine()
+    BlenderBridge()
         : _renderer()
         , _render_queue()
         , _draw_queue(1)
@@ -45,13 +54,87 @@ public:
     };
 
 
-    /** API METHODS */
+    /**
+     * THE RUN LOOP
+     * 
+     * Training and rendering can be done in an asynchronous run loop, however they must be performed serially in the same background thread.
+     * 
+     * This run loop serves as a sort of scheduler for the training and rendering operations.
+     * 
+     */
+private:
+    void runloop_worker() {
+        do {
+            // train a single step
+            if (_is_training && _trainer.has_value()) {
+                _trainer->train_step();
+                if (_training_callback != nullptr) {
+                    _training_callback(_trainer->get_training_step());
+                }
+            }
 
-    void set_request_redraw_callback(std::function<void()> callback) {
-        this->_request_redraw = callback;
+            // check if we need to render
+            _render_queue.work();
+            _render_queue.wait();
+
+        } while (_keep_runloop_alive);
     }
 
+    void start_runloop(bool keep_alive) {
+        bool worker_inactive = !_runloop_future.valid() || _runloop_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+        
+        if (worker_inactive) {
+            _keep_runloop_alive = keep_alive;
+            // start the run loop
+            _runloop_future = std::async(
+                std::launch::async,
+                [this]() {
+                    this->runloop_worker();
+                }
+            );
+        }
+    }
+
+    void stop_runloop() {
+        _keep_runloop_alive = false;
+    }
+
+    /** TRAINING **/
+public:
+
+    bool can_train() const {
+        return _trainer.has_value();
+    }
+
+    bool is_training() const {
+        return _is_training;
+    }
+
+    void prepare_for_training(Dataset* dataset, NeRFProxy* proxy, const uint32_t& batch_size = NeRFConstants::batch_size) {
+        if (!_trainer.has_value()) {
+            _trainer = NeRFTrainingController(dataset, proxy, batch_size);
+            _trainer->prepare_for_training();
+        }
+    }
+
+    void start_training() {
+        _is_training = true;
+        start_runloop(true);
+    }
+
+    void stop_training() {
+        _is_training = false;
+        stop_runloop();
+    }
+
+    void set_training_callback(std::function<void(uint32_t)> callback) {
+        this->_training_callback = callback;
+    }
+
+    /** RENDERING **/
+public:
     void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies, const RenderFlags& flags) {
+        printf("render flags: %d\n", static_cast<int>(flags));
         _renderer.cancel();
 
         _render_queue.push([this, camera, proxies, flags]() {
@@ -76,11 +159,24 @@ public:
 
             _renderer.submit(request);
         });
+
+        start_runloop(false);
+    }
+
+    void set_request_redraw_callback(std::function<void()> callback) {
+        this->_request_redraw = callback;
     }
 
     void resize_render_surface(const uint32_t& width, const uint32_t& height) {
         _render_target.set_size(width, height);
     }
+    
+    /**
+     * The following functionality was adapted from the Pixar RenderMan for Blender plugin.
+     * https://github.com/prman-pixar/RenderManForBlender/blob/main/display_driver/d_blender.cpp#L335
+     * 
+     */
+private:
 
     // create or resize render texture
     void update_render_texture() {
@@ -106,19 +202,12 @@ public:
 
         glBindTexture(GL_TEXTURE_2D, 0);
     }
-    /**
-     * The following functionality was adapted from the Pixar RenderMan for Blender plugin.
-     * https://github.com/prman-pixar/RenderManForBlender/blob/main/display_driver/d_blender.cpp#L335
-     * 
-     * This will always be called from Blender's view_draw() function
-     */
+
+public:
+    // This will always be called from Blender's view_draw() function
 
     void draw()
     {
-        // For some reason these calls make rendering a little bit smoother
-        // glFlush();
-        // glFinish();
-
         update_render_texture();
 
         // copy render data

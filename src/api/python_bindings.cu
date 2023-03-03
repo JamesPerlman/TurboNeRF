@@ -192,11 +192,13 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("height", &OpenGLRenderSurface::height)
     ;
 
-    py::enum_<RenderFlags>(m, "RenderFlags")
+    py::enum_<RenderFlags>(m, "RenderFlags", py::arithmetic())
         .value("Preview", RenderFlags::Preview)
         .value("Final", RenderFlags::Final)
         .def(py::self | py::self)
         .def(py::self & py::self)
+        .def(py::self |= py::self)
+        .def(py::self &= py::self)
     ;
 
     py::class_<RenderRequest, std::shared_ptr<RenderRequest>>(m, "RenderRequest")
@@ -240,7 +242,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<NeRFTrainingController>(m, "Trainer")
         .def(
             py::init<
-                Dataset&,
+                Dataset*,
                 NeRFProxy*,
                 const uint32_t&
             >(),
@@ -266,23 +268,35 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
      * Integration classes
      */
 
-    py::class_<BlenderRenderEngine>(m, "BlenderRenderEngine")
+    py::class_<BlenderBridge>(m, "BlenderBridge")
         .def(py::init<>())
-        .def("set_request_redraw_callback", &BlenderRenderEngine::set_request_redraw_callback)
+        .def("can_train", &BlenderBridge::can_train)
+        .def("is_training", &BlenderBridge::is_training)
+        .def(
+            "prepare_for_training",
+            &BlenderBridge::prepare_for_training,
+            py::arg("dataset"),
+            py::arg("proxy"),
+            py::arg("batch_size")
+        )
+        .def("start_training", &BlenderBridge::start_training)
+        .def("stop_training", &BlenderBridge::stop_training)
+        .def("set_training_callback", &BlenderBridge::set_training_callback)
+        .def("set_request_redraw_callback", &BlenderBridge::set_request_redraw_callback)
         .def(
             "request_render",
-            &BlenderRenderEngine::request_render,
+            &BlenderBridge::request_render,
             py::arg("camera"),
             py::arg("nerfs"),
             py::arg("flags")
         )
         .def(
             "resize_render_surface",
-            &BlenderRenderEngine::resize_render_surface,
+            &BlenderBridge::resize_render_surface,
             py::arg("width"),
             py::arg("height")
         )
-        .def("draw", &BlenderRenderEngine::draw)
+        .def("draw", &BlenderBridge::draw)
     ;
 
     /**
@@ -292,8 +306,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<NeRFManager>(m, "Manager")
         .def(py::init<>())
         .def(
-            "create_trainable",
-            &NeRFManager::create_trainable,
+            "create",
+            &NeRFManager::create,
             py::arg("bbox"),
             py::return_value_policy::reference
         )
