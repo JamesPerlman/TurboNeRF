@@ -79,7 +79,7 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t n_samples,
     const uint32_t start_idx,
     const uint32_t level,
-    const float selection_threshold,
+    const bool sample_all_cells,
     const float decay_factor,
     const float* __restrict__ random_float,
     const tcnn::network_precision_t* __restrict__ network_sigma,
@@ -92,16 +92,24 @@ __global__ void update_occupancy_with_density_kernel(
 
     const uint32_t idx = i + start_idx;
 
-    // (selection_threshold * 100)% of cells are sampled randomly, and half of the rest are sampled based on the current occupancy
-    // if (selection_threshold < random_float[i]) {
-    //     if (selection_threshold < 0.5f * random_float[i]) {
-    //         if (!grid->is_occupied_at(level, idx)) {
-    //             return;
-    //         }
-    //     } else {
-    //         return;
-    //     }
-    // }
+    if (!sample_all_cells) {
+        const float random = random_float[i];
+        // only sample half of all cells
+        if (random > 0.5f) {
+            return;
+        }
+
+        // partition the remaining cells into two sets.
+        if (random < 0.25f) {
+            // the first half get sampled uniformly.
+            // passthrough here, don't return early
+        } else {
+            // for the second half, only sample cells that are currently occupied.
+            if (!grid->is_occupied_at(level, idx)) {
+                return;
+            }
+        }
+    }
 
     grid->update_sigma_at(level, idx, (float)network_sigma[i], decay_factor);
 }

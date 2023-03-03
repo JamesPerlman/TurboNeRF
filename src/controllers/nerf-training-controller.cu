@@ -129,8 +129,8 @@ void NeRFTrainingController::train_step() {
 	++training_step;
 }
 
-void NeRFTrainingController::update_occupancy_grid(const float& selection_threshold) {
+void NeRFTrainingController::update_occupancy_grid(const uint32_t& training_step) {
 	// TODO: multi-gpu training.  For now we just update the occupancy grid on the first device.
 	auto& ctx = contexts[0];
-	trainer.update_occupancy_grid(ctx, selection_threshold);
+	trainer.update_occupancy_grid(ctx, training_step);
 }

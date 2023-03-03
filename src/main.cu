@@ -116,8 +116,7 @@ int main(int argc, char* argv[])
 
 		if (i % 16 == 0 && i > 0) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
-			const float cell_selection_threshold = i > 256 ? 0.5f : 1.0f;
-			trainer.update_occupancy_grid(cell_selection_threshold);
+			trainer.update_occupancy_grid(i);
 		}
 
 		if (i % 16 == 0 && i > 0) {

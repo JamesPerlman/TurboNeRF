@@ -28,7 +28,7 @@ struct NeRFTrainingController {
 	// public methods
 	void prepare_for_training();
 	void train_step();
-	void update_occupancy_grid(const float& selection_threshold);
+	void update_occupancy_grid(const uint32_t& training_step);
 
 	uint32_t get_training_step() const {
 		return training_step;
