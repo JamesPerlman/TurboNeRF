@@ -118,6 +118,7 @@ public:
     }
 
     void start_training() {
+        cancel_render();
         _is_training = true;
         start_runloop(true);
     }
@@ -133,10 +134,13 @@ public:
 
     /** RENDERING **/
 public:
-    void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies, const RenderFlags& flags) {
-        printf("render flags: %d\n", static_cast<int>(flags));
+    void cancel_render() {
         _renderer.cancel();
+    }
 
+    void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies, const RenderFlags& flags) {
+        cancel_render();
+        
         _render_queue.push([this, camera, proxies, flags]() {
             auto request = std::make_shared<RenderRequest>(
                 camera,
