@@ -7,13 +7,13 @@ NRC_NAMESPACE_BEGIN
 RenderTaskFactory* create_render_task_factory(
     const RenderPattern& pattern,
     const int& n_rays_per_task,
-    const int& n_samples_per_task
+    const int& n_rays_per_preview
 ) {
     switch(pattern) {
         case RenderPattern::HexagonalGrid:
-            return new HexagonalGridRenderTaskFactory(n_rays_per_task, n_samples_per_task);
+            return new HexagonalGridRenderTaskFactory(n_rays_per_task, n_rays_per_preview);
         case RenderPattern::RectangularGrid:
-            return new RectangularGridRenderTaskFactory(n_rays_per_task, n_samples_per_task);
+            return new RectangularGridRenderTaskFactory(n_rays_per_task, n_rays_per_preview);
     }
     return nullptr;
 }

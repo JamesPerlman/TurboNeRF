@@ -11,12 +11,12 @@ NRC_NAMESPACE_BEGIN
 class RenderTaskFactory {
 public:
     const int n_rays_per_task;
-    const int n_samples_per_task;
+    const int n_rays_per_preview;
 
     RenderTaskFactory(
         const int n_rays_per_task,
-        const int n_samples_per_task
-    ) : n_rays_per_task(n_rays_per_task), n_samples_per_task(n_samples_per_task) {};
+        const int n_rays_per_preview = 0
+    ) : n_rays_per_task(n_rays_per_task), n_rays_per_preview(n_rays_per_preview) {};
     
     virtual std::vector<RenderTask> create_tasks(const RenderRequest* request) = 0;
 
@@ -28,7 +28,7 @@ public:
 RenderTaskFactory* create_render_task_factory(
     const RenderPattern& pattern,
     const int& n_rays_per_task,
-    const int& n_samples_per_task
+    const int& n_rays_per_preview = 0
 );
 
 NRC_NAMESPACE_END

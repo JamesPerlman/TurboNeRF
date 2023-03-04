@@ -55,12 +55,13 @@ void NeRFRenderingController::submit(
 
     // split this request into batches
     uint32_t n_rays_per_batch = batch_size / 8;
+    uint32_t n_rays_per_preview = 1<<14;
 
     unique_ptr<RenderTaskFactory> factory(
         create_render_task_factory(
             pattern,
             n_rays_per_batch,
-            batch_size
+            n_rays_per_preview
         )
     );
 
