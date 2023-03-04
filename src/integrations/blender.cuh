@@ -81,10 +81,13 @@ private:
     }
 
     void start_runloop(bool keep_alive) {
+        if (keep_alive) {
+            _keep_runloop_alive = true;
+        }
+
         bool worker_inactive = !_runloop_future.valid() || _runloop_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
         
         if (worker_inactive) {
-            _keep_runloop_alive = keep_alive;
             // start the run loop
             _runloop_future = std::async(
                 std::launch::async,
