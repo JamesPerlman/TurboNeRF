@@ -50,7 +50,7 @@ for i in range(1024):
     trainer.train_step()
 
     if i % 16 == 0 and i > 0:
-        trainer.update_occupancy_grid(0.9)
+        trainer.update_occupancy_grid(i)
 
     if i % 32 == 0 and i > 0:
 
