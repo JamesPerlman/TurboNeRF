@@ -189,11 +189,10 @@ public:
 	inline __device__ float update_sigma_at(
 		const int& level,
 		const uint32_t& byte_idx,
-		const float& value,
-		const float& decay_factor
+		const float& value
 	) {
 		float* ptr = density + level * volume_i + byte_idx;
-		*ptr = 0.5f * ((*ptr * decay_factor) + value);
+		*ptr = fmaxf(value, *ptr);
 	}
 
 	/* From Müller, et al. 2022

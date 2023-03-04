@@ -13,22 +13,22 @@ NRC_NAMESPACE_BEGIN
 
 // occupancy cell values first get decayed by a factor (default 0.95) every update
 __global__ void decay_occupancy_grid_values_kernel(
-    const uint32_t n_cells_per_level,
-    const uint32_t n_levels,
-    const float factor,
-    float* __restrict__ grid_sigma
+    OccupancyGrid* grid,
+    const float factor
 ) {
     const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= n_cells_per_level) {
+    const uint32_t volume = grid->volume_i;
+
+    if (idx >= volume) {
         return;
     }
 
-    float* d = grid_sigma + idx;
+    float* d = grid->get_density() + idx;
 
     #pragma unroll
-    for (int i = 0; i < n_levels; ++i) {
+    for (int i = 0; i < grid->n_levels; ++i) {
         *d *= factor;
-        d += n_cells_per_level;
+        d += volume;
     }
 }
 
@@ -80,7 +80,6 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t start_idx,
     const uint32_t level,
     const bool sample_all_cells,
-    const float decay_factor,
     const float* __restrict__ random_float,
     const tcnn::network_precision_t* __restrict__ network_sigma,
     OccupancyGrid* grid
@@ -111,7 +110,7 @@ __global__ void update_occupancy_with_density_kernel(
         }
     }
 
-    grid->update_sigma_at(level, idx, (float)network_sigma[i], decay_factor);
+    grid->update_sigma_at(level, idx, (float)network_sigma[i]);
 }
 
 // occupancy bits are updated by thresholding each cell's density, default = 0.01 * 1024 / sqrt(3)

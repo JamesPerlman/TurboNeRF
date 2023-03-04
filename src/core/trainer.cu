@@ -225,6 +225,12 @@ void Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& train
 	const uint32_t n_levels = ctx.nerf->occupancy_grid.n_levels;
 	const float inv_aabb_size = 1.0f / ctx.nerf->bounding_box.size_x;
 
+	// decay occupancy grid values
+	decay_occupancy_grid_values_kernel<<<n_blocks_linear(grid_volume), n_threads_linear, 0, ctx.stream>>>(
+		ctx.workspace.occupancy_grid,
+		NeRFConstants::occupancy_decay
+	);
+
 	// loop through each grid level, querying the network for the density at each cell and updating the occupancy grid's density
 	for (int level = 0; level < n_levels; ++level) {
 
@@ -271,7 +277,6 @@ void Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& train
 				n_cells_updated,
 				level,
 				training_step < 256,
-				NeRFConstants::occupancy_decay,
 				ctx.workspace.random_float + 3 * batch_size, // (random_float + 3 * batch_size) is so thresholding doesn't correspond to x,y,z positions
 				ctx.workspace.network_output + 3 * batch_size,
 				ctx.workspace.occupancy_grid

@@ -9,10 +9,8 @@
 NRC_NAMESPACE_BEGIN
 
 __global__ void decay_occupancy_grid_values_kernel(
-    const uint32_t n_cells_per_level,
-    const uint32_t n_levels,
-    const float factor,
-    float* __restrict__ grid_sigma
+    OccupancyGrid* grid,
+    const float factor
 );
 
 __global__ void generate_grid_cell_network_sample_points_kernel(
@@ -31,7 +29,6 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t start_idx,
     const uint32_t level,
     const bool sample_all_cells,
-    const float decay_factor,
     const float* __restrict__ random_float,
     const tcnn::network_precision_t* __restrict__ network_sigma,
     OccupancyGrid* grid
