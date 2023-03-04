@@ -1,10 +1,14 @@
-## LATEST UPDATE
+## PRE-RELEASE TO-DO LIST
+- [x] Python API
+- [x] Blender Bridge
+- [ ] Save NeRF  
+- [ ] Load NeRF  
+- [ ] Multi-GPU  
+- [ ] Multi-NeRF  
+- [ ] Downloadable Binary  
 
-Python API is working! Check examples/ folder.  
-Workin on the Blender integration now.
-Estimated ETA on the Blender plugin is ~March 14, 2022  
-Still a lot to do...  
-After the Blender integration is complete, I will release a binary along with the [addon codebase](https://github.com/JamesPerlman/blender_nerf_tools)
+Wishlist:
+- [ ] Drastically improve rendering quality / reduce training loss  
 
 ## INTRODUCTION
 
