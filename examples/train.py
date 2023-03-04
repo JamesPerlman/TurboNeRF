@@ -19,7 +19,7 @@ manager = tn.Manager()
 
 dataset = tn.Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json")
 
-nerf = manager.create_trainable(dataset.bounding_box)
+nerf = manager.create(dataset.bounding_box)
 
 trainer = tn.Trainer(dataset, nerf, batch_size=2<<21)
 
