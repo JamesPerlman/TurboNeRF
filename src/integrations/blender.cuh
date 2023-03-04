@@ -69,7 +69,11 @@ private:
             if (_is_training && _trainer.has_value()) {
                 _trainer->train_step();
                 if (_training_callback != nullptr) {
-                    _training_callback(_trainer->get_training_step());
+                    auto training_step = _trainer->get_training_step();
+                    if (training_step % 16 == 0) {
+                        _trainer->update_occupancy_grid(training_step);
+                    }
+                    _training_callback(training_step);
                 }
             }
 
