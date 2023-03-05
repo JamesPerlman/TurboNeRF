@@ -106,7 +106,7 @@ struct TrainingWorkspace: Workspace {
 		// need to upgrade to C++20 to use typename parameters in lambdas :(
 		// auto alloc = []<typename T>(size_t size) { return allocate<T>(stream, size); };
 
-		occupancy_grid 		= allocate<OccupancyGrid>(stream, 1);
+		occupancy_grid 	= allocate<OccupancyGrid>(stream, 1);
 		bounding_box 	= allocate<BoundingBox>(stream, 1);
 		image_data 		= allocate<stbi_uc>(stream, n_pixel_elements);
 
