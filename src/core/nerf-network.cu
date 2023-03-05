@@ -19,7 +19,7 @@ using json = nlohmann::json;
 
 
 #if TCNN_HALF_PRECISION
-    constexpr float LOSS_SCALE = 128.0f;
+    constexpr float LOSS_SCALE = 1024.0f;
 #else
     constexpr float LOSS_SCALE = 1.0f;
 #endif
