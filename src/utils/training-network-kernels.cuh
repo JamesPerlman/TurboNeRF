@@ -234,6 +234,21 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
     }
 }
 
+// smooth L1 loss helpers (beta = 1.0f)
+inline __device__ float smooth_l1_loss_forward(const float& x) {
+	const float absx = fabsf(x);
+	return absx < 1.0f
+		? 0.5f * x * x
+		: absx - 0.5f;
+}
+
+// TODO: put these in a separate file
+inline __device__ float smooth_l1_loss_backward(const float& x) {
+	return fabsf(x) < 1.0f
+		? x
+		: copysignf(1.0f, x);
+}
+
 // RGBA to loss
 __global__ void ray_rgba_to_loss_forward_kernel(
 	const uint32_t n_rays,
@@ -262,17 +277,17 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
 	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
 
-	sse_loss[r_idx] = (dr * dr);
-	sse_loss[g_idx] = (dg * dg);
-	sse_loss[b_idx] = (db * db);
-	sse_loss[a_idx] = (da * da);
+	sse_loss[r_idx] = fabsf(dr) < smooth_l1_loss_forward(dr);
+	sse_loss[g_idx] = fabsf(dg) < smooth_l1_loss_forward(dg);
+	sse_loss[b_idx] = fabsf(db) < smooth_l1_loss_forward(db);
+	sse_loss[a_idx] = fabsf(da) < smooth_l1_loss_forward(da);
 }
 
 // dL/dR = (1/4) * (dL/dR_r + dL/dR_g + dL/dR_b + dL/dR_a)
 __global__ void ray_rgba_to_loss_backward_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
-	const float inv_2nrays,
+	const float inv_4nrays,
 	const float* __restrict__ ray_rgba,
 	const float* __restrict__ target_rgba,
 	float* __restrict__ dL_dR
@@ -293,10 +308,10 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
 	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
 
-	dL_dR[r_idx] = inv_2nrays * dr;
-	dL_dR[g_idx] = inv_2nrays * dg;
-	dL_dR[b_idx] = inv_2nrays * db;
-	dL_dR[a_idx] = inv_2nrays * da;
+	dL_dR[r_idx] = inv_4nrays * smooth_l1_loss_backward(dr);
+	dL_dR[g_idx] = inv_4nrays * smooth_l1_loss_backward(dg);
+	dL_dR[b_idx] = inv_4nrays * smooth_l1_loss_backward(db);
+	dL_dR[a_idx] = inv_4nrays * smooth_l1_loss_backward(da);
 }
 
 NRC_NAMESPACE_END
