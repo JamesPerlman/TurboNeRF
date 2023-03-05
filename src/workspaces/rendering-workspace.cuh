@@ -51,7 +51,6 @@ struct RenderingWorkspace: Workspace {
 	float* rgba;
 	uint32_t n_rays = 0;
 
-	// samples
 	void enlarge(
 		const cudaStream_t& stream,
 		const uint32_t& n_pixels,
