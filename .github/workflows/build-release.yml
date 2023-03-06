@@ -8,6 +8,9 @@ on:
       - release
 jobs:
   build:
+    defaults:
+      run:
+        shell: bash -l {0}
     runs-on: windows-latest
     steps:
       - name: Setup Conda
