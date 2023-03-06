@@ -14,7 +14,7 @@ jobs:
     runs-on: windows-2022
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       
       - name: Install CMake
         uses: lukka/get-cmake@v3.24.2
@@ -33,12 +33,9 @@ jobs:
           environment-file: etc/py310.yml
           auto-activate-base: false
       
-      - name: Build
-        uses: lukka/run-cmake@v3
-        with:
-          cmakeBuildType: release
-          cmakeGenerator: Ninja
-          cmakeListsTxtPath: '${{ github.workspace }}/CMakeLists.txt'
-          buildDirectory: '${{ github.workspace }}/build'
-          buildWithCMake: true
+      - name: Configure CMake
+        shell: bash
+        run: cmake . -B build -G "Visual Studio 17 2022" -A x64
 
+      - name: Build
+        run: cmake --build build --config Release -j
