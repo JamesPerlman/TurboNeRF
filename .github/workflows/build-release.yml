@@ -18,8 +18,9 @@ jobs:
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v2.2.0
         with:
+          activate-environment: py310
+          environment-file: etc/py310.yml
           auto-activate-base: false
-          python-version: 3.10
       - run: |
           conda info
           conda list
