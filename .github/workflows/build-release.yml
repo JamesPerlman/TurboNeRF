@@ -13,14 +13,34 @@ jobs:
         shell: bash -l {0}
     runs-on: windows-latest
     steps:
+      - name: Use Cache
+        uses: actions/cache@v3
+      
+      - name: Install CMake
+        uses: lukka/get-cmake@v3.24.2
+      
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.8
+        id: cuda-toolkit
+        with:
+          cuda: '12.0.1'
+
       - name: Checkout Repo
         uses: actions/checkout@v2
+      
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v2.2.0
         with:
           activate-environment: py310
           environment-file: etc/py310.yml
           auto-activate-base: false
-      - run: |
-          conda info
-          conda list
+      
+      - name: Build
+        uses: lukka/run-cmake@v3
+        with:
+          cmakeBuildType: release
+          cmakeGenerator: Ninja
+          cmakeListsTxtPath: '${{ github.workspace }}/CMakeLists.txt'
+          buildDirectory: '${{ github.workspace }}/build'
+          buildWithCMake: true
+
