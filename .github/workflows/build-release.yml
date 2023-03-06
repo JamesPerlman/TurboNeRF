@@ -17,5 +17,5 @@ jobs:
           environment-file: etc/py310.yml
           auto-activate-base: false
       - run: |
-        conda info
-        conda list
+          conda info
+          conda list
