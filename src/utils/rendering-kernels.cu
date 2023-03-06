@@ -403,9 +403,9 @@ __global__ void composite_samples_kernel(
 		const float weight = alpha * trans;
 
 		// composite the same way we do accumulation during training
-		const float s_r = __linear_to_srgb((float)network_output[step_offset_0]);
-		const float s_g = __linear_to_srgb((float)network_output[step_offset_1]);
-		const float s_b = __linear_to_srgb((float)network_output[step_offset_2]);
+		const float s_r = (float)network_output[step_offset_0];
+		const float s_g = (float)network_output[step_offset_1];
+		const float s_b = (float)network_output[step_offset_2];
 
 		out_r += weight * s_r;
 		out_g += weight * s_g;
