@@ -74,8 +74,8 @@ Extreme gratitude to open source projects that will allow this project to reach 
 * [pybind11](https://github.com/pybind/pybind11)  
 * [RenderMan](https://github.com/prman-pixar/RenderManForBlender)
 * [glad](https://github.com/Dav1dde/glad)  
+* [cuda-cmake-github-actions](https://github.com/ptheywood/cuda-cmake-github-actions)  
 
-LICENSES TO BE ADDED TO CODEBASE SOON.  CHECK LICENSES/ DIRECTORY
 
 ## CITATIONS
 
