@@ -13,9 +13,8 @@ jobs:
         shell: bash -l {0}
     runs-on: windows-latest
     steps:
-      - name: Use Cache
-        uses: actions/cache@v3
-      
+      # - name: Use Cache
+      #   uses: actions/cache@v3
       - name: Install CMake
         uses: lukka/get-cmake@v3.24.2
       
