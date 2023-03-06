@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
 	trainer.prepare_for_training();
 
 	// set up rendering controller
-	auto renderer = nrc::NeRFRenderingController();
+	auto renderer = nrc::NeRFRenderingController(RenderPattern::LinearChunks);
 	constexpr int IMG_SIZE = 1024;
 	auto render_buffer = nrc::CUDARenderBuffer();
 	render_buffer.set_size(IMG_SIZE, IMG_SIZE);

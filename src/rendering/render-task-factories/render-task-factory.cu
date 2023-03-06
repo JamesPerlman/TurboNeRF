@@ -1,4 +1,5 @@
 #include "render-task-factory.cuh"
+#include "linear-chunk-render-task-factory.cuh"
 #include "hexagonal-grid-render-task-factory.cuh"
 #include "rectangular-grid-render-task-factory.cuh"
 
@@ -10,6 +11,8 @@ RenderTaskFactory* create_render_task_factory(
     const int& n_rays_per_preview
 ) {
     switch(pattern) {
+        case RenderPattern::LinearChunks:
+            return new LinearChunkRenderTaskFactory(n_rays_per_task, n_rays_per_preview);
         case RenderPattern::HexagonalGrid:
             return new HexagonalGridRenderTaskFactory(n_rays_per_task, n_rays_per_preview);
         case RenderPattern::RectangularGrid:

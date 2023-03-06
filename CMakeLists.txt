@@ -77,9 +77,11 @@ set(HEADERS
 	# rendering
 	src/rendering/ray-batch-coordinators/hexagonal-grid-ray-batch-coordinator.cuh
 	src/rendering/ray-batch-coordinators/hexagonal-tile-ray-batch-coordinator.cuh
+	src/rendering/ray-batch-coordinators/linear-buffer-ray-batch-coordinator.cuh
 	src/rendering/ray-batch-coordinators/ray-batch-coordinator.cuh
 	src/rendering/ray-batch-coordinators/rectangular-grid-ray-batch-coordinator.cuh
 	src/rendering/render-task-factories/hexagonal-grid-render-task-factory.cuh
+	src/rendering/render-task-factories/linear-chunk-render-task-factory.cuh
 	src/rendering/render-task-factories/rectangular-grid-render-task-factory.cuh
 	src/rendering/render-task-factories/render-task-factory.cuh
 
@@ -137,6 +139,7 @@ set(SOURCES
 	# rendering
 	src/rendering/ray-batch-coordinators/hexagonal-grid-ray-batch-coordinator.cu
 	src/rendering/ray-batch-coordinators/hexagonal-tile-ray-batch-coordinator.cu
+	src/rendering/ray-batch-coordinators/linear-buffer-ray-batch-coordinator.cu
 	src/rendering/ray-batch-coordinators/rectangular-grid-ray-batch-coordinator.cu
 	src/rendering/render-task-factories/render-task-factory.cu
 
