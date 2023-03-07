@@ -17,7 +17,7 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 # CUDA
 # if this is a local Debug build, automatically determine the CUDA architecture based on the installed GPUs
-if(DEFINED $ENV{GITHUB_ACTIONS})
+if(DEFINED ENV{GITHUB_ACTIONS})
 	message(STATUS "Building for GitHub Actions")
 	SET(SUPPORTED_CUDA_ARCHITECTURES "75;80;86;87;89;90;90a")
 	SET(CMAKE_CUDA_ARCHITECTURES ${SUPPORTED_CUDA_ARCHITECTURES} CACHE STRING "CUDA architectures" FORCE)
