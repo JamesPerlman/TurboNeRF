@@ -16,6 +16,7 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v3
         with:
+          ref: ${{ github.sha }}
           submodules: recursive
       
       - name: Install CMake
@@ -39,7 +40,13 @@ jobs:
         shell: bash
         env:
           CUDA_ARCH_LIST: 75;80;86;87;89;90;90a
-        run: cmake . -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release -j
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: TurboNeRF
+          path: build/Release/
