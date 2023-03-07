@@ -22,11 +22,10 @@ jobs:
         uses: lukka/get-cmake@v3.24.2
       
       - name: Install CUDA Toolkit
-        env:
-          cuda: '12.0.0'
-          visual_studio: 'Visual Studio 17 2022'
-        shell: powershell
-        run: '${{ github.workspace }}\scripts\actions\install_cuda_windows.ps1'
+        uses: JamesPerlman/get-cuda-toolkit@v0.2.8
+        id: cuda-toolkit
+        with:
+          cuda: '12.1.0'
 
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v2.2.0
