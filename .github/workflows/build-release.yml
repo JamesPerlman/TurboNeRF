@@ -37,6 +37,8 @@ jobs:
       
       - name: Configure CMake
         shell: bash
+        env:
+          CUDA_ARCH_LIST: 75;80;86;87;89;90;90a
         run: cmake . -B build -G "Visual Studio 17 2022" -A x64
 
       - name: Build
