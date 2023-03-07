@@ -22,7 +22,7 @@ jobs:
         uses: lukka/get-cmake@v3.24.2
       
       - name: Install CUDA Toolkit
-        uses: JamesPerlman/get-cuda-toolkit@latest
+        uses: JamesPerlman/get-cuda-toolkit@master
         id: cuda-toolkit
         with:
           cuda: '12.1.0'
