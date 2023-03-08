@@ -47,12 +47,16 @@ jobs:
       - name: Install CMake
         uses: lukka/get-cmake@v3.24.2
 
+      - name: Set CUDA Hash Key
+        run: |
+          echo "CUDA_HASH_KEY=${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
+
       - name: Cache CUDA Toolkit
         uses: actions/cache@v3
         id: cache-cuda-toolkit
         with:
           path: ${{ env.CUDA_PATH }}
-          key: cuda-${{ runner.os }}-${{ env.CUDA_VERSION }}-${CUDA_SUB_PACKAGES//[[:space:]\\"\[\],-]/}
+          key: cuda-${{ runner.os }}-${{ env.CUDA_HASH_KEY }}
         
       - name: Install CUDA Toolkit
         uses: JamesPerlman/get-cuda-toolkit@master
