@@ -83,9 +83,22 @@ jobs:
 
       - name: CMake Build
         run: cmake --build build --config Release -j
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+      
+      - name: Archive Build Result
+        uses: thedoctor0/zip-release@0.7.1
         with:
-          name: ${{ matrix.artifact.name }} Build
+          type: 'zip'
           path: build/Release/
+          filename: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+
+      - name: Upload Binaries
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
+          bodyFile: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+          commit: ${{ github.sha }}
+          makeLatest: true
+          name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
+          prerelease: true
+          token: ${{ secrets.GITHUB_TOKEN }}
