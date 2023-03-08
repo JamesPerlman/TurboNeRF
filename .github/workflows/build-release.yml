@@ -21,21 +21,21 @@ jobs:
       matrix:
         # https://en.wikipedia.org/wiki/CUDA#GPUs_supported
         artifact: [
-          # {
-          #   arch: "75",
-          #   name: "Turing",
-          #   gpus: "RTX 2060 - 2080 & Ti, Quadro RTX 4000 - 8000"
-          # },
+          {
+            arch: "75",
+            name: "Turing",
+            gpus: "RTX 2060 - 2080 & Ti, Quadro RTX 4000 - 8000"
+          },
           {
             arch: "86",
             name: "Ampere",
             gpus: "RTX 3050 - 3090 & Ti, RTX A2000 - A6000"
           },
-          # {
-          #   arch: "89",
-          #   name: "Lovelace",
-          #   gpus: "RTX 4070 - 4090, RTX 6000 Ada"
-          # }
+          {
+            arch: "89",
+            name: "Lovelace",
+            gpus: "RTX 4070 - 4090, RTX 6000 Ada"
+          }
         ]
     steps:
       - name: Checkout Repo
@@ -103,11 +103,12 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
-          bodyFile: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+          artifacts: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+          # body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
           commit: ${{ github.sha }}
           makeLatest: true
           name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
           prerelease: true
+          replaceArtifacts: true
           tag: 'pre-release'
           token: ${{ secrets.GITHUB_TOKEN }}
