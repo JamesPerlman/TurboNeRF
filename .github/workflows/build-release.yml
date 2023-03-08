@@ -41,7 +41,13 @@ jobs:
         shell: bash
         env:
           CUDA_ARCH_LIST: 75;80;86;87;89;90;90a
-        run: cmake . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake . \
+            -B build \
+            -G "Visual Studio 17 2022" \
+            -A x64 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPYTHON_EXECUTABLE=${CONDA_PREFIX}/python.exe
 
       - name: Build
         run: cmake --build build --config Release -j
