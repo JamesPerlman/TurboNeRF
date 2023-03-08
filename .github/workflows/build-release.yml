@@ -51,11 +51,8 @@ jobs:
         with:
           path: ~/cache-hash.env
           key: ${{ runner.os }}-env-vars-${{ hashFiles('~/cache-hash.env') }}
-          run: |
-            export $(cat ~/cache-hash.env | xargs)
-            echo $CUDA_VERSION
-            echo $CUDA_SUB_PACKAGES
-            echo $CUDA_PATH
+        run: |
+          export $(cat ~/cache-hash.env | xargs)
       
       - name: test dummy cache write
         if: steps.cache-env-vars.outputs.cache-hit != 'true'
