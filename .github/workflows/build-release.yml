@@ -71,7 +71,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.CUDA_PATH }}
-          key: ${{ steps.cache-cuda-toolkit-restore.outputs.cache-primary-key }}
+          key: ${{ steps.cache-cuda-toolkit-restore.outputs.key }}
 
       # - name: Setup Conda
       #   uses: conda-incubator/setup-miniconda@v2.2.0
