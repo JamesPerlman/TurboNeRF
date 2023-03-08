@@ -50,47 +50,51 @@ jobs:
           method: 'network'
           # https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/
           sub-packages: '["cublas_dev", "cudart", "curand_dev", "nvcc", "thrust", "visual_studio_integration"]'
-
-      - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v2.2.0
-        with:
-          activate-environment: py310
-          environment-file: etc/py310.yml
-          auto-activate-base: false
       
-      - name: CMake Configure
-        env:
-          CUDA_ARCH_LIST: ${{ matrix.artifact.arch }}
-          TCNN_CUDA_ARCHITECTURES: ${{ matrix.artifact.arch }}
-          
+      - name: List DLLs
         run: |
-          cmake . \
-            -B build \
-            -G "Visual Studio 17 2022" \
-            -A x64 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
-            -DTN_BUILD_PYD=ON \
-            -DTN_BUILD_EXE=OFF
+          ls ${CUDA_TOOLKIT_ROOT_DIR}/bin/*.dll
 
-      - name: CMake Build
-        run: cmake --build build --config Release -j
+      # - name: Setup Conda
+      #   uses: conda-incubator/setup-miniconda@v2.2.0
+      #   with:
+      #     activate-environment: py310
+      #     environment-file: etc/py310.yml
+      #     auto-activate-base: false
       
-      - name: Archive Build Result
-        uses: thedoctor0/zip-release@0.7.1
-        with:
-          type: 'zip'
-          path: build/Release/
-          filename: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+      # - name: CMake Configure
+      #   env:
+      #     CUDA_ARCH_LIST: ${{ matrix.artifact.arch }}
+      #     TCNN_CUDA_ARCHITECTURES: ${{ matrix.artifact.arch }}
+          
+      #   run: |
+      #     cmake . \
+      #       -B build \
+      #       -G "Visual Studio 17 2022" \
+      #       -A x64 \
+      #       -DCMAKE_BUILD_TYPE=Release \
+      #       -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
+      #       -DTN_BUILD_PYD=ON \
+      #       -DTN_BUILD_EXE=OFF
 
-      - name: Upload Binaries
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
-          bodyFile: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
-          commit: ${{ github.sha }}
-          makeLatest: true
-          name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
-          prerelease: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: CMake Build
+      #   run: cmake --build build --config Release -j
+      
+      # - name: Archive Build Result
+      #   uses: thedoctor0/zip-release@0.7.1
+      #   with:
+      #     type: 'zip'
+      #     path: build/Release/
+      #     filename: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+
+      # - name: Upload Binaries
+      #   uses: ncipollo/release-action@v1
+      #   with:
+      #     allowUpdates: true
+      #     body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
+      #     bodyFile: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+      #     commit: ${{ github.sha }}
+      #     makeLatest: true
+      #     name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
+      #     prerelease: true
+      #     token: ${{ secrets.GITHUB_TOKEN }}
