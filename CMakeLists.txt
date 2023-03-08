@@ -249,7 +249,6 @@ function(copy_cuda_dlls)
   # These are the DLL names
 	set(CUDA_DLL_NAMES
 		cublas64_12
-		cublasLt64_12
 		cudart64_12
 		curand64_10
 	)
