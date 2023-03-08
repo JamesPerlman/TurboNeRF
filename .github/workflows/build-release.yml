@@ -19,24 +19,24 @@ jobs:
           ref: ${{ github.sha }}
           submodules: recursive
       
-      # - name: Install CMake
-      #   uses: lukka/get-cmake@v3.24.2
+      - name: Install CMake
+        uses: lukka/get-cmake@v3.24.2
       
-      # - name: Install CUDA Toolkit
-      #   uses: JamesPerlman/get-cuda-toolkit@master
-      #   id: cuda-toolkit
-      #   with:
-      #     cuda: '12.1.0'
-      #     method: 'network'
-      #     # https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/
-      #     sub-packages: '[
-      #       "cublas",
-      #       "cudart",
-      #       "curand",
-      #       "nvcc",
-      #       "thrust",
-      #       "visual_studio_integration"
-      #     ]'
+      - name: Install CUDA Toolkit
+        uses: JamesPerlman/get-cuda-toolkit@master
+        id: cuda-toolkit
+        with:
+          cuda: '12.1.0'
+          method: 'network'
+          # https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/
+          sub-packages: '[
+            "cublas",
+            "cudart",
+            "curand",
+            "nvcc",
+            "thrust",
+            "visual_studio_integration"
+          ]'
 
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v2.2.0
@@ -45,34 +45,28 @@ jobs:
           environment-file: etc/py310.yml
           auto-activate-base: false
       
-      - name: wtf
+      - name: CMake Configure
+        shell: bash
+        env:
+          # CUDA_ARCH_LIST: 75;80;86;87;89;90;90a
+          CUDA_ARCH_LIST: 86
+          TCNN_CUDA_ARCHITECTURES: ${CUDA_ARCH_LIST}
+          
         run: |
-          conda activate py310
-          echo ${CONDA_PREFIX}/python.exe
-          ${CONDA_PREFIX}/python.exe --version
-      
-      # - name: CMake Configure
-      #   shell: bash
-      #   env:
-      #     # CUDA_ARCH_LIST: 75;80;86;87;89;90;90a
-      #     CUDA_ARCH_LIST: 86
-      #     TCNN_CUDA_ARCHITECTURES: ${CUDA_ARCH_LIST}
-      #     
-      #   run: |
-      #     cmake . \
-      #       -B build \
-      #       -G "Visual Studio 17 2022" \
-      #       -A x64
-      #       -DCMAKE_BUILD_TYPE=Release \
-      #       -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
-      #       -DTN_BUILD_PYD=ON
-      #       -DTN_BUILD_EXE=OFF
+          cmake . \
+            -B build \
+            -G "Visual Studio 17 2022" \
+            -A x64
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
+            -DTN_BUILD_PYD=ON
+            -DTN_BUILD_EXE=OFF
 
-      # - name: CMake Build
-      #   run: cmake --build build --config Release -j
+      - name: CMake Build
+        run: cmake --build build --config Release -j
 
-      # - name: Upload Artifact
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: TurboNeRF
-      #     path: build/Release/
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: TurboNeRF
+          path: build/Release/
