@@ -48,6 +48,7 @@ jobs:
       - name: wtf
         shell: bash
         run: |
+          conda activate py310
           echo ${CONDA_PREFIX}/python.exe
           ${CONDA_PREFIX}/python.exe --version
       
