@@ -6,6 +6,9 @@ on:
   pull_request:
     branches:
       - release
+env:
+  CUDA_VERSION: "12.1.0"
+  CUDA_SUB_PACKAGES: '["cublas", "cublas_dev", "cudart", "curand", "curand_dev", "nvcc", "nvrtc", "nvrtc_dev", "thrust", "visual_studio_integration"]'
 jobs:
   build:
     runs-on: windows-2022
@@ -41,30 +44,65 @@ jobs:
       
       - name: Install CMake
         uses: lukka/get-cmake@v3.24.2
-      
-      - name: Install CUDA Toolkit
-        uses: JamesPerlman/get-cuda-toolkit@master
-        id: cuda-toolkit
+
+      - name: Restore Cached Env Variables
+        uses: actions/cache@v3
+        id: cache-env-vars
         with:
-          cuda: '12.1.0'
-          method: 'network'
-          # https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/
-          sub-packages: '[
-            "cublas",
-            "cublas_dev",
-            "cudart",
-            "curand",
-            "curand_dev",
-            "nvcc",
-            "nvrtc",
-            "nvrtc_dev",
-            "thrust",
-            "visual_studio_integration"
-          ]'
+          path: ~/cache-hash.env
+          key: ${{ runner.os }}-env-vars-${{ hashFiles('~/cache-hash.env') }}
+          run: |
+            export $(cat ~/cache-hash.env | xargs)
+            echo $CUDA_VERSION
+            echo $CUDA_SUB_PACKAGES
+            echo $CUDA_PATH
       
-      - name: List DLLs
+      - name: test dummy cache write
+        if: steps.cache-env-vars.outputs.cache-hit != 'true'
         run: |
-          ls "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1/bin"
+          echo "CUDA_VERSION=aoeu" >> ~/cache-hash.env
+          echo "CUDA_SUB_PACKAGES=ee11" >> ~/cache-hash.env
+          echo "CUDA_PATH=fuubar" >> ~/cache-hash.env
+
+      # - name: Cache CUDA Toolkit
+      #   uses: actions/cache@v3
+      #   id: cache-cuda-toolkit
+      #   path: 
+
+      # - name: Install CUDA Toolkit
+      #   uses: JamesPerlman/get-cuda-toolkit@master
+      #   if: steps.cache-cuda-toolkit.outputs.cache-hit != 'true'
+      #   id: cuda-toolkit
+      #   with:
+      #     cuda: 
+      #     method: 'network'
+      #     # https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/
+      #     sub-packages: '[
+      #       "cublas",
+      #       "cublas_dev",
+      #       "cudart",
+      #       "curand",
+      #       "curand_dev",
+      #       "nvcc",
+      #       "nvrtc",
+      #       "nvrtc_dev",
+      #       "thrust",
+      #       "visual_studio_integration"
+      #     ]'
+      #     run: |
+      #       echo CUDA_VERSION=${{ steps.cuda-toolkit.outputs.cuda-version }} >> ~/cache-hash.env
+      #       echo CUDA_SUB_PACKAGES=${{ steps.cuda-toolkit.outputs.sub-packages }} >> ~/cache-hash.env
+      #       echo CUDA_PATH=${{ steps.cuda-toolkit.outputs.cuda-path }} >> ~/cache-hash.env
+            
+
+
+      # - name: List installed subpackages
+      #   run: |
+      #     echo ${{ steps.cuda-toolkit.outputs.sub-packages }}
+        
+      # - name: List DLLs
+      #   run: |
+      #     ls "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1/bin"
 
       # - name: Setup Conda
       #   uses: conda-incubator/setup-miniconda@v2.2.0
