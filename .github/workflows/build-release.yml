@@ -40,7 +40,8 @@ jobs:
       - name: Configure CMake
         shell: bash
         env:
-          CUDA_ARCH_LIST: 75;80;86;87;89;90;90a
+          # CUDA_ARCH_LIST: 75;80;86;87;89;90;90a
+          CUDA_ARCH_LIST: 86
         run: |
           cmake . \
             -B build \
