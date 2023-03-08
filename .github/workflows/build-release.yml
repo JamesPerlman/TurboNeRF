@@ -8,10 +8,30 @@ on:
       - release
 jobs:
   build:
+    runs-on: windows-2022
     defaults:
       run:
         shell: bash -el {0}
-    runs-on: windows-2022
+    strategy:
+      matrix:
+        # https://en.wikipedia.org/wiki/CUDA#GPUs_supported
+        artifact: [
+          {
+            arch: "75",
+            name: "Turing",
+            gpus: "RTX 2060, 2070, 2080"
+          },
+          {
+            arch: "86",
+            name: "Ampere",
+            gpus: "RTX 3050, 3060, 3070, 3080, 3090, RTX A2000 - A6000"
+          },
+          {
+            arch: "89",
+            name: "Lovelace",
+            gpus: "RTX 4070, 4080, 4090, RTX 6000 Ada"
+          }
+        ]
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v3
@@ -48,9 +68,8 @@ jobs:
       - name: CMake Configure
         shell: bash
         env:
-          # CUDA_ARCH_LIST: 75;80;86;87;89;90;90a
-          CUDA_ARCH_LIST: 86
-          TCNN_CUDA_ARCHITECTURES: ${CUDA_ARCH_LIST}
+          CUDA_ARCH_LIST: ${{ matrix.artifact.arch }}
+          TCNN_CUDA_ARCHITECTURES: ${{ matrix.artifact.arch }}
           
         run: |
           cmake . \
@@ -68,5 +87,5 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: TurboNeRF
+          name: ${{ matrix.artifact.name }} Build
           path: build/Release/
