@@ -66,10 +66,9 @@ jobs:
         
       - name: test dummy cache read
         run: |
-          echo $CUDA_VERSION
-          echo $CUDA_SUB_PACKAGES
+          echo ${{ env.CUDA_VERSION }}
+          echo ${{ env.CUDA_SUB_PACKAGES }}
           echo $CUDA_PATH
-          echo "fugg"
 
       # - name: Cache CUDA Toolkit
       #   uses: actions/cache@v3
