@@ -28,6 +28,7 @@ jobs:
         with:
           cuda: '12.1.0'
           method: 'network'
+          sub-packages: ['nvcc', 'visual_studio_integration', 'CURAND', 'CUBLAS']
 
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v2.2.0
