@@ -10,7 +10,7 @@ jobs:
   build:
     defaults:
       run:
-        shell: bash -l {0}
+        shell: bash -el {0}
     runs-on: windows-2022
     steps:
       - name: Checkout Repo
@@ -46,7 +46,6 @@ jobs:
           auto-activate-base: false
       
       - name: wtf
-        shell: bash
         run: |
           conda activate py310
           echo ${CONDA_PREFIX}/python.exe
@@ -58,13 +57,16 @@ jobs:
       #     # CUDA_ARCH_LIST: 75;80;86;87;89;90;90a
       #     CUDA_ARCH_LIST: 86
       #     TCNN_CUDA_ARCHITECTURES: ${CUDA_ARCH_LIST}
+      #     
       #   run: |
       #     cmake . \
       #       -B build \
       #       -G "Visual Studio 17 2022" \
       #       -A x64
       #       -DCMAKE_BUILD_TYPE=Release \
-      #       -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe"
+      #       -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
+      #       -DTN_BUILD_PYD=ON
+      #       -DTN_BUILD_EXE=OFF
 
       # - name: CMake Build
       #   run: cmake --build build --config Release -j
