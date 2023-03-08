@@ -49,7 +49,7 @@ jobs:
 
       - name: Set CUDA Hash Key
         run: |
-          echo "CUDA_HASH_KEY=cuda-${{ runner.os }}-${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
+          echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cuda-${{ runner.os }}-${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
 
       - name: Restore Cached CUDA Toolkit
         uses: actions/cache@v3
