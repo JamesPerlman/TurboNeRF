@@ -50,11 +50,12 @@ jobs:
 
       - name: Set CUDA Hash Key
         run: |
-          echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cuda-${{ runner.os }}-${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
+#          echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cuda-cuda-${{ runner.os }}-${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
+          echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cache-key" >> $GITHUB_ENV
 
-      - name: Restore Cached CUDA Toolkit
+      - name: Cache CUDA Toolkit
         uses: actions/cache@v3
-        id: cache-cuda-toolkit-restore
+        id: cache-cuda-toolkit
         with:
           path: ${{ env.CUDA_PATH }}
           key: ${{ env.INSTALL_CUDA_TOOLKIT_CACHE_KEY }}
@@ -67,12 +68,6 @@ jobs:
           cuda: ${{ env.CUDA_VERSION }}
           method: 'network'
           sub-packages: ${{ env.CUDA_SUB_PACKAGES }}
-      
-      - name: Save Cached CUDA Toolkit
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.CUDA_PATH }}
-          key: ${{ env.INSTALL_CUDA_TOOLKIT_CACHE_KEY }}
 
       # - name: Setup Conda
       #   uses: conda-incubator/setup-miniconda@v2.2.0
@@ -94,6 +89,13 @@ jobs:
       #       -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
       #       -DTN_BUILD_PYD=ON \
       #       -DTN_BUILD_EXE=OFF
+        
+      # - name: Cache CMake Build
+      #   uses: actions/cache@v3
+      #   id: cache-cmake-build
+      #   with:
+      #     path: build
+      #     key: latest-cmake-build-${{ matrix.artifact.name }}
 
       # - name: CMake Build
       #   run: cmake --build build --config Release -j
