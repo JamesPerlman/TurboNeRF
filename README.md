@@ -26,8 +26,6 @@ Since everything here has been written from scratch*, this codebase is permissiv
 
 (*with generous help from [NeRF](https://github.com/bmild/nerf), [nerfstudio](https://github.com/nerfstudio-project/nerfstudio), [NerfAcc](https://github.com/KAIR-BAIR/nerfacc), and completely built on the [tiny-cuda-nn](https://github.com/NVLabs/tiny-cuda-nn) backend.)  
 
-DISCLAIMER: Although I am extremely passionate about NeRFs and their artistic applications, I do not have a deep background in ML research or CUDA development, and the code I've written here may certainly reflect that.  But perhaps that's where you come in!  Feel free to browse and suggest changes, this is all a learning process!  
-
 Enjoy!  
 -James  
 https://twitter.com/jperldev
