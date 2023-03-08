@@ -109,6 +109,6 @@ jobs:
           makeLatest: true
           name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
           prerelease: true
-          replaceArtifacts: true
+          replacesArtifacts: true
           tag: 'pre-release'
           token: ${{ secrets.GITHUB_TOKEN }}
