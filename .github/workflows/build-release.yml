@@ -19,17 +19,17 @@ jobs:
           {
             arch: "75",
             name: "Turing",
-            gpus: "RTX 2060, 2070, 2080"
+            gpus: "RTX 2060 - 2080 & Ti, Quadro RTX 4000 - 8000"
           },
           {
             arch: "86",
             name: "Ampere",
-            gpus: "RTX 3050, 3060, 3070, 3080, 3090, RTX A2000 - A6000"
+            gpus: "RTX 3050 - 3090 & Ti, RTX A2000 - A6000"
           },
           {
             arch: "89",
             name: "Lovelace",
-            gpus: "RTX 4070, 4080, 4090, RTX 6000 Ada"
+            gpus: "RTX 4070 - 4090, RTX 6000 Ada"
           }
         ]
     steps:
