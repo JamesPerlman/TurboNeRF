@@ -34,7 +34,6 @@ jobs:
             "cudart",
             "curand",
             "nvcc",
-            "nvrtc",
             "thrust",
             "visual_studio_integration"
           ]'
