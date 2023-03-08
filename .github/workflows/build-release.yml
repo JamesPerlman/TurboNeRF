@@ -36,7 +36,7 @@ jobs:
             "nvcc", \
             "nvrtc", \
             "thrust", \
-            "visual_studio_integration", \
+            "visual_studio_integration" \
           ]'
 
       - name: Setup Conda
