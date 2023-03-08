@@ -59,7 +59,7 @@ jobs:
             -A x64
             -DCMAKE_BUILD_TYPE=Release \
             -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
-            -DTN_BUILD_PYD=ON
+            -DTN_BUILD_PYD=ON \
             -DTN_BUILD_EXE=OFF
 
       - name: CMake Build
