@@ -3,9 +3,7 @@
 #
 cmake_minimum_required (VERSION 3.24)
 
-
 cmake_policy(SET CMP0104 NEW)
-
 cmake_policy(SET CMP0077 NEW)
 
 project (NeRFRenderCore LANGUAGES CUDA CXX)
@@ -14,6 +12,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+# options
+option(TN_BUILD_EXE "Build executable" ON)
 
 # CUDA
 if(DEFINED ENV{CUDA_ARCH_LIST})
@@ -161,7 +162,11 @@ set(SOURCES
 )
 
 # project executable
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+
+# build exe if TN_BUILD_EXE is set to ON
+if(TN_BUILD_EXE)
+	add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+endif()
 
 # pybind11
 add_subdirectory(includes/pybind11)
