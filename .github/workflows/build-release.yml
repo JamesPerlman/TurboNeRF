@@ -48,10 +48,9 @@ jobs:
       - name: Install CMake
         uses: lukka/get-cmake@v3.24.2
 
-      - name: Set CUDA Hash Key
-        run: |
+      - name: Set CUDA Cache Key
+        run: echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cache-key" >> $GITHUB_ENV
 #          echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cuda-cuda-${{ runner.os }}-${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
-          echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cache-key" >> $GITHUB_ENV
 
       - name: Cache CUDA Toolkit
         uses: actions/cache@v3
