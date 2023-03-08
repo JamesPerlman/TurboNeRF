@@ -1,11 +1,12 @@
 name: build release
 on:
-  push:
-    branches:
-      - release
-  pull_request:
-    branches:
-      - release
+  # push:
+  #   branches:
+  #     - release
+  # pull_request:
+  #   branches:
+  #     - release
+  workflow_dispatch:
 
 jobs:
   build:
@@ -49,66 +50,71 @@ jobs:
 
       - name: Set CUDA Hash Key
         run: |
-          echo "CUDA_HASH_KEY=${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
+          echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cuda-${{ runner.os }}-${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
 
-      - name: Cache CUDA Toolkit
+      - name: Restore Cached CUDA Toolkit
         uses: actions/cache@v3
-        id: cache-cuda-toolkit
+        id: cache-cuda-toolkit-restore
         with:
           path: ${{ env.CUDA_PATH }}
-          key: cuda-${{ runner.os }}-${{ env.CUDA_HASH_KEY }}
+          key: ${{ env.INSTALL_CUDA_TOOLKIT_CACHE_KEY }}
         
       - name: Install CUDA Toolkit
         uses: JamesPerlman/get-cuda-toolkit@master
-        if: steps.cache-cuda-toolkit.outputs.cache-hit != 'true'
+        if: steps.cache-cuda-toolkit-restore.outputs.cache-hit != 'true'
         id: cuda-toolkit
         with:
           cuda: ${{ env.CUDA_VERSION }}
           method: 'network'
-          # https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/
           sub-packages: ${{ env.CUDA_SUB_PACKAGES }}
-
-      - name: Setup Conda
-        uses: conda-incubator/setup-miniconda@v2.2.0
-        with:
-          activate-environment: py310
-          environment-file: etc/py310.yml
-          auto-activate-base: false
-
-      - name: CMake Configure
-        env:
-          CUDA_ARCH_LIST: ${{ matrix.artifact.arch }}
-          TCNN_CUDA_ARCHITECTURES: ${{ matrix.artifact.arch }}
-        run: |
-          cmake . \
-            -B build \
-            -G "Visual Studio 17 2022" \
-            -A x64 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
-            -DTN_BUILD_PYD=ON \
-            -DTN_BUILD_EXE=OFF
-
-      - name: CMake Build
-        run: cmake --build build --config Release -j
       
-      - name: Archive Build Result
-        uses: thedoctor0/zip-release@0.7.1
+      - name: Save Cached CUDA Toolkit
+        uses: actions/cache@v3
         with:
-          type: 'zip'
-          path: build/Release/
-          filename: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+          path: ${{ env.CUDA_PATH }}
+          key: ${{ env.INSTALL_CUDA_TOOLKIT_CACHE_KEY }}
 
-      - name: Upload Binaries
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: true
-          artifacts: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
-          # body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
-          commit: ${{ github.sha }}
-          makeLatest: true
-          name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
-          prerelease: true
-          replacesArtifacts: true
-          tag: 'pre-release'
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Setup Conda
+      #   uses: conda-incubator/setup-miniconda@v2.2.0
+      #   with:
+      #     activate-environment: py310
+      #     environment-file: etc/py310.yml
+      #     auto-activate-base: false
+
+      # - name: CMake Configure
+      #   env:
+      #     CUDA_ARCH_LIST: ${{ matrix.artifact.arch }}
+      #     TCNN_CUDA_ARCHITECTURES: ${{ matrix.artifact.arch }}
+      #   run: |
+      #     cmake . \
+      #       -B build \
+      #       -G "Visual Studio 17 2022" \
+      #       -A x64 \
+      #       -DCMAKE_BUILD_TYPE=Release \
+      #       -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
+      #       -DTN_BUILD_PYD=ON \
+      #       -DTN_BUILD_EXE=OFF
+
+      # - name: CMake Build
+      #   run: cmake --build build --config Release -j
+      
+      # - name: Archive Build Result
+      #   uses: thedoctor0/zip-release@0.7.1
+      #   with:
+      #     type: 'zip'
+      #     path: build/Release/
+      #     filename: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+
+      # - name: Upload Binaries
+      #   uses: ncipollo/release-action@v1
+      #   with:
+      #     allowUpdates: true
+      #     artifacts: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+      #     # body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
+      #     commit: ${{ github.sha }}
+      #     makeLatest: true
+      #     name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
+      #     prerelease: true
+      #     replacesArtifacts: true
+      #     tag: 'pre-release'
+      #     token: ${{ secrets.GITHUB_TOKEN }}
