@@ -253,19 +253,12 @@ function(copy_cuda_dlls)
 		curand64_10
 	)
 
-	# Convert them to paths
-	set(CUDA_DLL_PATHS "")
-
-	foreach(CUDA_DLL_NAME ${CUDA_DLL_NAMES})
-		list(APPEND CUDA_DLL_PATHS "${CUDA_TOOLKIT_ROOT_DIR}/bin/${CUDA_DLL_NAME}.dll")
-	endforeach()
-
 	# Copy them to the output directory after building
-	foreach(CUDA_DLL_PATH ${CUDA_DLL_PATHS})
+	foreach(CUDA_DLL_NAME ${CUDA_DLL_NAMES})
 		add_custom_command(TARGET ${BUILD_TARGET} POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"${CUDA_DLL_PATH}"
-			$<TARGET_FILE_DIR:${BUILD_TARGET}>
+			"${CUDA_TOOLKIT_ROOT_DIR}/bin/${CUDA_DLL_NAME}.dll"
+			"$<TARGET_FILE_DIR:${BUILD_TARGET}>/"
 		)
 	endforeach()
 endfunction()
