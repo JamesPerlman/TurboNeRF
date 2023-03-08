@@ -47,19 +47,6 @@ jobs:
       
       - name: Install CMake
         uses: lukka/get-cmake@v3.24.2
-
-#       - name: Set CUDA Cache Key
-#         run: echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cache-key" >> $GITHUB_ENV
-# #          echo "INSTALL_CUDA_TOOLKIT_CACHE_KEY=cuda-cuda-${{ runner.os }}-${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
-
-      - name: Cache CUDA Toolkit
-        uses: actions/cache@v3
-        id: cache-cuda-toolkit
-        with:
-          path: ${{ env.CUDA_PATH }}
-          key: abc
-          restore-keys: |
-            abc
         
       - name: Install CUDA Toolkit
         uses: JamesPerlman/get-cuda-toolkit@master
@@ -70,54 +57,48 @@ jobs:
           method: 'network'
           sub-packages: ${{ env.CUDA_SUB_PACKAGES }}
 
-      # - name: Setup Conda
-      #   uses: conda-incubator/setup-miniconda@v2.2.0
-      #   with:
-      #     activate-environment: py310
-      #     environment-file: etc/py310.yml
-      #     auto-activate-base: false
+      - name: Setup Conda
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          activate-environment: py310
+          environment-file: etc/py310.yml
+          auto-activate-base: false
 
-      # - name: CMake Configure
-      #   env:
-      #     CUDA_ARCH_LIST: ${{ matrix.artifact.arch }}
-      #     TCNN_CUDA_ARCHITECTURES: ${{ matrix.artifact.arch }}
-      #   run: |
-      #     cmake . \
-      #       -B build \
-      #       -G "Visual Studio 17 2022" \
-      #       -A x64 \
-      #       -DCMAKE_BUILD_TYPE=Release \
-      #       -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
-      #       -DTN_BUILD_PYD=ON \
-      #       -DTN_BUILD_EXE=OFF
-        
-      # - name: Cache CMake Build
-      #   uses: actions/cache@v3
-      #   id: cache-cmake-build
-      #   with:
-      #     path: build
-      #     key: latest-cmake-build-${{ matrix.artifact.name }}
+      - name: CMake Configure
+        env:
+          CUDA_ARCH_LIST: ${{ matrix.artifact.arch }}
+          TCNN_CUDA_ARCHITECTURES: ${{ matrix.artifact.arch }}
+        run: |
+          cmake . \
+            -B build \
+            -G "Visual Studio 17 2022" \
+            -A x64 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPYTHON_EXECUTABLE="${CONDA_PREFIX}\\python.exe" \
+            -DTN_BUILD_PYD=ON \
+            -DTN_BUILD_EXE=OFF
 
-      # - name: CMake Build
-      #   run: cmake --build build --config Release -j
+      - name: CMake Build
+        run: cmake --build build --config Release -j
       
-      # - name: Archive Build Result
-      #   uses: thedoctor0/zip-release@0.7.1
-      #   with:
-      #     type: 'zip'
-      #     path: build/Release/
-      #     filename: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+      - name: Archive Build Result
+        uses: thedoctor0/zip-release@0.7.1
+        with:
+          type: 'zip'
+          directory: build/Release/
+          path: .
+          filename: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
 
-      # - name: Upload Binaries
-      #   uses: ncipollo/release-action@v1
-      #   with:
-      #     allowUpdates: true
-      #     artifacts: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
-      #     # body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
-      #     commit: ${{ github.sha }}
-      #     makeLatest: true
-      #     name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
-      #     prerelease: true
-      #     replacesArtifacts: true
-      #     tag: 'pre-release'
-      #     token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Binaries
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          artifacts: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+          # body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
+          commit: ${{ github.sha }}
+          makeLatest: true
+          name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
+          prerelease: true
+          replacesArtifacts: true
+          tag: 'pre-release'
+          token: ${{ secrets.GITHUB_TOKEN }}
