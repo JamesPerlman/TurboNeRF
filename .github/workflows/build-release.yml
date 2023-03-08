@@ -45,14 +45,17 @@ jobs:
       - name: Install CMake
         uses: lukka/get-cmake@v3.24.2
 
-      - name: Restore Cached Env Variables
+      - name: Cache Env File
         uses: actions/cache@v3
         id: cache-env-vars
         with:
           path: ~/cache-hash.env
           key: ${{ runner.os }}-env-vars-${{ hashFiles('~/cache-hash.env') }}
+      
+      - name: Restore Cached Env
+        if: steps.cache-env-vars.outputs.cache-hit == 'true'
         run: |
-          export $(cat ~/cache-hash.env | xargs)
+          cat ~/cache-hash.env >> $GITHUB_ENV
       
       - name: test dummy cache write
         if: steps.cache-env-vars.outputs.cache-hit != 'true'
