@@ -58,6 +58,8 @@ jobs:
         with:
           path: ${{ env.CUDA_PATH }}
           key: abc
+          restore-keys: |
+            abc
         
       - name: Install CUDA Toolkit
         uses: JamesPerlman/get-cuda-toolkit@master
