@@ -28,7 +28,16 @@ jobs:
         with:
           cuda: '12.1.0'
           method: 'network'
-          sub-packages: '["nvcc", "visual_studio_integration", "CURAND", "CUBLAS"]'
+          # https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/
+          sub-packages: '[ \
+            "cublas", \
+            "cudart", \
+            "curand", \
+            "nvcc", \
+            "nvrtc", \
+            "thrust", \
+            "visual_studio_integration", \
+          ]'
 
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v2.2.0
