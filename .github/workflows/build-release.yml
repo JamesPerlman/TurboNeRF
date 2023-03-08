@@ -49,14 +49,14 @@ jobs:
 
       - name: Set CUDA Hash Key
         run: |
-          echo "CUDA_HASH_KEY=${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
+          echo "CUDA_HASH_KEY=cuda-${{ runner.os }}-${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]\",')" >> $GITHUB_ENV
 
       - name: Restore Cached CUDA Toolkit
         uses: actions/cache@v3
         id: cache-cuda-toolkit-restore
         with:
           path: ${{ env.CUDA_PATH }}
-          key: cuda-${{ runner.os }}-${{ env.CUDA_HASH_KEY }}
+          key: ${{ env.INSTALL_CUDA_TOOLKIT_CACHE_KEY }}
         
       - name: Install CUDA Toolkit
         uses: JamesPerlman/get-cuda-toolkit@master
@@ -71,7 +71,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.CUDA_PATH }}
-          key: ${{ steps.cache-cuda-toolkit-restore.outputs.key }}
+          key: ${{ env.INSTALL_CUDA_TOOLKIT_CACHE_KEY }}
 
       # - name: Setup Conda
       #   uses: conda-incubator/setup-miniconda@v2.2.0
