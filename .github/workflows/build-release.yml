@@ -17,6 +17,7 @@ jobs:
       CUDA_VERSION: "12.1.0"
       CUDA_SUB_PACKAGES: '["cublas", "cublas_dev", "cudart", "curand", "curand_dev", "nvcc", "nvrtc", "nvrtc_dev", "thrust", "visual_studio_integration"]'
       CUDA_PATH: "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1"
+      CUDA_HASH_KEY: ${CUDA_VERSION}-$(echo $CUDA_SUB_PACKAGES | tr -d '[:space:]\[\]",')
     strategy:
       matrix:
         # https://en.wikipedia.org/wiki/CUDA#GPUs_supported
@@ -52,7 +53,7 @@ jobs:
         id: cache-cuda-toolkit
         with:
           path: ${{ env.CUDA_PATH }}
-          key: cuda-${{ runner.os }}-${{ env.CUDA_VERSION }}-${{ env.CUDA_SUB_PACKAGES }}
+          key: cuda-${{ runner.os }}-${{ env.CUDA_HASH_KEY }}
         
       - name: Install CUDA Toolkit
         uses: JamesPerlman/get-cuda-toolkit@master
