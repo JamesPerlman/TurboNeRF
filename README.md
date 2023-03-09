@@ -5,7 +5,7 @@
 - [ ] Load NeRF  
 - [ ] Multi-GPU  
 - [ ] Multi-NeRF  
-- [ ] Downloadable Binary  
+- [x] Downloadable Binaries  
 
 Wishlist:
 - [ ] Drastically improve rendering quality / reduce training loss  
