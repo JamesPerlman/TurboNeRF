@@ -87,13 +87,13 @@ jobs:
           type: 'zip'
           directory: build/Release/
           path: .
-          filename: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+          filename: '../archive/TurboNeRF-${{ matrix.artifact.name }}.zip'
 
       - name: Upload Binaries
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: 'build/Release/TurboNeRF-${{ matrix.artifact.name }}.zip'
+          artifacts: 'build/archive/TurboNeRF-${{ matrix.artifact.name }}.zip'
           # body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
           commit: ${{ github.sha }}
           makeLatest: true
