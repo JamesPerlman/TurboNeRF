@@ -93,7 +93,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: 'TurboNeRF-${{ matrix.artifact.name }}.zip'
+          artifacts: 'build/Release/TurboNeRF-${{ matrix.artifact.name }}.zip'
           # body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
           commit: ${{ github.sha }}
           makeLatest: true
