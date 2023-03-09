@@ -5,6 +5,7 @@
 - [ ] Load NeRF  
 - [ ] Multi-GPU  
 - [ ] Multi-NeRF  
+- [ ] Dataset Preparation Tools  
 - [x] Downloadable Binaries  
 
 Wishlist:
