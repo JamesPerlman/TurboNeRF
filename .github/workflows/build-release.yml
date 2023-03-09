@@ -97,7 +97,7 @@ jobs:
           # body: 'Binary for NVIDIA ${{ matrix.artifact.name }} GPUs: ${{ matrix.artifact.gpus }}'
           commit: ${{ github.sha }}
           makeLatest: true
-          name: 'TurboNeRF Pre-Release (${{ matrix.artifact.name }})'
+          name: 'TurboNeRF Pre-Release Binaries'
           prerelease: true
           replacesArtifacts: true
           tag: 'pre-release'
