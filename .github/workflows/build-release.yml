@@ -15,8 +15,7 @@ jobs:
       run:
         shell: bash -el {0}
     env:
-      CUDA_VERSION: "12.1.0"
-      CUDA_SUB_PACKAGES: '["cublas", "cublas_dev", "cudart", "curand", "curand_dev", "nvcc", "nvrtc", "nvrtc_dev", "thrust", "visual_studio_integration"]'
+      CUDA_SUB_PACKAGES: 
       CUDA_PATH: "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.1"
     strategy:
       matrix:
@@ -53,9 +52,20 @@ jobs:
         if: steps.cache-cuda-toolkit-restore.outputs.cache-hit != 'true'
         id: cuda-toolkit
         with:
-          cuda: ${{ env.CUDA_VERSION }}
+          cuda: "12.1.0"
           method: 'network'
-          sub-packages: ${{ env.CUDA_SUB_PACKAGES }}
+          sub-packages: '[
+            "cublas",
+            "cublas_dev",
+            "cudart",
+            "curand",
+            "curand_dev",
+            "nvcc",
+            "nvrtc",
+            "nvrtc_dev",
+            "thrust",
+            "visual_studio_integration"
+          ]'
 
       - name: Setup Conda
         uses: conda-incubator/setup-miniconda@v2.2.0
