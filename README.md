@@ -44,8 +44,8 @@ Tested Configuration:
 Build steps:
 
 ```
-git clone git@github.com:JamesPerlman/NeRFRenderCore --recursive
-cd NeRFRenderCore
+git clone git@github.com:JamesPerlman/TurboNeRF --recursive
+cd TurboNeRF
 cmake . -B build
 cmake --build build -j
 ```

@@ -23,6 +23,12 @@
                 }
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "(msvc) Attach",
+            "type": "cppvsdbg",
+            "request": "attach",
+            "processId": "${command:pickProcess}",
         }
     ]
 }

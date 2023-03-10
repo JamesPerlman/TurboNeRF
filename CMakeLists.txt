@@ -6,7 +6,7 @@ cmake_minimum_required (VERSION 3.24)
 cmake_policy(SET CMP0104 NEW)
 cmake_policy(SET CMP0077 NEW)
 
-project (NeRFRenderCore LANGUAGES CUDA CXX)
+project (TurboNeRF LANGUAGES CUDA CXX)
 
 set(PYLIB_NAME PyTurboNeRF)
 
@@ -176,7 +176,7 @@ set(SOURCES
 	src/main.cu	
 )
 
-set(NeRFRenderCore_LIBRARIES
+set(TurboNeRF_LIBRARIES
 	PRIVATE
 	${OPENGL_LIBRARIES}
 	${CUDA_LIBRARIES}
@@ -188,7 +188,7 @@ set(NeRFRenderCore_LIBRARIES
 
 # Build Executable
 if(TN_BUILD_EXE)
-	message(STATUS "${PROJECT_NAME} Executable will be built!")
+	message(STATUS "${PROJECT_NAME} Executable WILL be built!")
 	add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 	
 	set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -199,7 +199,7 @@ if(TN_BUILD_EXE)
 
 	target_link_libraries(${PROJECT_NAME}
 		PRIVATE
-		${NeRFRenderCore_LIBRARIES}
+		${TurboNeRF_LIBRARIES}
 	)
 else()
 	message(STATUS "${PROJECT_NAME} Executable will NOT be built!")
@@ -207,7 +207,7 @@ endif()
 
 # Build Python Library
 if (TN_BUILD_PYD)
-	message(STATUS "${PYLIB_NAME} Python Library will be built!")
+	message(STATUS "${PYLIB_NAME} Python Library WILL be built!")
 	# pybind11
 	add_subdirectory(includes/pybind11)
 	include_directories(${pybind11_INCLUDE_DIRS})
@@ -226,7 +226,7 @@ if (TN_BUILD_PYD)
 
 	target_link_libraries(${PYLIB_NAME}
 		PRIVATE
-		${NeRFRenderCore_LIBRARIES}
+		${TurboNeRF_LIBRARIES}
 		pybind11::module
 	)
 else()

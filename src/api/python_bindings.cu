@@ -35,7 +35,7 @@ using namespace nrc;
     [](type& obj, const auto& value) { obj.name = value; }
 
 PYBIND11_MODULE(PyTurboNeRF, m) {
-    m.doc() = "NeRFRenderCore Python Bindings";
+    m.doc() = "TurboNeRF Python Bindings";
 
     /**
      * Global functions

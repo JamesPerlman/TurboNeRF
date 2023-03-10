@@ -154,6 +154,9 @@
         "__threading_support": "cpp",
         "__tuple": "cpp",
         "__memory": "cpp",
-        "version": "cpp"
+        "version": "cpp",
+        "glad.h": "c",
+        "coroutine": "cpp",
+        "resumable": "cpp"
     }
 }

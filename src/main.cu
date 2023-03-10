@@ -35,7 +35,7 @@ using namespace nrc;
 static const std::string DEFAULT_DATASET_PATH = "E:\\2022\\nerf-library\\testdata\\lego\\transforms.json";
 static const std::string DEFAULT_OUTPUT_PATH = "H:\\";
 static const std::string HELP_OUTPUT = R"(
-	Usage: NeRFRenderCore -i <path_to_json> -o <path_to_output_dir>
+	Usage: TurboNeRF -i <path_to_json> -o <path_to_output_dir>
 
 	Options:
 	-h,			Show this help message
@@ -114,7 +114,7 @@ int main(int argc, char* argv[])
 		trainer.train_step();
 		// every 16 training steps, update the occupancy grid
 
-		if (i % 16 == 0 && i > 0) {
+		if (i % 16 == 0 && i > 16) {
 			// only threshold to 50% after 256 training steps, otherwise select 100% of the cells
 			trainer.update_occupancy_grid(i);
 		}
