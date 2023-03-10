@@ -97,17 +97,17 @@ jobs:
           type: 'zip'
           directory: build/Release/
           path: .
-          filename: '../archive/TurboNeRF-${{ matrix.artifact.name }}.zip'
+          filename: '../archive/PyTurboNeRF-${{ matrix.artifact.name }}.zip'
 
       - name: Upload Binaries
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
-          artifacts: 'build/archive/TurboNeRF-${{ matrix.artifact.name }}.zip'
+          artifacts: 'build/archive/PyTurboNeRF-${{ matrix.artifact.name }}.zip'
           bodyFile: etc/pre-release.md
           commit: ${{ github.sha }}
           makeLatest: true
-          name: 'TurboNeRF Pre-Release Binaries'
+          name: 'PyTurboNeRF Pre-Release Binaries'
           prerelease: true
           replacesArtifacts: true
           tag: 'pre-release'
