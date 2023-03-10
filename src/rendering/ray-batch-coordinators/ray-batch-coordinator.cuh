@@ -7,7 +7,7 @@
 #include "../../models/ray-batch.cuh"
 #include "../../render-targets/render-target.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 /**
  * A ray batch coordinator is responsible for two main things:
@@ -105,4 +105,4 @@ inline __device__ void fill_ray_buffers(
 	alive[i] = true;
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

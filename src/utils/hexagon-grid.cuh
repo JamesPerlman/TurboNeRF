@@ -2,7 +2,7 @@
 #include "../common.h"
 #include "device-math.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 /**
  * This is a pseudo-regular hexagon.  The slope of the sides is 0.5 instead of 1/sqrt(3),
@@ -286,4 +286,4 @@ inline __device__ void hex_get_ij_from_xy(
     }
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

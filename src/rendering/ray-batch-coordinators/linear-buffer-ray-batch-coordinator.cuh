@@ -2,7 +2,7 @@
 
 #include "ray-batch-coordinator.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 class LinearBufferRayBatchCoordinator : public RayBatchCoordinator {
     const int n_rays;
@@ -31,4 +31,4 @@ public:
     ) override;
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

@@ -14,7 +14,7 @@
 #include "nerf-network.cuh"
 
 using namespace tcnn;
-using namespace nrc;
+using namespace turbo;
 using json = nlohmann::json;
 
 

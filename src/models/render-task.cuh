@@ -5,7 +5,7 @@
 #include "camera.cuh"
 #include "nerf.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 /**
  * A RenderTask is a portion of work that is performed by the Renderer.
@@ -49,4 +49,4 @@ public:
     };
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

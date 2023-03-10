@@ -6,7 +6,7 @@
 #include "../../models/render-request.cuh"
 #include "../../models/render-task.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 class RenderTaskFactory {
 public:
@@ -31,4 +31,4 @@ RenderTaskFactory* create_render_task_factory(
     const int& n_rays_per_preview = 0
 );
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

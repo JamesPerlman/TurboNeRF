@@ -5,7 +5,7 @@
 #include "../ray-batch-coordinators/hexagonal-tile-ray-batch-coordinator.cuh"
 #include "render-task-factory.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 class HexagonalGridRenderTaskFactory : public RenderTaskFactory {
 public:
@@ -151,4 +151,4 @@ public:
     }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

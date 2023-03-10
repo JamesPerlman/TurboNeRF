@@ -8,7 +8,7 @@
 #include "../utils/nerf-constants.cuh"
 #include "common-network-kernels.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 template <int N_CHANNELS, bool ACCUMULATE>
 __global__ void copy_gradients_kernel(
@@ -314,4 +314,4 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	dL_dR[a_idx] = inv_4nrays * smooth_l1_loss_backward(da);
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

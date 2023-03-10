@@ -10,7 +10,7 @@
 #include "../../common.h"
 #include "../linalg.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct alignas(float) Transform4f
 {
@@ -223,4 +223,4 @@ struct alignas(float) Transform4f
     }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

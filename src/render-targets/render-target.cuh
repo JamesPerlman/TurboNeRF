@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 // For now, all Render Targets should be in RGBA8 format
 class RenderTarget {
@@ -56,4 +56,4 @@ public:
     };
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

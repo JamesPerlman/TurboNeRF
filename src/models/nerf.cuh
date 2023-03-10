@@ -6,7 +6,7 @@
 #include "../core/occupancy-grid.cuh"
 #include "../core/nerf-network.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct NeRF {
     NetworkParamsWorkspace params;
@@ -24,4 +24,4 @@ struct NeRF {
     
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

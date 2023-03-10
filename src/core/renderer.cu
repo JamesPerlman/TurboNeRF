@@ -9,7 +9,7 @@
 
 #include "renderer.cuh"
 
-using namespace nrc;
+using namespace turbo;
 using namespace tcnn;
 
 #define CHECK_IS_CANCELED(task) \

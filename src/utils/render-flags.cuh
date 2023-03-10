@@ -2,7 +2,7 @@
 
 #include "../common.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 enum class RenderFlags: int {
     Preview = 1 << 0,
@@ -27,4 +27,4 @@ inline RenderFlags& operator&=(RenderFlags& a, RenderFlags b) {
     return a;
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

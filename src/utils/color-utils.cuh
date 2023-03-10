@@ -4,7 +4,7 @@
 
 // Thank you https://entropymine.com/imageworsener/srgbformula/ and ChatGPT
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 // fast math version
 inline __device__ float __srgb_to_linear(const float& srgb) {
@@ -40,4 +40,4 @@ inline __device__ float linear_to_srgb(const float& linear) {
     }
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

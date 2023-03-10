@@ -17,7 +17,7 @@
 #include "../models/nerf-proxy.cuh"
 #include "../workspaces/training-workspace.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct NeRFTrainingController {
 	// constructor
@@ -46,4 +46,4 @@ private:
 	void load_images(Trainer::Context& ctx);
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

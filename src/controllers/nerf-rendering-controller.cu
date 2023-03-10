@@ -9,7 +9,7 @@
 using namespace std;
 using namespace tcnn;
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 void render_thread_fn(NeRFRenderingController* controller, RenderRequest& request);
 
@@ -107,4 +107,4 @@ void NeRFRenderingController::submit(
     request->on_complete();
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

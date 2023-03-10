@@ -1,7 +1,7 @@
 #include "stream-compaction.cuh"
 #include <thrust/count.h>
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 size_t count_true_elements(
     const cudaStream_t& stream,
@@ -79,4 +79,4 @@ void generate_nonzero_compaction_indices(
     );
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

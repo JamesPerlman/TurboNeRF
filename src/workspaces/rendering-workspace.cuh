@@ -8,7 +8,7 @@
 #include "../models/camera.cuh"
 #include "workspace.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct RenderingWorkspace: Workspace {
 
@@ -117,4 +117,4 @@ struct RenderingWorkspace: Workspace {
 	};
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

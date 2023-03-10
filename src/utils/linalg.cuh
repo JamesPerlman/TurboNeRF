@@ -13,7 +13,7 @@
 #include <json/json.hpp>
 #include "../common.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 
 inline NRC_HOST_DEVICE float lerp(const float &a, const float &b, const float &t)
@@ -256,4 +256,4 @@ inline NRC_HOST_DEVICE float l2_squared_norm(const float3& v)
     return v.x * v.x + v.y * v.y + v.z * v.z;
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

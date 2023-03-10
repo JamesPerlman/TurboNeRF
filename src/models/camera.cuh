@@ -9,7 +9,7 @@
 #include "../utils/linalg/transform4f.cuh"
 #include "ray.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct DistortionParams {
 	float k1;
@@ -104,4 +104,4 @@ struct Camera {
 	}
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

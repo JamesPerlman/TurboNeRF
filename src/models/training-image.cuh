@@ -8,7 +8,7 @@
 
 using namespace std;
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct TrainingImage {
 	int2 dimensions;
@@ -20,4 +20,4 @@ struct TrainingImage {
 	void load_cpu(int n_channels = 0);
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

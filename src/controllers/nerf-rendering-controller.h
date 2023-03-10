@@ -9,7 +9,7 @@
 #include "../models/render-pattern.cuh"
 #include "../models/render-request.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct NeRFRenderingController {
 
@@ -36,4 +36,4 @@ public:
     void cancel();
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

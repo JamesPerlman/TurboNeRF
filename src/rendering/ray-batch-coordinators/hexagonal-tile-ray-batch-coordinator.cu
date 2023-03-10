@@ -9,7 +9,7 @@
 using namespace tcnn;
 
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 using HexagonTile = HexagonalTileRayBatchCoordinator::HexagonTile;
 
@@ -156,4 +156,4 @@ void HexagonalTileRayBatchCoordinator::copy_packed(
     );
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

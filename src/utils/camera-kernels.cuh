@@ -4,7 +4,7 @@
 
 #include "../models/camera.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 // adapted from Nerfies!  Thanks Google!
 // https://github.com/google/nerfies/blob/main/nerfies/camera.py#L26
@@ -143,4 +143,4 @@ __global__ void generate_undistorted_pixel_map_kernel(
     out_buf[idx + 1 * n_pixels] = yu;
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

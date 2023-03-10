@@ -6,7 +6,7 @@
 #include "../common.h"
 #include "../core/occupancy-grid.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 __global__ void decay_occupancy_grid_values_kernel(
     OccupancyGrid* grid,
@@ -39,4 +39,4 @@ __global__ void update_occupancy_grid_bits_kernel(
     OccupancyGrid* grid
 );
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

@@ -7,7 +7,7 @@
 #include "../../common.h"
 #include "ray-batch-coordinator.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 class HexagonalTileRayBatchCoordinator : public RayBatchCoordinator {
 
@@ -73,4 +73,4 @@ public:
     ) override;
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

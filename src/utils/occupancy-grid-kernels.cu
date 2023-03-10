@@ -9,7 +9,7 @@
 
 using namespace tcnn;
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 // occupancy cell values first get decayed by a factor (default 0.95) every update
 __global__ void decay_occupancy_grid_values_kernel(
@@ -139,4 +139,4 @@ __global__ void update_occupancy_grid_bits_kernel(
     grid_bits[idx] = cell_bits;
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

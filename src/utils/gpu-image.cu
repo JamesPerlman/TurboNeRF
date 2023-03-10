@@ -8,7 +8,7 @@
 
 #include "parallel-utils.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 __global__ void buffer_to_stbi_uc(
     const uint32_t n_elements,
@@ -121,4 +121,4 @@ void join_channels(
     join_channels_kernel<<<tcnn::n_blocks_linear(n_pixels), tcnn::n_threads_linear, 0, stream>>>(n_pixels, channels, data, output);
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

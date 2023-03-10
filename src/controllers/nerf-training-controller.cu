@@ -12,7 +12,7 @@
 #include "../common.h"
 #include "nerf-training-controller.h"
 
-using namespace nrc;
+using namespace turbo;
 using namespace tcnn;
 using namespace nlohmann;
 

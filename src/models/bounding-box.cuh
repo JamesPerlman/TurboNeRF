@@ -3,7 +3,7 @@
 #include "../common.h"
 #include "ray.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct BoundingBox {
 
@@ -72,4 +72,4 @@ struct BoundingBox {
     inline NRC_HOST_DEVICE float unit_to_pos_z(const float& z) const { return z * size_z + min_z; }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

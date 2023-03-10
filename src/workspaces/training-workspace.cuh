@@ -13,7 +13,7 @@
 #include "workspace.cuh"
 
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 // NeRFWorkspace?
 // TODO: Make this a derived struct from RenderingWorkspace
@@ -137,4 +137,4 @@ struct TrainingWorkspace: Workspace {
 	}
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

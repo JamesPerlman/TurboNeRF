@@ -9,7 +9,7 @@
 
 #include "../common.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 /**
  * @brief Find the index of the last item in a buffer of presorted ascending elements whose value is less than a given `max_value`
@@ -76,4 +76,4 @@ inline void copy_and_cast(
     copy_and_cast_kernel<<<n_blocks, block_size, 0, stream>>>(n_elements, dst, src);
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

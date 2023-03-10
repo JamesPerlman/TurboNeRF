@@ -18,7 +18,7 @@
 #include <iostream>
 #include <fstream>
 
-using namespace nrc;
+using namespace turbo;
 using namespace tcnn;
 using namespace nlohmann;
 

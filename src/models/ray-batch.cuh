@@ -2,7 +2,7 @@
 
 #include "../common.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct RayBatch {
     int size; // number of rays in this batch
@@ -17,4 +17,4 @@ struct RayBatch {
     bool* alive;
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

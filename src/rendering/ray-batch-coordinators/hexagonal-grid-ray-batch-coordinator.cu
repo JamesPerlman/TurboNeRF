@@ -9,7 +9,7 @@
 using namespace tcnn;
 
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 __global__ void generate_hexagonal_grid_of_rays_kernel(
     const int n_rays,
@@ -148,4 +148,4 @@ void HexagonalGridRayBatchCoordinator::copy_packed(
     );
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

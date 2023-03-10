@@ -3,7 +3,7 @@
 #include "../common.h"
 #include "workspace.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct OccupancyGridWorkspace: Workspace {
 
@@ -33,4 +33,4 @@ struct OccupancyGridWorkspace: Workspace {
     }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

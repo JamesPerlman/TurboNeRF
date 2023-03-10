@@ -4,7 +4,7 @@
 
 #include "../common.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 // https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
 template <typename T>
@@ -19,4 +19,4 @@ inline NRC_HOST_DEVICE T next_power_of_two(T v) {
     return v;
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

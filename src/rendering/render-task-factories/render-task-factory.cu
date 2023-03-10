@@ -3,7 +3,7 @@
 #include "hexagonal-grid-render-task-factory.cuh"
 #include "rectangular-grid-render-task-factory.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 RenderTaskFactory* create_render_task_factory(
     const RenderPattern& pattern,
@@ -21,4 +21,4 @@ RenderTaskFactory* create_render_task_factory(
     return nullptr;
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

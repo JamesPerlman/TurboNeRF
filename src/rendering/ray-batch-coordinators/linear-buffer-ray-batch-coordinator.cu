@@ -6,7 +6,7 @@
 using namespace tcnn;
 
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 __global__ void generate_linear_buffer_of_rays_kernel(
     const int n_rays,
@@ -106,4 +106,4 @@ void LinearBufferRayBatchCoordinator::copy_packed(
     );
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

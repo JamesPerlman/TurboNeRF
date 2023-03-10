@@ -7,7 +7,7 @@
 
 // Adapted from https://www.informit.com/articles/article.aspx?p=2455391&seqNum=2 - thank you informIT!
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 class OpenGLRenderSurface: public RenderTarget {
 private:
@@ -117,7 +117,7 @@ public:
     }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END
 
 
 /**

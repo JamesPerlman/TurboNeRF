@@ -4,7 +4,7 @@
 #include "../../models/camera.cuh"
 #include "ray-batch-coordinator.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 class HexagonalGridRayBatchCoordinator : public RayBatchCoordinator {   
 public:
@@ -36,4 +36,4 @@ public:
     ) override;
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

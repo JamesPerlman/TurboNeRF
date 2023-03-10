@@ -23,7 +23,7 @@
 
 namespace py = pybind11;
 
-using namespace nrc;
+using namespace turbo;
 
 #define GET(type, name) \
     #name,\

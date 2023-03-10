@@ -12,7 +12,7 @@
 #include "../workspaces/network-params-workspace.cuh"
 #include "../common.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct NerfNetwork {
 	std::shared_ptr<tcnn::Encoding<tcnn::network_precision_t>> direction_encoding;
@@ -133,4 +133,4 @@ private:
 	void enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size);
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

@@ -13,7 +13,7 @@
 #include "../utils/queues.h"
 #include "../common.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 class BlenderBridge 
 {
@@ -299,4 +299,4 @@ public:
     }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

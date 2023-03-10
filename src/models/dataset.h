@@ -15,7 +15,7 @@
 using namespace std;
 using json = nlohmann::json;
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct Dataset {
 	vector<Camera> cameras;
@@ -30,4 +30,4 @@ struct Dataset {
 	void load_images_in_parallel(std::function<void(const size_t, const TrainingImage&)> post_load_image = {});
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

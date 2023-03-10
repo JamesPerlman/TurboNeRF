@@ -10,7 +10,7 @@
 #include "../models/camera.cuh"
 #include "common-network-kernels.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 __global__ void generate_rays_pinhole_kernel(
 	const uint32_t n_rays,
@@ -123,4 +123,4 @@ __global__ void composite_samples_kernel(
     float* __restrict__ output_rgba
 );
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

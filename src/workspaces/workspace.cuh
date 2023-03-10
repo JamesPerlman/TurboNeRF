@@ -11,7 +11,7 @@
  * 
  */
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct Workspace {
     struct Allocation {
@@ -64,4 +64,4 @@ public:
     }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

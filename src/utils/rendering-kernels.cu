@@ -10,7 +10,7 @@
 
 using namespace tcnn;
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 // TODO: move this into a Camera utility kernel file
 // init_rays CUDA kernel
@@ -429,4 +429,4 @@ __global__ void composite_samples_kernel(
 	ray_trans[idx] = trans;
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

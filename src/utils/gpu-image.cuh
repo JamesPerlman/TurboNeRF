@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 void save_buffer_to_image(
     const cudaStream_t& stream,
@@ -43,4 +43,4 @@ void join_channels(
     float* output
 );
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

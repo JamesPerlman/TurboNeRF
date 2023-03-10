@@ -9,7 +9,7 @@
 #include "camera.cuh"
 #include "nerf-proxy.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 typedef std::function<void()> OnCancelCallback;
 typedef std::function<void()> OnCompleteCallback;
@@ -72,4 +72,4 @@ public:
     }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

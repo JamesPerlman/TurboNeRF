@@ -12,7 +12,7 @@
 #include "../utils/color-utils.cuh"
 #include "../utils/linalg/transform4f.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 /** This file contains helper kernels for generating rays and samples to fill the batch with data.
   */
@@ -393,4 +393,4 @@ __global__ void march_and_generate_network_positions_kernel(
 	n_ray_steps[i] = n_steps_taken;
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

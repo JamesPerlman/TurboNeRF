@@ -6,7 +6,7 @@
 #include "../common.h"
 #include "render-target.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 class CPURenderBuffer: public RenderTarget {
 private:
@@ -57,4 +57,4 @@ public:
     }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

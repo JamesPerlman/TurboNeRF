@@ -13,7 +13,7 @@
 
 #include <optional>
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct NeRFManager {
 private:
@@ -56,4 +56,4 @@ public:
 	// copy between GPUs?	
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

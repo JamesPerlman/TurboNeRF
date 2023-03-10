@@ -16,7 +16,7 @@
  * An instance of Trainer is managed by the TrainingController.
  */
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 struct Trainer {
 public:
@@ -67,4 +67,4 @@ public:
 	void create_pixel_undistort_map(Context& ctx);
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

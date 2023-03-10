@@ -27,7 +27,7 @@
 #include "integrations/blender.cuh"
 
 using namespace tcnn;
-using namespace nrc;
+using namespace turbo;
 
 
 
@@ -87,23 +87,23 @@ int main(int argc, char* argv[])
 	cudaStream_t stream;
 	CUDA_CHECK_THROW(cudaStreamCreate(&stream));
 
-	nrc::Dataset dataset = nrc::Dataset(DATASET_PATH);
+	turbo::Dataset dataset = turbo::Dataset(DATASET_PATH);
 
-	auto nerf_manager = nrc::NeRFManager();
+	auto nerf_manager = turbo::NeRFManager();
 
 	auto nerf = nerf_manager.create(dataset.bounding_box);
 
 	// set up training controller
-	auto trainer = nrc::NeRFTrainingController(&dataset, nerf, NeRFConstants::batch_size);
+	auto trainer = turbo::NeRFTrainingController(&dataset, nerf, NeRFConstants::batch_size);
 	trainer.prepare_for_training();
 
 	// set up rendering controller
-	auto renderer = nrc::NeRFRenderingController(RenderPattern::LinearChunks);
+	auto renderer = turbo::NeRFRenderingController(RenderPattern::LinearChunks);
 	constexpr int IMG_SIZE = 1024;
-	auto render_buffer = nrc::CUDARenderBuffer();
+	auto render_buffer = turbo::CUDARenderBuffer();
 	render_buffer.set_size(IMG_SIZE, IMG_SIZE);
 
-	auto camera_transform = nrc::Transform4f::Identity();
+	auto camera_transform = turbo::Transform4f::Identity();
 	auto cam6 = dataset.cameras[6];
 	auto cam0 = dataset.cameras[6];
 
@@ -122,8 +122,8 @@ int main(int argc, char* argv[])
 		if (i % 16 == 0 && i > 0) {
 			float progress = (float)i / (360.f * 16.0f);
 			float tau = 2.0f * 3.14159f;
-			auto tform = nrc::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
-			auto render_cam = nrc::Camera(
+			auto tform = turbo::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
+			auto render_cam = turbo::Camera(
 				make_int2(IMG_SIZE, IMG_SIZE),
 				cam0.near,
 				cam0.far,

@@ -7,7 +7,7 @@
 #include "dataset.h"
 #include "nerf.cuh"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 /**
  * A NeRFProxy is a reference to one or more NeRF objects.
@@ -39,4 +39,4 @@ struct NeRFProxy {
     }
 };
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END

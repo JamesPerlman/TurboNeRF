@@ -2,7 +2,7 @@
 
 #include "../common.h"
 
-NRC_NAMESPACE_BEGIN
+TURBO_NAMESPACE_BEGIN
 
 /**
  * Just a simple function to divide two integers
@@ -35,4 +35,4 @@ inline __device__ __host__ T set_bit(const T& bitmask, const U bit, const bool v
         : (bitmask & ~bit);
 }
 
-NRC_NAMESPACE_END
+TURBO_NAMESPACE_END
