@@ -138,6 +138,12 @@ public:
         stop_runloop();
     }
 
+    void wait_for_training_to_stop() {
+        if (_runloop_future.valid()) {
+            _runloop_future.wait();
+        }
+    }
+
     void set_training_callback(std::function<void(uint32_t)> callback) {
         this->_training_callback = callback;
     }

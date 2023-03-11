@@ -281,6 +281,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         )
         .def("start_training", &BlenderBridge::start_training)
         .def("stop_training", &BlenderBridge::stop_training)
+        .def("wait_for_training_to_stop", &BlenderBridge::wait_for_training_to_stop)
         .def("set_training_callback", &BlenderBridge::set_training_callback)
         .def("set_request_redraw_callback", &BlenderBridge::set_request_redraw_callback)
         .def(
