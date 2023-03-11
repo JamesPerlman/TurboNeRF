@@ -283,6 +283,12 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("stop_training", &BlenderBridge::stop_training)
         .def("set_training_callback", &BlenderBridge::set_training_callback)
         .def("set_request_redraw_callback", &BlenderBridge::set_request_redraw_callback)
+        .def(
+            "render_final",
+            &BlenderBridge::render_final,
+            py::arg("camera"),
+            py::arg("nerfs")
+        )
         .def("cancel_render", &BlenderBridge::cancel_render)
         .def(
             "request_render",

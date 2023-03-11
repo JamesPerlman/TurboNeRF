@@ -18,8 +18,10 @@ TURBO_NAMESPACE_BEGIN
 class BlenderBridge 
 {
 private:
+    NeRFRenderingController _previewer;
     NeRFRenderingController _renderer;
     std::optional<NeRFTrainingController> _trainer;
+    CPURenderBuffer _preview_target;
     CPURenderBuffer _render_target;
     std::function<void()> _request_redraw;
     std::function<void(uint32_t)> _training_callback;
@@ -35,7 +37,7 @@ private:
     
     void enqueue_redraw() {
         _draw_queue.push([this]() {
-            this->_render_target.synchronize();
+            this->_preview_target.synchronize();
             _request_redraw();
         });
         _draw_queue.work();
@@ -44,7 +46,8 @@ private:
 public:
 
     BlenderBridge()
-        : _renderer()
+        : _previewer(RenderPattern::HexagonalGrid)
+        , _renderer(RenderPattern::LinearChunks)
         , _render_queue()
         , _draw_queue(1)
     {
@@ -139,10 +142,34 @@ public:
         this->_training_callback = callback;
     }
 
-    /** RENDERING **/
+    /** RENDERING (FINAL) **/
+public:
+    std::vector<float> render_final(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
+        
+        _render_target.set_size(camera.resolution.x, camera.resolution.y);
+
+
+        auto request = std::make_shared<RenderRequest>(
+            camera,
+            proxies,
+            &_render_target,
+            RenderFlags::Final
+        );
+
+        _renderer.submit(request);
+        _render_target.synchronize();
+
+        const float* rgba = _render_target.get_rgba();
+        size_t n_pixels = _render_target.n_pixels();
+
+        std::vector<float> pixels(rgba, rgba + 4 * n_pixels);
+
+        return pixels;
+    }
+    /** RENDERING (PREVIEW) **/
 public:
     void cancel_render() {
-        _renderer.cancel();
+        _previewer.cancel();
     }
 
     void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies, const RenderFlags& flags) {
@@ -152,7 +179,7 @@ public:
             auto request = std::make_shared<RenderRequest>(
                 camera,
                 proxies,
-                &_render_target,
+                &_preview_target,
                 flags,
                 // on_complete
                 [this]() {
@@ -164,11 +191,11 @@ public:
                 },
                 // on_cancel
                 [this]() {
-                    // no-op
+                    // noop
                 }
             );
 
-            _renderer.submit(request);
+            _previewer.submit(request);
         });
 
         start_runloop(false);
@@ -179,7 +206,7 @@ public:
     }
 
     void resize_render_surface(const uint32_t& width, const uint32_t& height) {
-        _render_target.set_size(width, height);
+        _preview_target.set_size(width, height);
     }
     
     /**
@@ -205,10 +232,10 @@ private:
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
 
         // if texture size is not correct, resize it
-        if (width != _render_target.width || height != _render_target.height) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, _render_target.width, _render_target.height, 0, GL_RGBA, GL_FLOAT, _render_target.get_rgba());
+        if (width != _preview_target.width || height != _preview_target.height) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, _preview_target.width, _preview_target.height, 0, GL_RGBA, GL_FLOAT, _preview_target.get_rgba());
         } else {
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _render_target.width, _render_target.height, GL_RGBA, GL_FLOAT, _render_target.get_rgba());
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, _preview_target.width, _preview_target.height, GL_RGBA, GL_FLOAT, _preview_target.get_rgba());
         }
 
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -221,12 +248,9 @@ public:
     {
         update_render_texture();
 
-        // copy render data
-        // _renderer.write_to(&_render_target);
-
         // These are the vertices of a quad that covers the entire viewport.
-        const float w = static_cast<float>(_render_target.width);
-        const float h = static_cast<float>(_render_target.height);
+        const float w = static_cast<float>(_preview_target.width);
+        const float h = static_cast<float>(_preview_target.height);
 
         GLfloat vertices[8] = {
             0.0f, 0.0f,
