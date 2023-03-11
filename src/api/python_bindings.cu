@@ -289,7 +289,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("camera"),
             py::arg("nerfs")
         )
-        .def("cancel_render", &BlenderBridge::cancel_render)
+        .def("cancel_preview", &BlenderBridge::cancel_preview)
         .def(
             "request_render",
             &BlenderBridge::request_render,
