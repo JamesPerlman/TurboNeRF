@@ -147,7 +147,6 @@ class BlenderBridge
 
     void runloop_worker() {
         do {
-            printf("RUNLOOP\n");
             if (_is_training && _trainer.has_value()) {
                 // train a single step
                 _trainer->train_step();
@@ -158,9 +157,7 @@ class BlenderBridge
             }
             // check if we need to render
             _preview_queue.work();
-            printf("ZE PREVIEW QUEUE IST GEARBEITET\n");
             _preview_queue.wait();
-            printf("ZE LOOP IST LOOPING\n");
 
             if (_stop_runloop) {
                 _stop_runloop = false;
@@ -169,11 +166,9 @@ class BlenderBridge
             }
 
         } while (_keep_runloop_alive);
-        printf("ZE LOOP IST GESTOPPT\n");
     }
 
     void start_runloop(bool keep_alive) {
-        printf("STARTLOOPEN\n");
         // we don't want to start a new runloop if we are stopping the current one
         if (_stop_runloop) {
             return;
@@ -197,7 +192,6 @@ class BlenderBridge
     }
 
     void stop_runloop() {
-        printf("STOP ZE LOOP\n");
         _stop_runloop = true;
         _keep_runloop_alive = false;
     }
@@ -247,8 +241,8 @@ class BlenderBridge
     }
 
     void wait_for_runloop_to_stop() {
-        if (_runloop_future.valid()) {
-            _runloop_future.wait();
+        while (_keep_runloop_alive) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     }
 
@@ -333,7 +327,6 @@ class BlenderBridge
             return;
         }
 
-        printf("STAY PUSHIN THOSE PREVIES BOI\n");
         _preview_queue.push([this, camera, proxies, flags]() {
             auto request = std::make_shared<RenderRequest>(
                 camera,
@@ -370,11 +363,10 @@ class BlenderBridge
     }
     
     void enqueue_redraw() {
-        printf("WE BE PUSHIN ENQUEUES N SHIT\n");
         if (_stop_runloop) {
             return;
         }
-        
+
         _draw_queue.push([this]() {
             this->_preview_target.synchronize();
             this->dispatch(ObservableEvent::OnRequestRedraw);
