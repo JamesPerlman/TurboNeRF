@@ -119,7 +119,7 @@ jobs:
       - name: Trigger TurboNeRF-Blender Release
         uses: peter-evans/repository-dispatch@v2
         with:
-          token: ${{ secrets.SYNC_PAT}}
+          token: ${{ secrets.SYNC_PAT }}
           repository: 'TurboNeRF/TurboNeRF-Blender'
           event-type: 'release'
           client-payload: '{"tag": "pre-release"}'
