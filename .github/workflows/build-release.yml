@@ -122,5 +122,5 @@ jobs:
           token: ${{ secrets.SYNC_PAT }}
           repository: 'TurboNeRF/TurboNeRF-Blender'
           event-type: 'release'
-          client-payload: '{"tag": "pre-release"}'
+          client-payload: '{ "tag" : "pre-release" }'
 
