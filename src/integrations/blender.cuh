@@ -17,38 +17,69 @@ TURBO_NAMESPACE_BEGIN
 
 class BlenderBridge 
 {
-private:
+    public:
+
+    enum class ObservableEvent {
+        OnTrainingStart,
+        OnTrainingStop,
+        OnTrainingStep,
+        OnPreviewStart,
+        OnPreviewProgress,
+        OnPreviewComplete,
+        OnPreviewCancel,
+        OnRenderStart,
+        OnRenderProgress,
+        OnRenderComplete,
+        OnRenderCancel,
+        OnRequestRedraw
+    };
+
+    private:
+
+    struct EventObserver {
+        uint32_t id;
+        ObservableEvent event;        
+
+        // TODO: look into sending arbitrary data with the event (via callback)
+        // https://github.com/pybind/pybind11_json
+        std::function<void()> callback;
+
+        EventObserver(uint32_t id, ObservableEvent event, std::function<void()> callback)
+            : id(id)
+            , event(event)
+            , callback(callback)
+        {};
+    };
+
     NeRFRenderingController _previewer;
     NeRFRenderingController _renderer;
     std::optional<NeRFTrainingController> _trainer;
     CPURenderBuffer _preview_target;
     CPURenderBuffer _render_target;
-    std::function<void()> _request_redraw;
-    std::function<void(uint32_t)> _training_callback;
+    std::vector<EventObserver> _event_observers;
+    uint32_t _event_observer_id = 0;
 
-    TwoItemQueue _render_queue;
+    TwoItemQueue _preview_queue;
     DebounceQueue _draw_queue;
 
     std::future<void> _runloop_future;
+    bool _stop_runloop = false;
     bool _keep_runloop_alive = false;
     bool _is_training = false;
+    bool _is_rendering = false;
+    bool _is_previewing = false;
+
+    float _preview_progress = 0.0f;
+    float _render_progress = 0.0f;
 
     GLuint _render_tex_id = 0;
     
-    void enqueue_redraw() {
-        _draw_queue.push([this]() {
-            this->_preview_target.synchronize();
-            _request_redraw();
-        });
-        _draw_queue.work();
-    }
-    
-public:
+    public:
 
     BlenderBridge()
         : _previewer(RenderPattern::HexagonalGrid)
         , _renderer(RenderPattern::LinearChunks)
-        , _render_queue()
+        , _preview_queue()
         , _draw_queue(1)
     {
         if (!gladLoadGL()) {
@@ -56,6 +87,53 @@ public:
         };
     };
 
+    /** EVENT OBSERVERS **/
+    public:
+
+    uint32_t add_observer(ObservableEvent event, std::function<void()> callback) {
+        uint32_t id = _event_observer_id++;
+        _event_observers.emplace_back(id, event, callback);
+        return id;
+    }
+
+    void remove_observer(uint32_t id) {
+        // first find the index of the observer with find_if
+        auto it = std::find_if(_event_observers.begin(), _event_observers.end(), [id](const EventObserver& observer) {
+            return observer.id == id;
+        });
+        // if it's invalid, early return
+        if (it == _event_observers.end()) {
+            return;
+        }
+
+        // remove the observer
+        _event_observers.erase(it);
+
+        // if the number of observers is 0, reset the event observer id
+        if (_event_observers.size() == 0) {
+            _event_observer_id = 0;
+        }
+
+        // otherwise set the event observer id to the max id + 1
+        else {
+            _event_observer_id = 1 + std::max_element(
+                _event_observers.begin(),
+                _event_observers.end(),
+                [](const EventObserver& a, const EventObserver& b) {
+                    return a.id < b.id;
+                }
+            )->id;
+        }
+    }
+
+    private:
+    void dispatch(ObservableEvent event) {
+        for (auto& observer : _event_observers) {
+            if (observer.event == event) {
+                observer.callback();
+            }
+        }
+    }
 
     /**
      * THE RUN LOOP
@@ -65,29 +143,42 @@ public:
      * This run loop serves as a sort of scheduler for the training and rendering operations.
      * 
      */
-private:
+    private:
+
     void runloop_worker() {
         do {
-            // train a single step
+            printf("RUNLOOP\n");
             if (_is_training && _trainer.has_value()) {
+                // train a single step
                 _trainer->train_step();
-                if (_training_callback != nullptr) {
-                    auto training_step = _trainer->get_training_step();
-                    if (training_step % 16 == 0) {
-                        _trainer->update_occupancy_grid(training_step);
-                    }
-                    _training_callback(training_step);
+                auto training_step = _trainer->get_training_step();
+                if (training_step % 16 == 0) {
+                    _trainer->update_occupancy_grid(training_step);
                 }
             }
-
             // check if we need to render
-            _render_queue.work();
-            _render_queue.wait();
+            _preview_queue.work();
+            printf("ZE PREVIEW QUEUE IST GEARBEITET\n");
+            _preview_queue.wait();
+            printf("ZE LOOP IST LOOPING\n");
+
+            if (_stop_runloop) {
+                _stop_runloop = false;
+                _keep_runloop_alive = false;
+                break;
+            }
 
         } while (_keep_runloop_alive);
+        printf("ZE LOOP IST GESTOPPT\n");
     }
 
     void start_runloop(bool keep_alive) {
+        printf("STARTLOOPEN\n");
+        // we don't want to start a new runloop if we are stopping the current one
+        if (_stop_runloop) {
+            return;
+        }
+
         if (keep_alive) {
             _keep_runloop_alive = true;
         }
@@ -106,11 +197,20 @@ private:
     }
 
     void stop_runloop() {
+        printf("STOP ZE LOOP\n");
+        _stop_runloop = true;
         _keep_runloop_alive = false;
     }
 
     /** TRAINING **/
-public:
+    public:
+
+    uint32_t get_training_step() const {
+        if (_trainer.has_value()) {
+            return _trainer->get_training_step();
+        }
+        return 0;
+    }
 
     bool can_train() const {
         return _trainer.has_value();
@@ -128,29 +228,46 @@ public:
     }
 
     void start_training() {
-        cancel_preview();
+        if (_is_training == true) {
+            dispatch(ObservableEvent::OnTrainingStart);
+        }
+
         _is_training = true;
+        cancel_preview();
         start_runloop(true);
     }
 
     void stop_training() {
+        if (_is_training) {
+            dispatch(ObservableEvent::OnTrainingStop);
+        }
+
         _is_training = false;
         stop_runloop();
     }
 
-    void wait_for_training_to_stop() {
+    void wait_for_runloop_to_stop() {
         if (_runloop_future.valid()) {
             _runloop_future.wait();
         }
     }
 
-    void set_training_callback(std::function<void(uint32_t)> callback) {
-        this->_training_callback = callback;
+    /** RENDERING (FINAL) **/
+    public:
+
+    bool is_rendering() const {
+        return _is_rendering;
     }
 
-    /** RENDERING (FINAL) **/
-public:
-    std::vector<float> render_final(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
+    float get_render_progress() const {
+        return _render_progress;
+    }
+
+    void cancel_render() {
+        _renderer.cancel();
+    }
+
+    std::vector<float> request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
         
         _render_target.set_size(camera.resolution.x, camera.resolution.y);
 
@@ -159,9 +276,26 @@ public:
             camera,
             proxies,
             &_render_target,
-            RenderFlags::Final
+            RenderFlags::Final,
+            // on_complete
+            [this]() {
+                this->_is_rendering = false;
+                this->dispatch(ObservableEvent::OnRenderComplete);
+            },
+            // on_progress
+            [this](float progress) {
+                this->_render_progress = progress;
+                this->dispatch(ObservableEvent::OnRenderProgress);
+            },
+            // on_cancel
+            [this]() {
+                this->_is_rendering = false;
+                this->dispatch(ObservableEvent::OnRenderCancel);
+            }
         );
 
+        _is_rendering = true;
+        this->dispatch(ObservableEvent::OnRenderStart);
         _renderer.submit(request);
         _render_target.synchronize();
 
@@ -172,16 +306,35 @@ public:
 
         return pixels;
     }
+
+    void resize_render_surface(const uint32_t& width, const uint32_t& height) {
+        _render_target.set_size(width, height);
+    }
+
     /** RENDERING (PREVIEW) **/
-public:
+    public:
+
+    bool is_previewing() const {
+        return _is_previewing;
+    }
+
+    float get_preview_progress() const {
+        return _preview_progress;
+    }
+
     void cancel_preview() {
         _previewer.cancel();
     }
 
-    void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies, const RenderFlags& flags) {
+    void request_preview(const Camera& camera, std::vector<NeRFProxy*>& proxies, const RenderFlags& flags) {
         cancel_preview();
-        
-        _render_queue.push([this, camera, proxies, flags]() {
+
+        if (_stop_runloop) {
+            return;
+        }
+
+        printf("STAY PUSHIN THOSE PREVIES BOI\n");
+        _preview_queue.push([this, camera, proxies, flags]() {
             auto request = std::make_shared<RenderRequest>(
                 camera,
                 proxies,
@@ -189,30 +342,44 @@ public:
                 flags,
                 // on_complete
                 [this]() {
-                    this->enqueue_redraw();
+                    this->_is_previewing = false;
+                    this->dispatch(ObservableEvent::OnPreviewComplete);
                 },
                 // on_progress
                 [this](float progress) {
-                    this->enqueue_redraw();
+                    this->_preview_progress = progress;
+                    this->dispatch(ObservableEvent::OnPreviewProgress);
                 },
                 // on_cancel
                 [this]() {
-                    // noop
+                    this->_is_previewing = false;
+                    this->dispatch(ObservableEvent::OnPreviewCancel);
                 }
             );
 
+            this->_is_previewing = true;
+            this->dispatch(ObservableEvent::OnPreviewStart);
             _previewer.submit(request);
         });
 
         start_runloop(false);
     }
 
-    void set_request_redraw_callback(std::function<void()> callback) {
-        this->_request_redraw = callback;
-    }
-
-    void resize_render_surface(const uint32_t& width, const uint32_t& height) {
+    void resize_preview_surface(const uint32_t& width, const uint32_t& height) {
         _preview_target.set_size(width, height);
+    }
+    
+    void enqueue_redraw() {
+        printf("WE BE PUSHIN ENQUEUES N SHIT\n");
+        if (_stop_runloop) {
+            return;
+        }
+        
+        _draw_queue.push([this]() {
+            this->_preview_target.synchronize();
+            this->dispatch(ObservableEvent::OnRequestRedraw);
+        });
+        _draw_queue.work();
     }
     
     /**
@@ -220,7 +387,7 @@ public:
      * https://github.com/prman-pixar/RenderManForBlender/blob/main/display_driver/d_blender.cpp#L335
      * 
      */
-private:
+    private:
 
     // create or resize render texture
     void update_render_texture() {
@@ -247,7 +414,8 @@ private:
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-public:
+    public:
+    
     // This will always be called from Blender's view_draw() function
 
     void draw()

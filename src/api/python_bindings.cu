@@ -35,7 +35,13 @@ using namespace turbo;
     [](type& obj, const auto& value) { obj.name = value; }
 
 PYBIND11_MODULE(PyTurboNeRF, m) {
+    /**
+     * Global attributes
+     * 
+     */
+
     m.doc() = "TurboNeRF Python Bindings";
+    m.attr("__version__") = "0.0.1";
 
     /**
      * Global functions
@@ -156,6 +162,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     ;
 
     py::enum_<RenderPattern>(m, "RenderPattern")
+        .value("LinearChunks", RenderPattern::LinearChunks)
         .value("HexagonalGrid", RenderPattern::HexagonalGrid)
         .value("RectangularGrid", RenderPattern::RectangularGrid)
     ;
@@ -265,11 +272,34 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     ;
 
     /**
-     * Integration classes
+     * Integration Modules
      */
+
+    /**
+     * Blender is the only integration for now.
+     * 
+     */
+
+    // TODO: This is a large module.  Consider defining it in a separate file.
+
+    py::enum_<BlenderBridge::ObservableEvent>(m, "BlenderBridgeEvent")
+        .value("OnTrainingStarted", BlenderBridge::ObservableEvent::OnTrainingStart)
+        .value("OnTrainingStopped", BlenderBridge::ObservableEvent::OnTrainingStop)
+        .value("OnTrainingStep", BlenderBridge::ObservableEvent::OnTrainingStep)
+        .value("OnPreviewStart", BlenderBridge::ObservableEvent::OnPreviewStart)
+        .value("OnPreviewProgress", BlenderBridge::ObservableEvent::OnPreviewProgress)
+        .value("OnPreviewComplete", BlenderBridge::ObservableEvent::OnPreviewComplete)
+        .value("OnPreviewCancel", BlenderBridge::ObservableEvent::OnPreviewCancel)
+        .value("OnRenderStart", BlenderBridge::ObservableEvent::OnRenderStart)
+        .value("OnRenderProgress", BlenderBridge::ObservableEvent::OnRenderProgress)
+        .value("OnRenderComplete", BlenderBridge::ObservableEvent::OnRenderComplete)
+        .value("OnRenderCancel", BlenderBridge::ObservableEvent::OnRenderCancel)
+        .value("OnRequestRedraw", BlenderBridge::ObservableEvent::OnRequestRedraw)
+    ;
 
     py::class_<BlenderBridge>(m, "BlenderBridge")
         .def(py::init<>())
+        // training
         .def("can_train", &BlenderBridge::can_train)
         .def("is_training", &BlenderBridge::is_training)
         .def(
@@ -281,22 +311,16 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         )
         .def("start_training", &BlenderBridge::start_training)
         .def("stop_training", &BlenderBridge::stop_training)
-        .def("wait_for_training_to_stop", &BlenderBridge::wait_for_training_to_stop)
-        .def("set_training_callback", &BlenderBridge::set_training_callback)
-        .def("set_request_redraw_callback", &BlenderBridge::set_request_redraw_callback)
-        .def(
-            "render_final",
-            &BlenderBridge::render_final,
-            py::arg("camera"),
-            py::arg("nerfs")
-        )
-        .def("cancel_preview", &BlenderBridge::cancel_preview)
+        .def("wait_for_runloop_to_stop", &BlenderBridge::wait_for_runloop_to_stop)
+        // rendering (final)
+        .def("is_rendering", &BlenderBridge::is_rendering)
+        .def("get_render_progress", &BlenderBridge::get_render_progress)
+        .def("cancel_render", &BlenderBridge::cancel_render)
         .def(
             "request_render",
             &BlenderBridge::request_render,
             py::arg("camera"),
-            py::arg("nerfs"),
-            py::arg("flags")
+            py::arg("proxies")
         )
         .def(
             "resize_render_surface",
@@ -304,7 +328,38 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("width"),
             py::arg("height")
         )
+        // rendering (preview)
+        .def("is_previewing", &BlenderBridge::is_previewing)
+        .def("get_preview_progress", &BlenderBridge::get_preview_progress)
+        .def("cancel_preview", &BlenderBridge::cancel_preview)
+        .def(
+            "request_preview",
+            &BlenderBridge::request_preview,
+            py::arg("camera"),
+            py::arg("proxies"),
+            py::arg("flags")
+        )
+        .def(
+            "resize_preview_surface",
+            &BlenderBridge::resize_preview_surface,
+            py::arg("width"),
+            py::arg("height")
+        )
+        // drawing
+        .def("enqueue_redraw", &BlenderBridge::enqueue_redraw)
         .def("draw", &BlenderBridge::draw)
+        // event observers
+        .def(
+            "add_observer",
+            &BlenderBridge::add_observer,
+            py::arg("event"),
+            py::arg("callback")
+        )
+        .def(
+            "remove_observer",
+            &BlenderBridge::remove_observer,
+            py::arg("id")
+        )
     ;
 
     /**
