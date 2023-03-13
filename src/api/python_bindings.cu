@@ -322,6 +322,20 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("camera"),
             py::arg("proxies")
         )
+        .def("get_render_rgba", [](BlenderBridge& bb) {
+            float* rgba = bb.get_render_rgba();
+            std::size_t n_pixels = bb.get_render_n_pixels();
+            return py::memoryview::from_buffer(
+                (void*)rgba, // data
+                sizeof(float), // size of one element
+                py::format_descriptor<float>::value, // format
+                { 4 * n_pixels }, // shape
+                { 0 }, // strides,
+                true
+            );
+            
+        })
+        .def("get_render_n_pixels", &BlenderBridge::get_render_n_pixels)
         .def(
             "resize_render_surface",
             &BlenderBridge::resize_render_surface,

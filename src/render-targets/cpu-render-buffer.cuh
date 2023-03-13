@@ -52,7 +52,7 @@ public:
         }
     }
 
-    const float* get_rgba() {
+    float* get_rgba() const {
         return rgba_cpu;
     }
 };

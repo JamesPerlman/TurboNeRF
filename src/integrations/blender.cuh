@@ -59,11 +59,10 @@ class BlenderBridge
     std::vector<EventObserver> _event_observers;
     uint32_t _event_observer_id = 0;
 
-    TwoItemQueue _preview_queue;
+    TwoItemQueue _render_queue;
     DebounceQueue _draw_queue;
 
     std::future<void> _runloop_future;
-    bool _stop_runloop = false;
     bool _keep_runloop_alive = false;
     bool _is_training = false;
     bool _is_rendering = false;
@@ -79,7 +78,7 @@ class BlenderBridge
     BlenderBridge()
         : _previewer(RenderPattern::HexagonalGrid)
         , _renderer(RenderPattern::LinearChunks)
-        , _preview_queue()
+        , _render_queue()
         , _draw_queue(1)
     {
         if (!gladLoadGL()) {
@@ -156,24 +155,13 @@ class BlenderBridge
                 }
             }
             // check if we need to render
-            _preview_queue.work();
-            _preview_queue.wait();
-
-            if (_stop_runloop) {
-                _stop_runloop = false;
-                _keep_runloop_alive = false;
-                break;
-            }
+            _render_queue.work();
+            _render_queue.wait();
 
         } while (_keep_runloop_alive);
     }
 
     void start_runloop(bool keep_alive) {
-        // we don't want to start a new runloop if we are stopping the current one
-        if (_stop_runloop) {
-            return;
-        }
-
         if (keep_alive) {
             _keep_runloop_alive = true;
         }
@@ -192,7 +180,6 @@ class BlenderBridge
     }
 
     void stop_runloop() {
-        _stop_runloop = true;
         _keep_runloop_alive = false;
     }
 
@@ -261,48 +248,63 @@ class BlenderBridge
         _renderer.cancel();
     }
 
-    std::vector<float> request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
-        
-        _render_target.set_size(camera.resolution.x, camera.resolution.y);
-
-
-        auto request = std::make_shared<RenderRequest>(
-            camera,
-            proxies,
-            &_render_target,
-            RenderFlags::Final,
-            // on_complete
-            [this]() {
-                this->_is_rendering = false;
-                this->dispatch(ObservableEvent::OnRenderComplete);
-            },
-            // on_progress
-            [this](float progress) {
-                this->_render_progress = progress;
-                this->dispatch(ObservableEvent::OnRenderProgress);
-            },
-            // on_cancel
-            [this]() {
-                this->_is_rendering = false;
-                this->dispatch(ObservableEvent::OnRenderCancel);
-            }
-        );
+    void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
+        if (_is_rendering) {
+            return;
+        }
 
         _is_rendering = true;
-        this->dispatch(ObservableEvent::OnRenderStart);
-        _renderer.submit(request);
-        _render_target.synchronize();
 
-        const float* rgba = _render_target.get_rgba();
-        size_t n_pixels = _render_target.n_pixels();
+        cancel_preview();
+        stop_training();
 
-        std::vector<float> pixels(rgba, rgba + 4 * n_pixels);
+        _render_queue.push([this, camera, proxies]() {
+            _render_target.set_size(camera.resolution.x, camera.resolution.y);
+            auto request = std::make_shared<RenderRequest>(
+                camera,
+                proxies,
+                &this->_render_target,
+                RenderFlags::Final,
+                // on_complete
+                [this]() {
+                    printf("Completin'!\n");
+                    this->_render_progress = 1.0f;
+                    this->_render_target.synchronize();
+                    this->dispatch(ObservableEvent::OnRenderComplete);
+                    this->_is_rendering = false;
+                },
+                // on_progress
+                [this](float progress) {
+                    printf("Updatin'!\n");
+                    this->_render_progress = progress;
+                    this->_render_target.synchronize();
+                    this->dispatch(ObservableEvent::OnRenderProgress);
+                },
+                // on_cancel
+                [this]() {
+                    printf("Cancelin'!\n");
+                    this->dispatch(ObservableEvent::OnRenderCancel);
+                    this->_is_rendering = false;
+                }
+            );
 
-        return pixels;
+            this->dispatch(ObservableEvent::OnRenderStart);
+            _renderer.submit(request);
+        });
+        
+        start_runloop(false);
     }
 
     void resize_render_surface(const uint32_t& width, const uint32_t& height) {
         _render_target.set_size(width, height);
+    }
+
+    size_t get_render_n_pixels() const {
+        return _render_target.n_pixels();
+    }
+
+    float* get_render_rgba() const {
+        return _render_target.get_rgba();
     }
 
     /** RENDERING (PREVIEW) **/
@@ -323,11 +325,11 @@ class BlenderBridge
     void request_preview(const Camera& camera, std::vector<NeRFProxy*>& proxies, const RenderFlags& flags) {
         cancel_preview();
 
-        if (_stop_runloop) {
+        if (_is_rendering) {
             return;
         }
 
-        _preview_queue.push([this, camera, proxies, flags]() {
+        _render_queue.push([this, camera, proxies, flags]() {
             auto request = std::make_shared<RenderRequest>(
                 camera,
                 proxies,
@@ -363,9 +365,6 @@ class BlenderBridge
     }
     
     void enqueue_redraw() {
-        if (_stop_runloop) {
-            return;
-        }
 
         _draw_queue.push([this]() {
             this->_preview_target.synchronize();
