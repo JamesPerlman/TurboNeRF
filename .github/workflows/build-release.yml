@@ -48,8 +48,7 @@ jobs:
         uses: lukka/get-cmake@v3.24.2
         
       - name: Install CUDA Toolkit
-        uses: JamesPerlman/get-cuda-toolkit@master
-        if: steps.cache-cuda-toolkit-restore.outputs.cache-hit != 'true'
+        uses: Jimver/get-cuda-toolkit@v0.2.9
         id: cuda-toolkit
         with:
           cuda: "12.1.0"
