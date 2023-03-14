@@ -352,7 +352,7 @@ class BlenderBridge
 
             this->_is_previewing = true;
             this->dispatch(ObservableEvent::OnPreviewStart);
-            _previewer.submit(request);
+            this->_previewer.submit(request);
         });
 
         start_runloop(false);
