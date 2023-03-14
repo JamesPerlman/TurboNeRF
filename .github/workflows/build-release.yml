@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  Build PyTurboNeRF:
+  build-python-library-binaries:
     runs-on: windows-2022
     defaults:
       run:
@@ -112,7 +112,7 @@ jobs:
           replacesArtifacts: true
           tag: 'pre-release'
           token: ${{ secrets.GITHUB_TOKEN }}
-  Release Blender Addon:
+  trigger-blender-addon-release:
     runs-on: ubuntu-latest
     needs: build
     steps:
