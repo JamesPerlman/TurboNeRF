@@ -267,7 +267,6 @@ class BlenderBridge
                 RenderFlags::Final,
                 // on_complete
                 [this]() {
-                    printf("Completin'!\n");
                     this->_render_progress = 1.0f;
                     this->_render_target.synchronize();
                     this->dispatch(ObservableEvent::OnRenderComplete);
@@ -275,14 +274,12 @@ class BlenderBridge
                 },
                 // on_progress
                 [this](float progress) {
-                    printf("Updatin'!\n");
                     this->_render_progress = progress;
                     this->_render_target.synchronize();
                     this->dispatch(ObservableEvent::OnRenderProgress);
                 },
                 // on_cancel
                 [this]() {
-                    printf("Cancelin'!\n");
                     this->dispatch(ObservableEvent::OnRenderCancel);
                     this->_is_rendering = false;
                 }
