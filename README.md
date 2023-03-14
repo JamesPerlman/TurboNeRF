@@ -1,3 +1,10 @@
+## IN OPEN ALPHA 0.0.1!
+
+Happy Pi Day! This project is now in open alpha testing.  For the full story, as well as instructions and support resources, please see this video and its description: https://youtu.be/TeWYAbhgaiU  
+
+Enjoy!  
+
+
 ## PRE-RELEASE TO-DO LIST
 - [x] Python API
 - [x] Blender Bridge
