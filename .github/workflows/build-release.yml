@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-python-library-binaries:
+  build-pylib-binaries:
     runs-on: windows-2022
     defaults:
       run:
@@ -114,7 +114,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
   trigger-blender-addon-release:
     runs-on: ubuntu-latest
-    needs: build-python-library-binaries
+    needs: build-pylib-binaries
     steps:
       - name: Trigger TurboNeRF-Blender Release
         uses: peter-evans/repository-dispatch@v2
