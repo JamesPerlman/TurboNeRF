@@ -286,7 +286,8 @@ class BlenderBridge
             );
 
             this->dispatch(ObservableEvent::OnRenderStart);
-            _renderer.submit(request);
+            this->_render_target.clear();
+            this->_renderer.submit(request);
         });
         
         start_runloop(false);
