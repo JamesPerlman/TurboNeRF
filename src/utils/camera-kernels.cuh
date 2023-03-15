@@ -123,11 +123,11 @@ __global__ void generate_undistorted_pixel_map_kernel(
     const float& p1 = camera.dist_params.p1;
     const float& p2 = camera.dist_params.p2;
 
-    const uint32_t& x = idx % w;
-    const uint32_t& y = idx / w;
+    const uint32_t x = idx % w;
+    const uint32_t y = idx / w;
 
-    const float& xd = (float(x) + 0.5f) / float(w) - 0.5f;
-    const float& yd = (float(y) + 0.5f) / float(h) - 0.5f;
+    const float xd = (float(x) - camera.principal_point.x) / camera.focal_length.x;
+    const float yd = (float(y) - camera.principal_point.y) / camera.focal_length.y;
 
     float xu, yu;
     radial_and_tangential_undistort(
@@ -139,8 +139,8 @@ __global__ void generate_undistorted_pixel_map_kernel(
         xu, yu
     );
 
-    out_buf[idx + 0 * n_pixels] = xu;
-    out_buf[idx + 1 * n_pixels] = yu;
+    out_buf[idx + 0 * n_pixels] = xu * camera.focal_length.x + camera.principal_point.x;
+    out_buf[idx + 1 * n_pixels] = yu * camera.focal_length.y + camera.principal_point.y;
 }
 
 TURBO_NAMESPACE_END

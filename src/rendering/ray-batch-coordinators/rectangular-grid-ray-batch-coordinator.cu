@@ -40,7 +40,7 @@ __global__ void generate_rectangular_grid_of_rays_kernel(
     // normalize to camera space
     const Camera cam = *camera;
 
-    Ray local_ray = cam.local_ray_at_pixel_xy_index(x + grid_offset.x, y + grid_offset.y);
+    Ray local_ray = cam.local_ray_at_pixel_xy(x + grid_offset.x, y + grid_offset.y);
     Ray global_ray = cam.global_ray_from_local_ray(local_ray);
 
     fill_ray_buffers(i, stride, global_ray, bbox, pos, dir, idir, t, index, alive);

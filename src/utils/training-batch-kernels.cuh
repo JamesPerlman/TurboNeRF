@@ -136,7 +136,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	pix_rgba[i_offset_3] = (float)a / 255.0f;
 	
 	// TODO: optimize (we can likely eliminate some allocations here)
-	Ray local_ray = cam.local_ray_at_pixel_xy_normalized(x, y);
+	Ray local_ray = cam.local_ray_at_pixel_xy(x, y);
 	Ray global_ray = cam.global_ray_from_local_ray(local_ray);
 
 	const float3 global_origin = global_ray.o;

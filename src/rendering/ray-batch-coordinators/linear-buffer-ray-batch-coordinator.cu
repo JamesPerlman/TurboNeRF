@@ -34,7 +34,7 @@ __global__ void generate_linear_buffer_of_rays_kernel(
     
     const Camera cam = *camera;
 
-    const Ray local_ray = cam.local_ray_at_pixel_xy_index(ix, iy);
+    const Ray local_ray = cam.local_ray_at_pixel_xy(ix, iy);
     const Ray global_ray = cam.global_ray_from_local_ray(local_ray);
 
     fill_ray_buffers(i, stride, global_ray, bbox, pos, dir, idir, t, index, alive);

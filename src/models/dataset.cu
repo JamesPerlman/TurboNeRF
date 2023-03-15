@@ -23,19 +23,28 @@ Dataset::Dataset(const string& file_path) {
     cameras.reserve(n_frames);
     images.reserve(n_frames);
 
-    int w = json_data.value("w", 0);
-    int h = json_data.value("h", 0);
+    float w = json_data.value("w", 0.0f);
+    float h = json_data.value("h", 0.0f);
 
-    image_dimensions = make_int2(w, h);
+    image_dimensions = make_int2((int)w, (int)h);
     n_pixels_per_image = (uint32_t)(w * h);
     n_channels_per_image = 4;
+
+    float cx = json_data.value("cx", 0.5f * w);
+    float cy = json_data.value("cy", 0.5f * h);
+    float2 principal_point = make_float2(cx, cy);
     
     // TODO: per-camera focal length
-    float2 focal_length{json_data["fl_x"], json_data["fl_y"]};
-    float2 view_angle{json_data["camera_angle_x"], json_data["camera_angle_y"]};
-    float2 angle_tans{tanf(view_angle.x), tanf(view_angle.y)};
-    // sensor size is the size of the sensor at distance 1 from the camera's origin
-    
+    // if "fl_x" and "fl_y" are specified, these values are the focal lengths for their respective axes (in pixels)
+    float2 focal_length = make_float2(0.0f, 0.0f);
+    if (json_data.contains("fl_x") && json_data.contains("fl_y")) {
+        focal_length = make_float2(json_data["fl_x"], json_data["fl_y"]);
+    } else if (json_data.contains("camera_angle_x") && json_data.contains("camera_angle_y")) {
+        focal_length = make_float2(
+            0.5f * w / tanf(0.5f * json_data["camera_angle_x"]),
+            0.5f * h / tanf(0.5f * json_data["camera_angle_y"])
+        );
+    }
 
     uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
     bounding_box = BoundingBox((float)aabb_size);
@@ -60,7 +69,7 @@ Dataset::Dataset(const string& file_path) {
         Transform4f camera_matrix = transform_matrix.from_nerf();
 
         // TODO: per-camera dimensions
-        cameras.emplace_back(image_dimensions, near, far, focal_length, view_angle, camera_matrix, dist_params);
+        cameras.emplace_back(image_dimensions, near, far, focal_length, principal_point, camera_matrix, dist_params);
 
         // images
         string file_path = frame["file_path"];

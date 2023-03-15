@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -99,7 +99,7 @@ int main(int argc, char* argv[])
 
 	// set up rendering controller
 	auto renderer = turbo::NeRFRenderingController(RenderPattern::LinearChunks);
-	constexpr int IMG_SIZE = 1024;
+	int IMG_SIZE = dataset.cameras[0].resolution.x;
 	auto render_buffer = turbo::CUDARenderBuffer();
 	render_buffer.set_size(IMG_SIZE, IMG_SIZE);
 
@@ -122,14 +122,14 @@ int main(int argc, char* argv[])
 		if (i % 16 == 0 && i > 0) {
 			float progress = (float)i / (360.f * 16.0f);
 			float tau = 2.0f * 3.14159f;
-			auto tform = turbo::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
+			//auto tform = turbo::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = turbo::Camera(
 				make_int2(IMG_SIZE, IMG_SIZE),
 				cam0.near,
 				cam0.far,
 				cam0.focal_length,
-				cam0.view_angle,
-				tform,
+				cam0.principal_point,
+				cam0.transform,
 				cam0.dist_params
 			);
 
