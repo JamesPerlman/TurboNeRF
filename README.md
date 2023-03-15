@@ -1,4 +1,4 @@
-![TurboNeRF](https://github.com/slowcon/TurboNeRF/blob/main/TurboNERF-HG-Logo.png?raw=true)
+![TurboNeRF](https://github.com/slowcon/TurboNeRF/blob/main/assets/images/TurboNERF-GH-Logo.png?raw=true)
 [![Discord](https://img.shields.io/discord/1083484809873064046?label=Discord&logo=Discord&logoColor=white)](https://discord.gg/pfRTqT2mvb)
 ## IN OPEN ALPHA 0.0.1!
 
