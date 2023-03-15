@@ -23,8 +23,11 @@ Dataset::Dataset(const string& file_path) {
     cameras.reserve(n_frames);
     images.reserve(n_frames);
 
-    image_dimensions = make_int2(json_data["w"], json_data["h"]);
-    n_pixels_per_image = (uint32_t)image_dimensions.x * (uint32_t)image_dimensions.y;
+    int w = json_data.value("w", 0);
+    int h = json_data.value("h", 0);
+
+    image_dimensions = make_int2(w, h);
+    n_pixels_per_image = (uint32_t)(w * h);
     n_channels_per_image = 4;
     
     // TODO: per-camera focal length
@@ -62,9 +65,11 @@ Dataset::Dataset(const string& file_path) {
         // images
         string file_path = frame["file_path"];
         path absolute_path = base_dir / file_path; // construct the absolute path using base_dir
-        images.emplace_back(absolute_path.string(), image_dimensions);
+        // only add the image if it exists
+        if (exists(absolute_path)) {
+            images.emplace_back(absolute_path.string(), image_dimensions);
+        }
     }
-
 }
 
 // this method was written (mostly) by ChatGPT!
