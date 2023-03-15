@@ -86,8 +86,8 @@ __global__ void copy_packed_rgba_rectangular_grid_kernel(
     }
 
     // calculate x and y in local grid space (output pixel)
-    int ox = i % grid_size.x;
     int oy = divide(i, grid_size.x);
+    int ox = i - oy * grid_size.x;
 
     // get the corresponding buffer index (input pixel)
     const int ix = divide(ox * grid_resolution.x, grid_size.x);

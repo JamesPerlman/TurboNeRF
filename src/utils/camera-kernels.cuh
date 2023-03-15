@@ -3,6 +3,7 @@
 #include "../common.h"
 
 #include "../models/camera.cuh"
+#include "../utils/device-math.cuh"
 
 TURBO_NAMESPACE_BEGIN
 
@@ -112,8 +113,7 @@ __global__ void generate_undistorted_pixel_map_kernel(
         return;
     }
     
-    const uint32_t w = camera.resolution.x;
-    const uint32_t h = camera.resolution.y;
+    const uint32_t& w = camera.resolution.x;
 
     const float& k1 = camera.dist_params.k1;
     const float& k2 = camera.dist_params.k2;
@@ -123,8 +123,8 @@ __global__ void generate_undistorted_pixel_map_kernel(
     const float& p1 = camera.dist_params.p1;
     const float& p2 = camera.dist_params.p2;
 
-    const uint32_t x = idx % w;
-    const uint32_t y = idx / w;
+    const uint32_t y = divide(idx, w);
+    const uint32_t x = idx - y * w;
 
     const float xd = (float(x) - camera.principal_point.x) / camera.focal_length.x;
     const float yd = (float(y) - camera.principal_point.y) / camera.focal_length.y;
