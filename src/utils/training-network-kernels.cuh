@@ -105,10 +105,6 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 
     for (int i = 0; i < n_samples; ++i) {
         const float alpha = s_alpha[i];
-
-		if (trans < NeRFConstants::min_transmittance) {
-			break;
-		}
 		
         const float weight = trans * alpha;
 
@@ -119,6 +115,9 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 
 		trans *= (1.0f - alpha);
 
+		if (trans < NeRFConstants::min_transmittance) {
+			break;
+		}
     }
 
     ray_rgba_buf[idx + 0 * batch_size] = r;
