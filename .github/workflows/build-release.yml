@@ -7,12 +7,12 @@ on:
   #   branches:
   #     - release
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Build tag'
+        required: true
+        default: 'pre-release'
 
-inputs:
-  tag:
-    description: 'Build tag'
-    required: true
-    default: 'pre-release'
 
 jobs:
   build-pylib-binaries:
