@@ -98,8 +98,8 @@ jobs:
           path: .
           filename: '../archive/PyTurboNeRF-${{ matrix.artifact.name }}.zip'
 
-      - name: Upload Binaries
-        id: make-release
+      - name: Generate Release
+        id: gen-release
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
@@ -114,7 +114,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
     
     outputs:
-      release_url: ${{ steps.make-release.outputs.html_url }}
+      release_url: ${{ steps.gen-release.outputs.html_url }}
 
   notify-discord:
     runs-on: ubuntu-20.04
