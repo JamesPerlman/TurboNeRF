@@ -259,10 +259,10 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
 	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
 
-	sse_loss[r_idx] = fabsf(dr) < smooth_l1_loss_forward(dr);
-	sse_loss[g_idx] = fabsf(dg) < smooth_l1_loss_forward(dg);
-	sse_loss[b_idx] = fabsf(db) < smooth_l1_loss_forward(db);
-	sse_loss[a_idx] = fabsf(da) < smooth_l1_loss_forward(da);
+	sse_loss[r_idx] = smooth_l1_loss_forward(dr);
+	sse_loss[g_idx] = smooth_l1_loss_forward(dg);
+	sse_loss[b_idx] = smooth_l1_loss_forward(db);
+	sse_loss[a_idx] = smooth_l1_loss_forward(da);
 }
 
 // dL/dR = (1/4) * (dL/dR_r + dL/dR_g + dL/dR_b + dL/dR_a)
