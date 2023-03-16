@@ -8,7 +8,15 @@ on:
   #     - release
   workflow_dispatch:
 
+inputs:
+  tag:
+    description: 'Build tag'
+    required: true
+    default: 'pre-release'
+
 jobs:
+  define-version:
+
   build-pylib-binaries:
     runs-on: windows-2022
     defaults:
@@ -106,11 +114,12 @@ jobs:
           bodyFile: etc/pre-release.md
           commit: ${{ github.sha }}
           makeLatest: true
-          name: 'PyTurboNeRF Pre-Release Binaries'
+          name: 'PyTurboNeRF Binaries'
           prerelease: true
           replacesArtifacts: true
-          tag: 'pre-release'
+          tag: ${{ inputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
   trigger-blender-addon-release:
     runs-on: ubuntu-latest
     needs: build-pylib-binaries
@@ -121,5 +130,4 @@ jobs:
           token: ${{ secrets.SYNC_PAT }}
           repository: 'JamesPerlman/TurboNeRF-Blender'
           event-type: 'release'
-          client-payload: '{ "tag" : "pre-release" }'
-
+          client-payload: '{ "tag" : "${{ inputs.tag }}" }'
