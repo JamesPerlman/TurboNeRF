@@ -123,8 +123,8 @@ __global__ void generate_undistorted_pixel_map_kernel(
     const float& p1 = camera.dist_params.p1;
     const float& p2 = camera.dist_params.p2;
 
-    const uint32_t y = divide(idx, w);
-    const uint32_t x = idx - y * w;
+    const int y = divide(idx, w);
+    const int x = idx - y * w;
 
     const float xd = (float(x) - camera.principal_point.x) / camera.focal_length.x;
     const float yd = (float(y) - camera.principal_point.y) / camera.focal_length.y;
