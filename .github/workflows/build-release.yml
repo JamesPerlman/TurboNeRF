@@ -125,7 +125,7 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         with:
-          args: "New release available! [PyTurboNeRF ${{ inputs.tag }}](${{ needs.build-pylib-binaries.outputs.release_url }})"
+          args: "A new version of the TurboNeRF core binary is now available! [PyTurboNeRF ${{ inputs.tag }}](<${{ needs.build-pylib-binaries.outputs.release_url }}>)"
 
   trigger-blender-addon-release:
     runs-on: ubuntu-20.04
