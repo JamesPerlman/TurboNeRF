@@ -9,16 +9,16 @@ on:
 
 
 jobs:
-  test:
+  notify-discord:
     runs-on: ubuntu-20.04
     steps:
-      - name: Discord Notify
+      - name: Dispatch Release Notification
         uses: Ilshidur/action-discord@0.3.2
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         with:
-          args: 'DO NOT BE ALARMED.  THIS IS SIMPLY A TEST.  ${{ inputs.tag }}'
-    
+          args: "*THIS IS JUST A TEST* New release available! [${{ inputs.tag }}](https://rick.roll)"
+  
   build-pylib-binaries:
     runs-on: windows-2022
     defaults:
