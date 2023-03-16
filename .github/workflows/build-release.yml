@@ -15,8 +15,6 @@ inputs:
     default: 'pre-release'
 
 jobs:
-  define-version:
-
   build-pylib-binaries:
     runs-on: windows-2022
     defaults:
