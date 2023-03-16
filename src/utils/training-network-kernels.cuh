@@ -33,25 +33,9 @@ __global__ void copy_gradients_kernel(
 	}
 }
 
-/**
- * All of this code is deliberately under-optimized for readability.  Will fuse kernels and optimize later.
- */
-
 template <typename T>
 inline __device__ float density_to_sigma(const T& density) {
 	return __expf((float)density - 1.0f);
-}
-
-inline __device__ float sigma_to_trans(
-    const float* __restrict__ sigma,
-    const float* __restrict__ dt,
-    const int& i
-) {
-    float sigma_dt = 0.0f;
-    for (int j = 0; j < i; ++j) {
-        sigma_dt += sigma[j] * dt[j];
-    }
-    return __expf(-sigma_dt);
 }
 
 /**
