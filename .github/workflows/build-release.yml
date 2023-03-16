@@ -115,6 +115,7 @@ jobs:
           filename: '../archive/PyTurboNeRF-${{ matrix.artifact.name }}.zip'
 
       - name: Upload Binaries
+        id: make-release
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
@@ -127,9 +128,12 @@ jobs:
           replacesArtifacts: true
           tag: ${{ inputs.tag }}
           token: ${{ secrets.GITHUB_TOKEN }}
+    
+    outputs:
+      release_url: ${{ steps.make-release.outputs.html_url }}
 
   trigger-blender-addon-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: build-pylib-binaries
     steps:
       - name: Trigger TurboNeRF-Blender Release
@@ -138,4 +142,8 @@ jobs:
           token: ${{ secrets.SYNC_PAT }}
           repository: 'JamesPerlman/TurboNeRF-Blender'
           event-type: 'release'
-          client-payload: '{ "tag" : "${{ inputs.tag }}" }'
+          client-payload: |
+            {
+              "tag": "${{ inputs.tag }}",
+              "release_url": "${{ needs.build-pylib-binaries.outputs.release_url }}"
+            }
