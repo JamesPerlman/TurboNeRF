@@ -130,9 +130,9 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const stbi_uc b = pixel[2];
 	const stbi_uc a = pixel[3];
 	
-	pix_rgba[i_offset_0] = (float)r / 255.0f;
-	pix_rgba[i_offset_1] = (float)g / 255.0f;
-	pix_rgba[i_offset_2] = (float)b / 255.0f;
+	pix_rgba[i_offset_0] = __srgb_to_linear((float)r / 255.0f);
+	pix_rgba[i_offset_1] = __srgb_to_linear((float)g / 255.0f);
+	pix_rgba[i_offset_2] = __srgb_to_linear((float)b / 255.0f);
 	pix_rgba[i_offset_3] = (float)a / 255.0f;
 	
 	// TODO: optimize (we can likely eliminate some allocations here)
