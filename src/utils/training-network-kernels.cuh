@@ -189,11 +189,8 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 		const float dt = s_dt[i];
 		const float alpha = s_alpha[i];
 		
-		const float alpha_complement = 1.0f - alpha;
 		const float weight = trans * alpha;
         const float k = dt * (trans - weight);
-
-		trans *= alpha_complement;
 
 		cumsum_r -= weight * r;
 		cumsum_g -= weight * g;
@@ -211,6 +208,8 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 		s_dL_dcolor_g[i] = dL_dR_g * weight;
 		s_dL_dcolor_b[i] = dL_dR_b * weight;
 		
+		trans *= 1.0f - alpha;
+
 		if (trans < NeRFConstants::min_transmittance) {
 			break;
 		}
