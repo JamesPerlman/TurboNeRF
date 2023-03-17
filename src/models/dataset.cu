@@ -46,14 +46,13 @@ Dataset::Dataset(const string& file_path) {
         );
     }
 
-    uint32_t aabb_size = std::min(json_data.value("aabb_size", 16), 128);
+    uint32_t aabb_size = std::min(json_data.value("aabb_scale", 16), 128);
     bounding_box = BoundingBox((float)aabb_size);
 
     DistortionParams dist_params(
         json_data.value("k1", 0.0f),
         json_data.value("k2", 0.0f),
         json_data.value("k3", 0.0f),
-        json_data.value("k4", 0.0f),
         json_data.value("p1", 0.0f),
         json_data.value("p2", 0.0f)
     );
@@ -79,6 +78,9 @@ Dataset::Dataset(const string& file_path) {
             images.emplace_back(absolute_path.string(), image_dimensions);
         }
     }
+
+    // remove excess allocated images
+    images.shrink_to_fit();
 }
 
 // this method was written (mostly) by ChatGPT!

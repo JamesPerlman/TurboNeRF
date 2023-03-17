@@ -100,11 +100,10 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     py::class_<DistortionParams>(m, "DistortionParams")
         .def(
-            py::init<float, float, float, float, float, float>(),
+            py::init<float, float, float, float, float>(),
             py::arg("k1") = 0.0f,
             py::arg("k2") = 0.0f,
             py::arg("k3") = 0.0f,
-            py::arg("k4") = 0.0f,
             py::arg("p1") = 0.0f,
             py::arg("p2") = 0.0f
         )

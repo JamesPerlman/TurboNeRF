@@ -15,14 +15,13 @@ struct DistortionParams {
 	float k1;
 	float k2;
 	float k3;
-	float k4;
 
 	float p1;
 	float p2;
 
 	// constructor
-	DistortionParams(float k1 = 0.0f, float k2 = 0.0f, float k3 = 0.0f, float k4 = 0.0f, float p1 = 0.0f, float p2 = 0.0f)
-		: k1(k1), k2(k2), k3(k3), k4(k4), p1(p1), p2(p2) { }
+	DistortionParams(float k1 = 0.0f, float k2 = 0.0f, float k3 = 0.0f, float p1 = 0.0f, float p2 = 0.0f)
+		: k1(k1), k2(k2), k3(k3), p1(p1), p2(p2) { }
 };
 
 struct Camera {
@@ -46,7 +45,7 @@ struct Camera {
 		DistortionParams dist_params = DistortionParams()
 	)
 		: resolution(resolution)
-		, resolution_f(float2{float(resolution.x), float(resolution.y)})
+		, resolution_f(make_float2(resolution.x, resolution.y))
 		, near(near)
 		, far(far)
 		, focal_length(focal_length)
@@ -84,16 +83,6 @@ struct Camera {
 		return Ray{ ray_o, ray_d };
 	}
 	
-	// inline __device__ Ray local_ray_at_pixel_xy_normalized(const float& x, const float& y) const {
-	// 	const float sx = sensor_size.x * x;
-	// 	const float sy = sensor_size.y * y;
-
-	// 	float3 ray_o = make_float3(sx, sy, near);
-	// 	float3 ray_d = ray_o;
-
-	// 	return Ray{ ray_o, ray_d };
-	// }
-
 	inline __device__ Ray global_ray_from_local_ray(const Ray& local_ray) const {
 		float3 global_origin = transform * local_ray.o;
 		float3 global_direction = transform.mmul_ul3x3(local_ray.d);
