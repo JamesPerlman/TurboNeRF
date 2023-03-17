@@ -116,10 +116,6 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const float x = undistort_map[pixel_idx + 0 * n_pixels_per_image];
 	const float y = undistort_map[pixel_idx + 1 * n_pixels_per_image];
 
-	// const uint32_t pixel_x = pixel_idx % image_dimensions.x;
-	// const uint32_t pixel_y = pixel_idx / image_dimensions.x;
-	// const uint32_t x = pixel_x;
-	// const uint32_t y = pixel_y;
 	const Camera cam = cameras[image_idx];
 	
 	const uint32_t img_offset = image_idx * image_data_stride;
