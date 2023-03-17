@@ -167,6 +167,7 @@ set(SOURCES
 	src/rendering/render-task-factories/render-task-factory.cu
 
 	# utils
+	src/utils/camera-kernels.cu
 	src/utils/gpu-image.cu
 	src/utils/occupancy-grid-kernels.cu
 	src/utils/rendering-kernels.cu
