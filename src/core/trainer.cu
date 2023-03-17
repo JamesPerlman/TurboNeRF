@@ -32,11 +32,8 @@ void Trainer::create_pixel_undistort_map(
 
 	const uint32_t n_pixels = w * h;
 
-	const dim3 block(16, 16);
-	const dim3 grid((w + block.x - 1) / block.x, (h + block.y - 1) / block.y);
-
 	// create the undistort map for camera 0 - assumption: all cameras have identical dist_params params
-	generate_undistorted_pixel_map_kernel<<<next_multiple(n_pixels, batch_size_granularity), n_threads_linear, 0, ctx.stream>>>(
+	generate_undistorted_pixel_map_kernel<<<n_blocks_linear(n_pixels), n_threads_linear, 0, ctx.stream>>>(
 		n_pixels,
 		camera,
 		ctx.workspace.undistort_map
@@ -127,7 +124,6 @@ void Trainer::generate_next_training_batch(
 		ctx.workspace.ray_t,
 		ctx.workspace.ray_step
 	);
-
 
 	/**
 	 * Count the number of rays that will fill the batch with the maximum number of samples
