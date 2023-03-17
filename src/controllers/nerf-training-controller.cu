@@ -34,8 +34,6 @@ NeRFTrainingController::NeRFTrainingController(Dataset* dataset, NeRFProxy* nerf
 	);
 }
 
-// NeRFTrainingController member functions
-
 void NeRFTrainingController::prepare_for_training() {
 
 	// we only prepare the first NeRF (for the first device) - the rest we will copy data to
