@@ -62,7 +62,7 @@ public:
 
 	// public methods
 	float train_step(Context& ctx);
-	void update_occupancy_grid(Context& ctx, const uint32_t& training_step);
+	float update_occupancy_grid(Context& ctx, const uint32_t& training_step);
 	void generate_next_training_batch(Context& ctx);
 	void create_pixel_undistort_map(Context& ctx);
 };

@@ -215,7 +215,7 @@ void Trainer::generate_next_training_batch(
 
 // update occupancy grid
 
-void Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& training_step) {
+float Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& training_step) {
 	const uint32_t grid_volume = ctx.nerf->occupancy_grid.volume_i;
 	const uint32_t n_bitfield_bytes = ctx.nerf->occupancy_grid.get_n_bitfield_elements();
 	const uint32_t n_levels = ctx.nerf->occupancy_grid.n_levels;
@@ -289,32 +289,15 @@ void Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& train
 		ctx.workspace.occupancy_grid
 	);
 
-	CHECK_DATA(bitfield_cpu, uint8_t, ctx.nerf->occupancy_grid.get_bitfield(), n_bitfield_bytes, ctx.stream);
+	uint32_t n_bits_occupied = count_1s(
+		ctx.nerf->occupancy_grid.get_bitfield(),
+		ctx.nerf->occupancy_grid.get_bitcounts(),
+		n_bitfield_bytes,
+		ctx.stream
+	);
 
-	// this is just debug code to print out the percentage of bits occupied
-	int bits_occupied = 0;
-	for (int i = 0; i < n_bitfield_bytes; ++i) {
-		for (int j = 0; j < n_levels; ++j) {
-			if (bitfield_cpu[i] & (1 << j)) {
-				++bits_occupied;
-			}
-		}
-	}
-
-	printf("%% of bits occupied: %f\n", 100.f * (float)bits_occupied / (grid_volume * n_levels));
-	
-	CHECK_DATA(cpu_ogrid_dens, float, ctx.nerf->occupancy_grid.get_density(), grid_volume, ctx.stream);
-	float min_value = std::numeric_limits<float>::max();
-	float max_value = std::numeric_limits<float>::lowest();
-	float sum_value = 0.0f;
-	for (int i = 0; i < grid_volume; ++i) {
-		if (cpu_ogrid_dens[i] < min_value) min_value = cpu_ogrid_dens[i];
-		if (cpu_ogrid_dens[i] > max_value) max_value = cpu_ogrid_dens[i];
-		sum_value += cpu_ogrid_dens[i];
-	}
-
-	float avg_value = sum_value / grid_volume;
-	printf("Occupancy Grid: min = %f, max = %f, avg = %f\n", min_value, max_value, avg_value);
+	float bits_occupied = (float)n_bits_occupied / (grid_volume * n_levels);
+	return bits_occupied;
 }
 
 float Trainer::train_step(
