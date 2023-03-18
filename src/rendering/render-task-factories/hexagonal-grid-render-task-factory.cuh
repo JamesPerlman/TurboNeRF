@@ -29,8 +29,9 @@ public:
         // dimensional properties of preview hexagon
         int p_H = hex_height_for_npix_and_aspect(p_npix, a);
         
-        // we want p_H to be the highest multiple of 10 where npix <= n_rays_per_task
-        p_H = (std::max(p_H, 10) / 10) * 10;
+        // we want p_H to be a multiple of M
+        int M = 10; // for best results, M should be the smallest number such that a * M is a positive integer
+        p_H = (std::max(p_H + (M - 1), M) / M) * M;
 
         int p_W, p_cw;
         hex_get_W_and_cw(p_H, a, p_W, p_cw);
@@ -53,30 +54,47 @@ public:
         // recalculate the number of rays per task
         int n_rays = n_pix_total_in_hex(H, cw);
 
-        // figure out how many preview hexagons we can fit in the image
+        // figure out how many preview hexagons we can fit in the image horizontally
         int pn_w = 1 + 2 * request->output->width / (p_W + p_cw);
 
         // we need pn_w to be odd
         pn_w = pn_w + (1 - pn_w & 1);
 
-        int pn_h = 3 + request->output->height / p_H;
+        // calculate number of preview hexagons in the vertical direction
+        int pn_h = 2 + request->output->height / p_H;
 
-        // now figure out how many full-res hexagons
-        int n_w = pn_w / s;
-        int n_h = pn_h / s;
+        // we need pn_h to be odd
+        pn_h = pn_h + (1 - pn_h & 1);
+
+        // now figure out how many full-res hexagons will fit
+        int n_w = std::max(3, pn_w / s);
+        int n_h = std::max(3, pn_h / s);
         int n_hex = n_w * n_h;
+        
+        // n_w and n_h must be odd
+        n_w = n_w + (1 - n_w & 1);
+        n_h = n_h + (1 - n_h & 1);
+        
+        // find the position of the center preview hexagon
+        int pci = pn_w / 2;
+        int pcj = pn_h / 2;
+        int phx, phy;
+        hex_get_xy_from_ij(pci, pcj, p_H, p_W, p_cw, phx, phy);
 
         // center pixel coordinates
         int cx = request->output->width / 2;
         int cy = request->output->height / 2;
 
-        // find the position of the center hexagon
+        // calculate preview grid offsets
+        int2 po = { cx - phx - p_W / 2, cy - phy - p_H / 2 };
+
+        // find the position of the center full-res hexagon
         int ci = n_w / 2;
         int cj = n_h / 2;
         int hx, hy;
         hex_get_xy_from_ij(ci, cj, H, W, cw, hx, hy);
         
-        // calculate grid offsets
+        // calculate full-res grid offsets
         int2 o = { cx - hx, cy - hy };
 
         // prepare to create tasks by order of distance from the center
@@ -120,7 +138,7 @@ public:
             std::unique_ptr<RayBatchCoordinator>(
                 new HexagonalGridRayBatchCoordinator(
                     { pn_w, pn_h },
-                    { o.x + cw / 4, o.y }, // ???
+                    po,
                     p_W,
                     p_H,
                     p_cw

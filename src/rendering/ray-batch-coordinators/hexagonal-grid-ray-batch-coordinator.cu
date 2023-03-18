@@ -41,8 +41,8 @@ __global__ void generate_hexagonal_grid_of_rays_kernel(
 
     hex_get_xy_from_ij(gi, gj, H, W, cw, ix, iy);
 
-    ix = ix + grid_offset.x;
-    iy = iy + grid_offset.y;
+    ix = ix - grid_offset.x + W / 2;
+    iy = iy - grid_offset.y + H / 2;
 
     const Camera cam = *camera;
 
@@ -102,8 +102,8 @@ __global__ void copy_packed_rgba_hexagonal_grid_kernel(
     int y = divide(i_out, output_width); // (i_out / output_width)
     int x = i_out - output_width * y;    // (i_out % output_width)
 
-    x -= grid_offset.x;
-    y -= grid_offset.y;
+    x += grid_offset.x;
+    y += grid_offset.y;
 
     // then we get the grid i,j indices
     int i, j;

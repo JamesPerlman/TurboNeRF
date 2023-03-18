@@ -282,7 +282,7 @@ inline __device__ void hex_get_ij_from_xy(
         j = divide(y, rh);
     } else {
         i = 2 * divide(x + tw, rw) - 1;
-        j = divide(y + th, rh);
+        j = divide(y - th, rh);
     }
 }
 
