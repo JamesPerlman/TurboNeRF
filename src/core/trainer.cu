@@ -317,13 +317,13 @@ void Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& train
 	printf("Occupancy Grid: min = %f, max = %f, avg = %f\n", min_value, max_value, avg_value);
 }
 
-void Trainer::train_step(
+float Trainer::train_step(
 	Trainer::Context& ctx
 ) {
 	// Generate training batch
 	generate_next_training_batch(ctx);
 
-	ctx.network.train(
+	const float loss = ctx.network.train(
 		ctx.stream,
 		ctx.nerf->params,
 		ctx.workspace.batch_size,
@@ -338,4 +338,6 @@ void Trainer::train_step(
 		ctx.workspace.network_concat,
 		ctx.workspace.network_output
 	);
+
+	return loss;
 }

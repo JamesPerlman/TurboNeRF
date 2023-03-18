@@ -123,7 +123,7 @@ void NeRFTrainingController::load_images(Trainer::Context& ctx) {
 void NeRFTrainingController::train_step() {
 	// TODO: multi-gpu training.  For now we just train on the first device.
 	auto& ctx = contexts[0];
-	trainer.train_step(ctx);
+	float loss = trainer.train_step(ctx);
 	++training_step;
 }
 

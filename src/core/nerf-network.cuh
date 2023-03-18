@@ -26,7 +26,7 @@ struct NerfNetwork {
 	
 	void set_params(NetworkParamsWorkspace& params_ws);
 
-	void train(
+	float train(
 		const cudaStream_t& stream,
 		NetworkParamsWorkspace& params_ws,
 		const uint32_t& batch_size,

@@ -167,7 +167,7 @@ void NerfNetwork::set_params(NetworkParamsWorkspace& params_ws) {
 	);
 }
 
-void NerfNetwork::train(
+float NerfNetwork::train(
 	const cudaStream_t& stream,
 	NetworkParamsWorkspace& params_ws,
 	const uint32_t& batch_size,
@@ -209,12 +209,6 @@ void NerfNetwork::train(
 		n_rays
 	);
 
-	printf(
-		"Loss: %f / # Rays: %u\n",
-		loss,
-		n_rays
-	);
-
 	// Backward
 	backward(
 		stream,
@@ -234,6 +228,8 @@ void NerfNetwork::train(
 
 	// Optimizer
 	optimizer_step(stream, params_ws);
+
+	return loss;
 }
 
 void NerfNetwork::inference(
