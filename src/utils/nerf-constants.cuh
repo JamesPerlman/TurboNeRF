@@ -17,7 +17,7 @@ namespace NeRFConstants {
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
 	// For some reason, the way the paper says it does not work for this implementation.
 	// It seems to work with a threshold of 0.01, when the paper says to multiply by min_step_size.
-    constexpr float occupancy_threshold = 0.01f * NeRFConstants::min_step_size;
+    constexpr float occupancy_threshold = 0.01f;// * NeRFConstants::min_step_size;
 
     constexpr uint32_t n_steps_per_render_compaction = 64;
 }
