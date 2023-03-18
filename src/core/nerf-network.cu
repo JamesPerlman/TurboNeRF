@@ -483,7 +483,7 @@ void NerfNetwork::backward(
 	float* target_rgba
 ) {
 	// zero out previous gradients
-	cudaMemsetAsync(network_ws.grad_dL_dR, 0, 4 * batch_size * sizeof(float), stream);
+	cudaMemsetAsync(network_ws.grad_dL_dR, 0, 3 * batch_size * sizeof(float), stream);
 	cudaMemsetAsync(network_ws.grad_dL_dcolor, 0, 3 * batch_size * sizeof(float), stream);
 	cudaMemsetAsync(network_ws.grad_dL_dsigma, 0, batch_size * sizeof(float), stream);
 
