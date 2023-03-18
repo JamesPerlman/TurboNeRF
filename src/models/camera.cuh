@@ -77,8 +77,8 @@ struct Camera {
 		const float xn = (x - cx) / focal_length.x;
 		const float yn = (y - cy) / focal_length.y;
 		
-		float3 ray_o = make_float3(xn, yn, near);
-		float3 ray_d = ray_o;
+		float3 ray_d = make_float3(xn, yn, 1.0f);
+		float3 ray_o = near * ray_d;
 
 		return Ray{ ray_o, ray_d };
 	}
