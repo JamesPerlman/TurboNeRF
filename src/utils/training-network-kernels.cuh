@@ -241,25 +241,21 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 	const uint32_t r_idx = idx;
 	const uint32_t g_idx = r_idx + batch_size;
 	const uint32_t b_idx = g_idx + batch_size;
-	const uint32_t a_idx = b_idx + batch_size;
 
 	if (idx >= n_rays) {
 		sse_loss[r_idx] = 0.0f;
 		sse_loss[g_idx] = 0.0f;
 		sse_loss[b_idx] = 0.0f;
-		sse_loss[a_idx] = 0.0f;
 		return;
 	}
 
 	const float dr = ray_rgba[r_idx] - target_rgba[r_idx];
 	const float dg = ray_rgba[g_idx] - target_rgba[g_idx];
 	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
-	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
 
 	sse_loss[r_idx] = smooth_l1_loss_forward(dr);
 	sse_loss[g_idx] = smooth_l1_loss_forward(dg);
 	sse_loss[b_idx] = smooth_l1_loss_forward(db);
-	sse_loss[a_idx] = smooth_l1_loss_forward(da);
 }
 
 // dL/dR = (1/4) * (dL/dR_r + dL/dR_g + dL/dR_b + dL/dR_a)
@@ -280,17 +276,14 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const uint32_t r_idx = idx;
 	const uint32_t g_idx = r_idx + batch_size;
 	const uint32_t b_idx = g_idx + batch_size;
-	const uint32_t a_idx = b_idx + batch_size;
 
 	const float dr = ray_rgba[r_idx] - target_rgba[r_idx];
 	const float dg = ray_rgba[g_idx] - target_rgba[g_idx];
 	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
-	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
 
 	dL_dR[r_idx] = inv_4nrays * smooth_l1_loss_backward(dr);
 	dL_dR[g_idx] = inv_4nrays * smooth_l1_loss_backward(dg);
 	dL_dR[b_idx] = inv_4nrays * smooth_l1_loss_backward(db);
-	dL_dR[a_idx] = inv_4nrays * smooth_l1_loss_backward(da);
 }
 
 TURBO_NAMESPACE_END

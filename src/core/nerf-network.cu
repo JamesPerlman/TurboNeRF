@@ -465,7 +465,7 @@ float NerfNetwork::calculate_loss(
 	return (1.0f / (float)n_rays) * thrust::reduce(
 		thrust::cuda::par_nosync.on(stream),
 		loss_buffer_ptr,
-		loss_buffer_ptr + 4 * batch_size,
+		loss_buffer_ptr + 3 * batch_size,
 		0.0f,
 		thrust::plus<float>()
 	);
