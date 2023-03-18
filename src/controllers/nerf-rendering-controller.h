@@ -27,7 +27,7 @@ private:
     RenderPattern pattern;
 
 public:
-    NeRFRenderingController(const RenderPattern& pattern = RenderPattern::HexagonalGrid, const uint32_t& batch_size = 0);
+    NeRFRenderingController(const RenderPattern& pattern = RenderPattern::LinearChunks, const uint32_t& batch_size = 0);
 
     void submit(
         std::shared_ptr<RenderRequest> request
