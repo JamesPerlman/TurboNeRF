@@ -36,15 +36,18 @@ Dataset::Dataset(const string& file_path) {
     
     // TODO: per-camera focal length
     // if "fl_x" and "fl_y" are specified, these values are the focal lengths for their respective axes (in pixels)
-    float2 focal_length = make_float2(0.0f, 0.0f);
-    if (json_data.contains("fl_x") && json_data.contains("fl_y")) {
-        focal_length = make_float2(json_data["fl_x"], json_data["fl_y"]);
-    } else if (json_data.contains("camera_angle_x") && json_data.contains("camera_angle_y")) {
-        focal_length = make_float2(
-            0.5f * w / tanf(0.5f * json_data["camera_angle_x"]),
-            0.5f * h / tanf(0.5f * json_data["camera_angle_y"])
-        );
+    float fl_x, fl_y;
+    if (json_data.contains("fl_x")) {
+        fl_x = json_data["fl_x"];
+        fl_y = json_data.value("fl_y", fl_x);
+    } else if (json_data.contains("camera_angle_x")) {
+        float ca_x = json_data["camera_angle_x"];
+        float ca_y = json_data.value("camera_angle_y", ca_x);
+        fl_x = 0.5f * w / tanf(0.5f * ca_x);
+        fl_y = 0.5f * h / tanf(0.5f * ca_y);
     }
+    
+    float2 focal_length = make_float2(fl_x, fl_y);
 
     uint32_t aabb_size = std::min(json_data.value("aabb_scale", 16), 128);
     bounding_box = BoundingBox((float)aabb_size);
