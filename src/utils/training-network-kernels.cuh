@@ -155,7 +155,6 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	const uint32_t idx_offset_0 = idx;
 	const uint32_t idx_offset_1 = idx_offset_0 + batch_size;
 	const uint32_t idx_offset_2 = idx_offset_1 + batch_size;
-	const uint32_t idx_offset_3 = idx_offset_2 + batch_size;
 
     // local references to sample data
     const float* __restrict__ s_dt = dt_buf + sample_offset;
@@ -169,7 +168,6 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
     const float dL_dR_r = dL_dR_buf[idx_offset_0];
 	const float dL_dR_g = dL_dR_buf[idx_offset_1];
 	const float dL_dR_b = dL_dR_buf[idx_offset_2];
-	const float dL_dR_a = dL_dR_buf[idx_offset_3];
 
     float* __restrict__ s_dL_dsigma = dL_dsigma_buf + sample_offset;
 
@@ -180,7 +178,6 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	float cumsum_r = ray_rgba_buf[idx_offset_0];
 	float cumsum_g = ray_rgba_buf[idx_offset_1];
 	float cumsum_b = ray_rgba_buf[idx_offset_2];
-	float cumsum_a = ray_rgba_buf[idx_offset_3];
 
 	float trans = 1.0f;
 	for (int i = 0; i < n_samples; ++i) {
@@ -197,14 +194,12 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 		cumsum_r -= weight * r;
 		cumsum_g -= weight * g;
 		cumsum_b -= weight * b;
-		cumsum_a -= weight;
 
         const float dRr_dsigma = -dt * cumsum_r + k * r;
         const float dRg_dsigma = -dt * cumsum_g + k * g;
         const float dRb_dsigma = -dt * cumsum_b + k * b;
-		const float dRa_dsigma = -dt * cumsum_a + k;
 
-        s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma + dL_dR_a * dRa_dsigma;
+        s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma;
 
 		s_dL_dcolor_r[i] = dL_dR_r * weight;
 		s_dL_dcolor_g[i] = dL_dR_g * weight;
