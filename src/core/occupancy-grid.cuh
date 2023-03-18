@@ -23,6 +23,7 @@ struct OccupancyGrid {
 private:
 	float* __restrict__ density;
 	uint8_t* __restrict__ bitfield;
+	uint8_t* __restrict__ bitcounts;
 
 public:
 	const int n_levels;
@@ -71,11 +72,16 @@ public:
 		
 		density = workspace.values;
 		bitfield = workspace.bitfield;
+		bitcounts = workspace.bitcounts;
 	}
 
 	// pointer getters
 	inline NRC_HOST_DEVICE uint8_t* get_bitfield() const {
 		return bitfield;
+	}
+
+	inline NRC_HOST_DEVICE uint8_t* get_bitcounts() const {
+		return bitcounts;
 	}
 
 	inline NRC_HOST_DEVICE float* get_density() const {
