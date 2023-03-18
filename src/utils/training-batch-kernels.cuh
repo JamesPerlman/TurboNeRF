@@ -125,6 +125,11 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const stbi_uc g = pixel[1];
 	const stbi_uc b = pixel[2];
 	const stbi_uc a = pixel[3];
+
+	if (a == 0) {
+		ray_alive[i] = false;
+		return;
+	}
 	
 	pix_rgba[i_offset_0] = __srgb_to_linear((float)r / 255.0f);
 	pix_rgba[i_offset_1] = __srgb_to_linear((float)g / 255.0f);
