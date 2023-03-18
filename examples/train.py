@@ -1,4 +1,6 @@
 from pathlib import Path
+from PIL import Image
+import numpy as np
 
 # Search for pyNeRFRenderCore in build/Debug/
 import sys
@@ -23,10 +25,13 @@ nerf = manager.create(dataset.bounding_box)
 
 trainer = tn.Trainer(dataset, nerf, batch_size=2<<21)
 
-renderer = tn.Renderer()
+renderer = tn.Renderer(pattern=tn.RenderPattern.LinearChunks)
 
-render_buf = tn.CUDARenderBuffer()
+# you can use any kind of render buffer you want, but if you want to get access to the rgba data as a np.array, you need to use the CPURenderBuffer
+render_buf = tn.CPURenderBuffer()
 render_buf.set_size(512, 512)
+principal_point = (render_buf.width / 2, render_buf.height / 2)
+focal_len = (500, 500)
 
 # Just pull a random camera from the dataset
 cam6 = dataset.cameras[6]
@@ -36,8 +41,8 @@ render_cam = tn.Camera(
     (render_buf.width, render_buf.height),
     cam6.near,
     cam6.far,
-    cam6.focal_length,
-    cam6.view_angle,
+    focal_len,
+    principal_point,
     cam6.transform,
     cam6.dist_params
 )
@@ -52,16 +57,27 @@ for i in range(1024):
     if i % 16 == 0 and i > 0:
         trainer.update_occupancy_grid(i)
 
-    if i % 32 == 0 and i > 0:
+    if i % 16 == 0 and i > 0:
 
         request = tn.RenderRequest(
             render_cam,
             [nerf],
-            render_buf
+            render_buf,
+            tn.RenderFlags.Final
         )
 
         renderer.submit(request)
-        render_buf.save_image(f"H:\\render_{i:05d}.png")
+
+        # save
+        rgba = np.array(render_buf.get_rgba())
+        rgba_uint8 = (rgba * 255).astype(np.uint8)
+        img = Image.fromarray(rgba_uint8, mode="RGBA")
+        img.save(f"H:\\render_{i:05d}.png")
+
+        # if you don't need direct access to the rgba data, you can use a CUDARenderBuffer (or a CPURenderBuffer) and the save_image method.
+        # it is likely that this method is slightly faster than using numpy for just saving an image.
+        # render_buf.save_image(f"H:\\render_{i:05d}.png")
+
         print(f"Saved render_{i:05d}.png!")
 
 # it is recommended to call these methods at the end of your program

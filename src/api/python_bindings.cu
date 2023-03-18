@@ -182,20 +182,37 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("width"),
             py::arg("height")
         )
+        .def_readonly("width", &RenderTarget::width)
+        .def_readonly("height", &RenderTarget::height)
+        .def("free", [](RenderTarget& rt) { rt.free(); })
+    ;
+
+    py::class_<CPURenderBuffer, RenderTarget>(m, "CPURenderBuffer")
+        .def(py::init<>())
+        .def("get_rgba", [](CPURenderBuffer& rb) {
+            
+            rb.synchronize();
+            float* rgba = rb.get_rgba();
+            
+            const int width = rb.width;
+            const int height = rb.height;
+            
+            py::array::StridesContainer strides = {
+                sizeof(float) * 4 * width,
+                sizeof(float) * 4,
+                sizeof(float)
+            };
+            
+            return py::array_t<float>({ height, width, 4 }, strides, rgba);
+        })
     ;
 
     py::class_<CUDARenderBuffer, RenderTarget>(m, "CUDARenderBuffer")
         .def(py::init<>())
-        .def("free", [](CUDARenderBuffer& rb) { rb.free(); })
-        .def_readonly("width", &CUDARenderBuffer::width)
-        .def_readonly("height", &CUDARenderBuffer::height)
     ;
 
     py::class_<OpenGLRenderSurface, RenderTarget>(m, "OpenGLRenderSurface")
         .def(py::init<>())
-        .def("free", [](OpenGLRenderSurface& rs) { rs.free(); })
-        .def_readonly("width", &OpenGLRenderSurface::width)
-        .def_readonly("height", &OpenGLRenderSurface::height)
     ;
 
     py::enum_<RenderFlags>(m, "RenderFlags", py::arithmetic())
@@ -221,7 +238,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("camera"),
             py::arg("nerfs"),
             py::arg("output"),
-            py::arg("flags"),
+            py::arg("flags") = RenderFlags::Final,
             py::arg("on_complete") = nullptr,
             py::arg("on_progress") = nullptr,
             py::arg("on_cancel") = nullptr
@@ -235,7 +252,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<NeRFRenderingController>(m, "Renderer")
         .def(
            py::init<const RenderPattern&, const uint32_t&>(),
-           py::arg("pattern") = RenderPattern::HexagonalGrid,
+           py::arg("pattern") = RenderPattern::LinearChunks,
            py::arg("batch_size") = 0
         )
         .def(
