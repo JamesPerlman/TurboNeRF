@@ -15,6 +15,9 @@
 TURBO_NAMESPACE_BEGIN
 
 struct NerfNetwork {
+	
+	NetworkWorkspace workspace;
+
 	std::shared_ptr<tcnn::Encoding<tcnn::network_precision_t>> direction_encoding;
 	std::shared_ptr<tcnn::NetworkWithInputEncoding<tcnn::network_precision_t>> density_network;
 	std::shared_ptr<tcnn::Network<tcnn::network_precision_t>> color_network;
@@ -66,8 +69,6 @@ private:
 	float aabb_size;
 	uint32_t batch_size = 0;
 	bool can_train = false;
-	
-	NetworkWorkspace network_ws;
 
 	// Helper context
 	struct ForwardContext : public tcnn::Context {
