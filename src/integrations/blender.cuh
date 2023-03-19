@@ -1,6 +1,8 @@
 #pragma once
 
+#include <any>
 #include <glad/glad.h>
+#include <map>
 #include <memory>
 #include <optional>
 
@@ -17,7 +19,10 @@ TURBO_NAMESPACE_BEGIN
 
 class BlenderBridge 
 {
+     /** EVENT OBSERVERS & HELPERS **/
     public:
+    
+    // TODO: This could be abstracted to a base class
 
     enum class ObservableEvent {
         OnTrainingStart,
@@ -34,22 +39,24 @@ class BlenderBridge
         OnRequestRedraw
     };
 
-    private:
+    using EventCallbackParam = std::map<std::string, std::any>;
+    using EventCallback = std::function<void(EventCallbackParam)>;
 
     struct EventObserver {
         uint32_t id;
         ObservableEvent event;        
 
-        // TODO: look into sending arbitrary data with the event (via callback)
-        // https://github.com/pybind/pybind11_json
-        std::function<void()> callback;
+        EventCallback callback;
 
-        EventObserver(uint32_t id, ObservableEvent event, std::function<void()> callback)
+        EventObserver(uint32_t id, ObservableEvent event, EventCallback callback)
             : id(id)
             , event(event)
             , callback(callback)
         {};
     };
+
+    /** PRIVATE PROPERTIES */
+    private:
 
     NeRFRenderingController _previewer;
     NeRFRenderingController _renderer;
@@ -86,10 +93,11 @@ class BlenderBridge
         };
     };
 
-    /** EVENT OBSERVERS **/
-    public:
+   /**
+    * EVENT OBSEREVR METHODS
+    */
 
-    uint32_t add_observer(ObservableEvent event, std::function<void()> callback) {
+    uint32_t add_observer(ObservableEvent event, EventCallback callback) {
         uint32_t id = _event_observer_id++;
         _event_observers.emplace_back(id, event, callback);
         return id;
@@ -126,10 +134,10 @@ class BlenderBridge
     }
 
     private:
-    void dispatch(ObservableEvent event) {
+    void dispatch(ObservableEvent event, std::map<std::string, std::any> data = {}) {
         for (auto& observer : _event_observers) {
             if (observer.event == event) {
-                observer.callback();
+                observer.callback(data);
             }
         }
     }
@@ -148,11 +156,12 @@ class BlenderBridge
         do {
             if (_is_training && _trainer.has_value()) {
                 // train a single step
-                _trainer->train_step();
+                auto metrics = _trainer->train_step();
                 auto training_step = _trainer->get_training_step();
                 if (training_step % 16 == 0) {
                     _trainer->update_occupancy_grid(training_step);
                 }
+                dispatch(ObservableEvent::OnTrainingStep, metrics.as_map());
             }
             // check if we need to render
             _render_queue.work();

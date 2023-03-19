@@ -19,6 +19,7 @@
 #include "../services/device-manager.cuh"
 #include "../services/nerf-manager.cuh"
 #include "../utils/linalg/transform4f.cuh"
+#include "pybind_cpp_utils.cuh"
 #include "pybind_cuda.cuh"
 
 namespace py = pybind11;
@@ -190,7 +191,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<CPURenderBuffer, RenderTarget>(m, "CPURenderBuffer")
         .def(py::init<>())
         .def("get_rgba", [](CPURenderBuffer& rb) {
-            
+
             rb.synchronize();
             float* rgba = rb.get_rgba();
             
@@ -349,7 +350,6 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
                 { 0 }, // strides,
                 true
             );
-            
         })
         .def("get_render_n_pixels", &BlenderBridge::get_render_n_pixels)
         .def(
@@ -381,7 +381,12 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         // event observers
         .def(
             "add_observer",
-            &BlenderBridge::add_observer,
+            [] (BlenderBridge& bb, BlenderBridge::ObservableEvent event, py::function callback) -> uint32_t {
+                return bb.add_observer(event, [callback](BlenderBridge::EventCallbackParam e) {
+                    py::gil_scoped_acquire acquire;
+                    callback(cpp_map_to_py_dict(e));
+                });
+            },
             py::arg("event"),
             py::arg("callback")
         )
