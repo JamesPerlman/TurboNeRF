@@ -12,9 +12,10 @@
 #include "../common.h"
 #include "nerf-training-controller.h"
 
-using namespace turbo;
 using namespace tcnn;
 using namespace nlohmann;
+
+TURBO_NAMESPACE_BEGIN
 
 NeRFTrainingController::NeRFTrainingController(Dataset* dataset, NeRFProxy* nerf_proxy, const uint32_t batch_size)
 {
@@ -120,11 +121,20 @@ void NeRFTrainingController::load_images(Trainer::Context& ctx) {
 }
 
 
-void NeRFTrainingController::train_step() {
+NeRFTrainingController::Metrics NeRFTrainingController::train_step() {
 	// TODO: multi-gpu training.  For now we just train on the first device.
 	auto& ctx = contexts[0];
 	float loss = trainer.train_step(ctx);
 	++training_step;
+
+	NeRFTrainingController::Metrics info;
+	
+	info.loss = loss;
+	info.step = training_step;
+	info.n_rays = ctx.n_rays_in_batch;
+	info.n_samples = ctx.n_samples_in_batch;
+
+	return info;
 }
 
 void NeRFTrainingController::update_occupancy_grid(const uint32_t& training_step) {
@@ -132,3 +142,5 @@ void NeRFTrainingController::update_occupancy_grid(const uint32_t& training_step
 	auto& ctx = contexts[0];
 	trainer.update_occupancy_grid(ctx, training_step);
 }
+
+TURBO_NAMESPACE_END
