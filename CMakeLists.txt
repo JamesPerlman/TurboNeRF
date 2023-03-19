@@ -215,6 +215,7 @@ if (TN_BUILD_PYD)
 	include_directories(${pybind11_INCLUDE_DIRS})
 
 	set(PYBIND_INCLUDES
+		src/api/pybind_cpp_utils.cuh
 		src/api/pybind_cuda.cuh
 		src/api/python_bindings.cu
 
