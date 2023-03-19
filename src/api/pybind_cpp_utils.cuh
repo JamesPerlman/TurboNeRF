@@ -18,17 +18,26 @@ py::object any_to_py(const std::any& value) {
 }
 
 py::object any_to_py_object(const std::any& value) {
-    if (value.type() == typeid(int)) {
-        return any_to_py<int>(value);
-    } else if (value.type() == typeid(uint32_t)) {
-        return any_to_py<uint32_t>(value);
-    } else if (value.type() == typeid(float)) {
-        return any_to_py<float>(value);
-    } else if (value.type() == typeid(std::string)) {
-        return any_to_py<std::string>(value);
-    } else {
+    #define ANY_TO_PY(TYPE) \
+        else if (value.type() == typeid(TYPE)) \
+            return any_to_py<TYPE>(value);\
+    
+    if (false) {}
+    
+    ANY_TO_PY(bool)
+    ANY_TO_PY(int)
+    ANY_TO_PY(uint32_t)
+    ANY_TO_PY(size_t)
+    ANY_TO_PY(double)
+    ANY_TO_PY(float)
+    ANY_TO_PY(std::string)
+    
+    else {
+        printf("An unsupported data type was encountered in `any_to_py_object`.\n");
         throw std::runtime_error("Unsupported data type.");
     }
+
+    #undef ANY_TO_PY
 }
 
 template <typename K, typename V>
