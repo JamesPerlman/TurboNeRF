@@ -31,10 +31,13 @@ public:
         
         // we want p_H to be a multiple of M
         int M = 10; // for best results, M should be the smallest number such that a * M is a positive integer
-        p_H = (std::max(p_H + (M - 1), M) / M) * M;
+        p_H = ((std::max(p_H, M) / M) + 1) * M;
 
         int p_W, p_cw;
         hex_get_W_and_cw(p_H, a, p_W, p_cw);
+
+        // update p_npix to be the actual number of pixels in the preview hexagon
+        p_npix = n_pix_total_in_hex(p_H, p_cw);
 
         // the full-res width should be the greatest positive even integer multiple of the preview height such that:
         // the number of pixels per hexagon is less than or equal to the number of rays per task
@@ -67,13 +70,14 @@ public:
         pn_h = pn_h + (1 - pn_h & 1);
 
         // now figure out how many full-res hexagons will fit
-        int n_w = std::max(3, pn_w / s);
-        int n_h = std::max(3, pn_h / s);
-        int n_hex = n_w * n_h;
-        
+        int n_w = std::max(3, pn_w / s) + 1;
+        int n_h = std::max(3, pn_h / s) + 1;
+
         // n_w and n_h must be odd
         n_w = n_w + (1 - n_w & 1);
         n_h = n_h + (1 - n_h & 1);
+
+        int n_hex = n_w * n_h;
         
         // find the position of the center preview hexagon
         int pci = pn_w / 2;
@@ -86,7 +90,10 @@ public:
         int cy = request->output->height / 2;
 
         // calculate preview grid offsets
-        int2 po = { cx - phx - p_W / 2, cy - phy - p_H / 2 };
+        int2 po = {
+            cx - phx + p_W / 2,
+            cy - phy + p_H / 2
+        };
 
         // find the position of the center full-res hexagon
         int ci = n_w / 2;
@@ -95,7 +102,10 @@ public:
         hex_get_xy_from_ij(ci, cj, H, W, cw, hx, hy);
         
         // calculate full-res grid offsets
-        int2 o = { cx - hx, cy - hy };
+        int2 o = {
+            cx - hx,
+            cy - hy
+        };
 
         // prepare to create tasks by order of distance from the center
         std::vector<int2> hex_coords;
