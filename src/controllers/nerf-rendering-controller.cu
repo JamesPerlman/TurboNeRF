@@ -107,4 +107,23 @@ void NeRFRenderingController::submit(
     request->on_complete();
 }
 
+std::vector<size_t> NeRFRenderingController::get_cuda_memory_allocated() const {
+
+    int n_gpus = DeviceManager::get_device_count();
+    std::vector<size_t> sizes(n_gpus);
+
+    // one context per GPU
+    int i = 0;
+    for (const auto& ctx : contexts) {
+        size_t total = 0;
+        
+        total += ctx.workspace.get_bytes_allocated();
+        total += ctx.network.workspace.get_bytes_allocated();
+
+        sizes[i++] = total;
+    }
+
+    return sizes;
+}
+
 TURBO_NAMESPACE_END

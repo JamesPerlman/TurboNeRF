@@ -137,10 +137,31 @@ NeRFTrainingController::Metrics NeRFTrainingController::train_step() {
 	return info;
 }
 
-void NeRFTrainingController::update_occupancy_grid(const uint32_t& training_step) {
+float NeRFTrainingController::update_occupancy_grid(const uint32_t& training_step) {
 	// TODO: multi-gpu training.  For now we just update the occupancy grid on the first device.
 	auto& ctx = contexts[0];
-	trainer.update_occupancy_grid(ctx, training_step);
+	float occ_perc = trainer.update_occupancy_grid(ctx, training_step);
+
+	return occ_perc;
+}
+
+std::vector<size_t> NeRFTrainingController::get_cuda_memory_allocated() const {
+
+    int n_gpus = DeviceManager::get_device_count();
+    std::vector<size_t> sizes(n_gpus);
+
+    // one context per GPU
+    int i = 0;
+    for (const auto& ctx : contexts) {
+        size_t total = 0;
+
+        total += ctx.workspace.get_bytes_allocated();
+		total += ctx.network.workspace.get_bytes_allocated();
+
+        sizes[i++] = total;
+    }
+
+	return sizes;
 }
 
 TURBO_NAMESPACE_END

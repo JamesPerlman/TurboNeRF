@@ -18,7 +18,7 @@ TURBO_NAMESPACE_BEGIN
 struct NeRFManager {
 private:
 	std::vector<NeRFProxy> proxies;
-	const int n_gpus = 1; // does nothing, for now
+
 public:
 	// TODO: protect nerfs with const getter?
 	// There are downstream effects which make this impossible for now
@@ -54,6 +54,27 @@ public:
 	// destroy nerfs
 
 	// copy between GPUs?	
+
+	std::vector<size_t> get_cuda_memory_allocated() const {
+		const int n_gpus = DeviceManager::get_device_count();
+		
+		std::vector<size_t> sizes(n_gpus, 0);
+
+		for (const auto& proxy : proxies) {
+			int i = 0;
+			// one nerf per gpu
+			for (const auto& nerf : proxy.nerfs) {
+				size_t total = 0;
+				
+				total += nerf.params.get_bytes_allocated();
+				total += nerf.occupancy_grid.workspace.get_bytes_allocated();
+
+				sizes[i++] += total;
+			}
+		}
+
+		return sizes;
+	}
 };
 
 TURBO_NAMESPACE_END

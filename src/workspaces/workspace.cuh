@@ -39,13 +39,15 @@ public:
         return ptr;
     }
 
-    size_t total_size() const {
+    size_t get_bytes_allocated() const {
         return _total_size;
     }
 
     // free all allocations
     void free_allocations() {
         CUDA_CHECK_THROW(cudaSetDevice(device_id));
+        // this is not super robust, and does not cover the edge case where one allocation fails
+        // in this case, even the freed allocations will stay in the _allocations vector
         for (const auto& allocation : _allocations) {
             if (allocation.ptr != nullptr) {
                 CUDA_CHECK_THROW(cudaFreeAsync(allocation.ptr, 0));
@@ -53,6 +55,7 @@ public:
         }
         
         _allocations.clear();
+        _total_size = 0;
     }
 
     ~Workspace() {

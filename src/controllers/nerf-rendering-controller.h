@@ -34,6 +34,8 @@ public:
     );
 
     void cancel();
+
+    std::vector<size_t> get_cuda_memory_allocated() const;
 };
 
 TURBO_NAMESPACE_END
