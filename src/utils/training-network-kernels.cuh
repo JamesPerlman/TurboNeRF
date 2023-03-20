@@ -120,11 +120,9 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 		}
     }
 
-	// composite with background color (white)
-
-    ray_rgba_buf[idx + 0 * batch_size] = r + (1.0f - a);
-    ray_rgba_buf[idx + 1 * batch_size] = g + (1.0f - a);
-    ray_rgba_buf[idx + 2 * batch_size] = b + (1.0f - a);
+    ray_rgba_buf[idx + 0 * batch_size] = r;
+    ray_rgba_buf[idx + 1 * batch_size] = g;
+    ray_rgba_buf[idx + 2 * batch_size] = b;
     ray_rgba_buf[idx + 3 * batch_size] = a;
 }
 

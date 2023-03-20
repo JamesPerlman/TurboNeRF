@@ -121,20 +121,17 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t img_offset = image_idx * image_data_stride;
 
 	const stbi_uc* __restrict__ pixel = image_data + img_offset + 4 * pixel_idx;
-	const stbi_uc r = pixel[0];
-	const stbi_uc g = pixel[1];
-	const stbi_uc b = pixel[2];
-	const stbi_uc a = pixel[3];
 
-	if (a == 0) {
-		ray_alive[i] = false;
-		return;
-	}
+	const float r = __srgb_to_linear((float)pixel[0] / 255.0f);
+	const float g = __srgb_to_linear((float)pixel[1] / 255.0f);
+	const float b = __srgb_to_linear((float)pixel[2] / 255.0f);
+	const float a = (float)pixel[3] / 255.0f;
+
 	
-	pix_rgba[i_offset_0] = __srgb_to_linear((float)r / 255.0f);
-	pix_rgba[i_offset_1] = __srgb_to_linear((float)g / 255.0f);
-	pix_rgba[i_offset_2] = __srgb_to_linear((float)b / 255.0f);
-	pix_rgba[i_offset_3] = (float)a / 255.0f;
+	pix_rgba[i_offset_0] = r;
+	pix_rgba[i_offset_1] = g;
+	pix_rgba[i_offset_2] = b;
+	pix_rgba[i_offset_3] = a;
 	
 	// TODO: optimize (we can likely eliminate some allocations here)
 	Ray local_ray = cam.local_ray_at_pixel_xy(x, y);
