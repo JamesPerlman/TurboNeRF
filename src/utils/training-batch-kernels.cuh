@@ -127,6 +127,10 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const float b = __srgb_to_linear((float)pixel[2] / 255.0f);
 	const float a = (float)pixel[3] / 255.0f;
 
+	if (a == 0.0f) {
+		ray_alive[i] = false;
+		return;
+	}
 	
 	pix_rgba[i_offset_0] = r;
 	pix_rgba[i_offset_1] = g;
