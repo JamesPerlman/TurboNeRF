@@ -436,6 +436,7 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		ray_offset,
 		output_buffer,
 		workspace.alpha_buf,
+		target_rgba,
 		workspace.ray_rgba
 	);
 
@@ -491,7 +492,7 @@ void NerfNetwork::backward(
 	ray_rgba_to_loss_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
-		1.0f / (4.0f * (float)n_rays),
+		1.0f / (3.0f * (float)n_rays),
 		workspace.ray_rgba,
 		target_rgba,
 		workspace.grad_dL_dR

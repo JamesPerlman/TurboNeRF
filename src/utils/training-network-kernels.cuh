@@ -79,6 +79,7 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 	const uint32_t* __restrict__ ray_offset_buf,
     const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
 	const float* __restrict__ alpha_buf,
+	const float* __restrict__ target_rgba_buf,
     float* __restrict__ ray_rgba_buf
 ) {
     uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -120,9 +121,10 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 		}
     }
 
-    ray_rgba_buf[idx + 0 * batch_size] = r;
-    ray_rgba_buf[idx + 1 * batch_size] = g;
-    ray_rgba_buf[idx + 2 * batch_size] = b;
+	const float ta = target_rgba_buf[idx + 3 * batch_size];
+    ray_rgba_buf[idx + 0 * batch_size] = r + ta * (1.0f - a);
+    ray_rgba_buf[idx + 1 * batch_size] = g + ta * (1.0f - a);
+    ray_rgba_buf[idx + 2 * batch_size] = b + ta * (1.0f - a);
     ray_rgba_buf[idx + 3 * batch_size] = a;
 }
 
@@ -153,6 +155,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	const uint32_t idx_offset_0 = idx;
 	const uint32_t idx_offset_1 = idx_offset_0 + batch_size;
 	const uint32_t idx_offset_2 = idx_offset_1 + batch_size;
+	const uint32_t idx_offset_3 = idx_offset_2 + batch_size;
 
     // local references to sample data
     const float* __restrict__ s_dt = dt_buf + sample_offset;
@@ -173,9 +176,11 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	float* __restrict__ s_dL_dcolor_g = s_dL_dcolor_r + batch_size;
 	float* __restrict__ s_dL_dcolor_b = s_dL_dcolor_g + batch_size;
 
-	float cumsum_r = ray_rgba_buf[idx_offset_0];
-	float cumsum_g = ray_rgba_buf[idx_offset_1];
-	float cumsum_b = ray_rgba_buf[idx_offset_2];
+	const float ray_a = ray_rgba_buf[idx_offset_3];
+
+	float cumsum_r = ray_rgba_buf[idx_offset_0] * ray_a;
+	float cumsum_g = ray_rgba_buf[idx_offset_1] * ray_a;
+	float cumsum_b = ray_rgba_buf[idx_offset_2] * ray_a;
 
 	float trans = 1.0f;
 	for (int i = 0; i < n_samples; ++i) {
@@ -260,7 +265,7 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 __global__ void ray_rgba_to_loss_backward_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
-	const float inv_4nrays,
+	const float inv_3nrays,
 	const float* __restrict__ ray_rgba,
 	const float* __restrict__ target_rgba,
 	float* __restrict__ dL_dR
@@ -279,9 +284,9 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const float dg = ray_rgba[g_idx] - target_rgba[g_idx];
 	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
 
-	dL_dR[r_idx] = inv_4nrays * smooth_l1_loss_backward(dr);
-	dL_dR[g_idx] = inv_4nrays * smooth_l1_loss_backward(dg);
-	dL_dR[b_idx] = inv_4nrays * smooth_l1_loss_backward(db);
+	dL_dR[r_idx] = inv_3nrays * smooth_l1_loss_backward(dr);
+	dL_dR[g_idx] = inv_3nrays * smooth_l1_loss_backward(dg);
+	dL_dR[b_idx] = inv_3nrays * smooth_l1_loss_backward(db);
 }
 
 TURBO_NAMESPACE_END
