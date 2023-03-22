@@ -219,12 +219,13 @@ class BlenderBridge
 
     void start_training() {
         if (_is_training == true) {
-            dispatch(ObservableEvent::OnTrainingStart);
+            return;
         }
 
         _is_training = true;
         cancel_preview();
         start_runloop(true);
+        dispatch(ObservableEvent::OnTrainingStart);
     }
 
     void stop_training() {
