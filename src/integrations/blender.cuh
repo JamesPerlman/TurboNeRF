@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 
 #include "../controllers/nerf-rendering-controller.h"
@@ -65,6 +66,7 @@ class BlenderBridge
     CPURenderBuffer _render_target;
     std::vector<EventObserver> _event_observers;
     uint32_t _event_observer_id = 0;
+    std::mutex _event_dispatch_mutex;
 
     TwoItemQueue _render_queue;
     DebounceQueue _draw_queue;
@@ -98,12 +100,14 @@ class BlenderBridge
     */
 
     uint32_t add_observer(ObservableEvent event, EventCallback callback) {
+        std::lock_guard lock(_event_dispatch_mutex);
         uint32_t id = _event_observer_id++;
         _event_observers.emplace_back(id, event, callback);
         return id;
     }
 
     void remove_observer(uint32_t id) {
+        std::lock_guard lock(_event_dispatch_mutex);
         // first find the index of the observer with find_if
         auto it = std::find_if(_event_observers.begin(), _event_observers.end(), [id](const EventObserver& observer) {
             return observer.id == id;
@@ -135,6 +139,7 @@ class BlenderBridge
 
     private:
     void dispatch(ObservableEvent event, std::map<std::string, std::any> data = {}) {
+        std::scoped_lock lock(_event_dispatch_mutex);
         for (auto& observer : _event_observers) {
             if (observer.event == event) {
                 observer.callback(data);
