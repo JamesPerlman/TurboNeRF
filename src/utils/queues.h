@@ -28,7 +28,7 @@ protected:
         do {
             current_task();
 
-            std::lock_guard<std::mutex> lock(m);
+            std::lock_guard lock(m);
             current_task = std::move(next_task);
             next_task = nullptr;
         } while (current_task != nullptr);
@@ -38,7 +38,7 @@ public:
     TwoItemQueue() = default;
 
     virtual void push(std::function<void()> task) {
-        std::lock_guard<std::mutex> lock(m);
+        std::lock_guard lock(m);
 
         // is the current task empty?
         if (current_task == nullptr) {
@@ -119,7 +119,7 @@ protected:
         do {
             current_task();
 
-            std::unique_lock<std::mutex> lock(m);
+            std::unique_lock lock(m);
             current_task = nullptr;
             lock.unlock();
 
@@ -128,7 +128,7 @@ protected:
             while (true) {
                 std::this_thread::sleep_for(wait_loop_granularity);
 
-                std::lock_guard<std::mutex> lock(m);
+                std::lock_guard lock(m);
                 if (current_task != nullptr) {
                     break;
                 }
