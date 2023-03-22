@@ -234,12 +234,13 @@ class BlenderBridge
     }
 
     void stop_training() {
-        if (_is_training) {
-            dispatch(ObservableEvent::OnTrainingStop);
+        if (!_is_training) {
+            return;
         }
 
         _is_training = false;
         stop_runloop();
+        dispatch(ObservableEvent::OnTrainingStop);
     }
 
     void wait_for_runloop_to_stop() {
