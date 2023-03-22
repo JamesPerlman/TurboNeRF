@@ -121,11 +121,17 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 		}
     }
 
-	const float ta = target_rgba_buf[idx + 3 * batch_size];
-    ray_rgba_buf[idx + 0 * batch_size] = r + ta * (1.0f - a);
-    ray_rgba_buf[idx + 1 * batch_size] = g + ta * (1.0f - a);
-    ray_rgba_buf[idx + 2 * batch_size] = b + ta * (1.0f - a);
-    ray_rgba_buf[idx + 3 * batch_size] = a;
+	const uint32_t idx_offset_0 = idx + 0 * batch_size;
+	const uint32_t idx_offset_1 = idx_offset_0 + batch_size;
+	const uint32_t idx_offset_2 = idx_offset_1 + batch_size;
+	const uint32_t idx_offset_3 = idx_offset_2 + batch_size;
+
+	const float ta = target_rgba_buf[idx_offset_3];
+
+    ray_rgba_buf[idx_offset_0] = r + ta * (1.0f - a);
+    ray_rgba_buf[idx_offset_1] = g + ta * (1.0f - a);
+    ray_rgba_buf[idx_offset_2] = b + ta * (1.0f - a);
+    ray_rgba_buf[idx_offset_3] = a;
 }
 
 // sigma to ray color backward
@@ -176,11 +182,9 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	float* __restrict__ s_dL_dcolor_g = s_dL_dcolor_r + batch_size;
 	float* __restrict__ s_dL_dcolor_b = s_dL_dcolor_g + batch_size;
 
-	const float ray_a = ray_rgba_buf[idx_offset_3];
-
-	float cumsum_r = ray_rgba_buf[idx_offset_0] * ray_a;
-	float cumsum_g = ray_rgba_buf[idx_offset_1] * ray_a;
-	float cumsum_b = ray_rgba_buf[idx_offset_2] * ray_a;
+	float cumsum_r = ray_rgba_buf[idx_offset_0];
+	float cumsum_g = ray_rgba_buf[idx_offset_1];
+	float cumsum_b = ray_rgba_buf[idx_offset_2];
 
 	float trans = 1.0f;
 	for (int i = 0; i < n_samples; ++i) {
