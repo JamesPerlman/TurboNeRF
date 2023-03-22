@@ -300,8 +300,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     // TODO: This is a large module.  Consider defining it in a separate file.
 
     py::enum_<BlenderBridge::ObservableEvent>(m, "BlenderBridgeEvent")
-        .value("OnTrainingStarted", BlenderBridge::ObservableEvent::OnTrainingStart)
-        .value("OnTrainingStopped", BlenderBridge::ObservableEvent::OnTrainingStop)
+        .value("OnTrainingStart", BlenderBridge::ObservableEvent::OnTrainingStart)
+        .value("OnTrainingStop", BlenderBridge::ObservableEvent::OnTrainingStop)
         .value("OnTrainingStep", BlenderBridge::ObservableEvent::OnTrainingStep)
         .value("OnPreviewStart", BlenderBridge::ObservableEvent::OnPreviewStart)
         .value("OnPreviewProgress", BlenderBridge::ObservableEvent::OnPreviewProgress)
