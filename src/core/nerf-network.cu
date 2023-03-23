@@ -34,7 +34,7 @@ NerfNetwork::NerfNetwork(const int& device_id)
 	// These values are from the Instant-NGP paper, page 4. "Multiresolution Hash Encoding"
 	double n_levels = 16.0;
 	double N_min = 16.0;
-	double N_max = 524288.0;
+	double N_max = 2048.0 * 16.0; // TODO: according to the paper this "16" should be the scene size
 	double b = exp((log(N_max) - log(N_min)) / (n_levels - 1.0));
 
 	// These network configurations were adapted from nerfstudio
@@ -53,10 +53,10 @@ NerfNetwork::NerfNetwork(const int& device_id)
 
 	json density_encoding_config = {
 		{"otype", "HashGrid"},
-		{"n_levels", 16},
+		{"n_levels", n_levels},
 		{"n_features_per_level", 2},
 		{"log2_hashmap_size", 19},
-		{"base_resolution", 16},
+		{"base_resolution", N_min},
 		{"per_level_scale", b},
 		// used by recommendation of Müller et al (instant-NGP paper, page 13 "Smooth Interpolation")
 		{"interpolation", "Linear"},
@@ -411,9 +411,6 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		false,
 		true // prepare_input_gradients
 	);
-	
-	// Zero out transmittance
-	cudaMemsetAsync(workspace.trans_buf, 0, batch_size * sizeof(float), stream);
 
 	// Continue forward with custom operators
 	density_to_sigma_forward_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
@@ -436,7 +433,6 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 		ray_offset,
 		output_buffer,
 		workspace.alpha_buf,
-		target_rgba,
 		workspace.ray_rgba
 	);
 
@@ -462,7 +458,7 @@ float NerfNetwork::calculate_loss(
 	return (1.0f / (float)n_rays) * thrust::reduce(
 		thrust::cuda::par_nosync.on(stream),
 		loss_buffer_ptr,
-		loss_buffer_ptr + 3 * batch_size,
+		loss_buffer_ptr + 4 * batch_size,
 		0.0f,
 		thrust::plus<float>()
 	);
@@ -484,7 +480,7 @@ void NerfNetwork::backward(
 	float* target_rgba
 ) {
 	// zero out previous gradients
-	cudaMemsetAsync(workspace.grad_dL_dR, 0, 3 * batch_size * sizeof(float), stream);
+	cudaMemsetAsync(workspace.grad_dL_dR, 0, 4 * batch_size * sizeof(float), stream);
 	cudaMemsetAsync(workspace.grad_dL_dcolor, 0, 3 * batch_size * sizeof(float), stream);
 	cudaMemsetAsync(workspace.grad_dL_dsigma, 0, batch_size * sizeof(float), stream);
 
@@ -492,7 +488,7 @@ void NerfNetwork::backward(
 	ray_rgba_to_loss_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
-		1.0f / (3.0f * (float)n_rays),
+		1.0f / (4.0f * (float)n_rays),
 		workspace.ray_rgba,
 		target_rgba,
 		workspace.grad_dL_dR
