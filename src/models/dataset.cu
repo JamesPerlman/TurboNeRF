@@ -50,6 +50,8 @@ Dataset::Dataset(const string& file_path) {
     float2 focal_length = make_float2(fl_x, fl_y);
 
     uint32_t aabb_size = std::min(json_data.value("aabb_scale", 16), 128);
+    float scene_scale = json_data.value("scene_scale", 1.0f);
+    
     bounding_box = BoundingBox((float)aabb_size);
 
     float global_near = json_data.value("near", 0.05f);
@@ -66,12 +68,12 @@ Dataset::Dataset(const string& file_path) {
     path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
 
     for (json frame : json_data["frames"]) {
-        float near = frame.value("near", global_near);
-        float far = frame.value("far", global_far);
+        float near = scene_scale * frame.value("near", global_near);
+        float far = scene_scale * frame.value("far", global_far);
 
         Transform4f transform_matrix(frame["transform_matrix"]);
 
-        Transform4f camera_matrix = transform_matrix.from_nerf();
+        Transform4f camera_matrix = Transform4f::Scale(scene_scale) * transform_matrix.from_nerf();
 
         // TODO: per-camera dimensions
         cameras.emplace_back(
