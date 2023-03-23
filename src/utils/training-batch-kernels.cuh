@@ -267,6 +267,40 @@ __global__ void march_and_count_steps_per_ray_kernel(
 }
 
 /**
+ * This is just a helper function for setting normalized values for the ray before passing into the network
+ * 
+ */
+
+inline __device__ void assign_normalized_ray(
+	const uint32_t& batch_size,
+	const uint32_t& sample_offset,
+	const uint32_t& n_steps_taken,
+	const float& x, const float& y, const float& z,
+	const float& dir_x, const float& dir_y, const float& dir_z,
+	const float& dt,
+	const float& inv_aabb_size,
+	float* __restrict__ out_pos_xyz,
+	float* __restrict__ out_dir_xyz,
+	float* __restrict__ out_dt
+) {
+	
+	const uint32_t step_offset_0 = sample_offset + n_steps_taken;
+	const uint32_t step_offset_1 = step_offset_0 + batch_size;
+	const uint32_t step_offset_2 = step_offset_1 + batch_size;
+
+	// assign normalized network inputs
+	out_dt[step_offset_0] = inv_aabb_size * dt;
+
+	out_pos_xyz[step_offset_0] = tcnn::clamp(x * inv_aabb_size + 0.5f, 0.0f, 1.0f);
+	out_pos_xyz[step_offset_1] = tcnn::clamp(y * inv_aabb_size + 0.5f, 0.0f, 1.0f);
+	out_pos_xyz[step_offset_2] = tcnn::clamp(z * inv_aabb_size + 0.5f, 0.0f, 1.0f);
+
+	out_dir_xyz[step_offset_0] = 0.5f * dir_x + 0.5f;
+	out_dir_xyz[step_offset_1] = 0.5f * dir_y + 0.5f;
+	out_dir_xyz[step_offset_2] = 0.5f * dir_z + 0.5f;
+}
+
+/**
  * This kernel has a few purposes:
  * 1. March rays through the occupancy grid and generate start/end intervals for each sample
  * 2. Compact other training buffers to maximize coalesced memory accesses
@@ -347,34 +381,41 @@ __global__ void march_and_generate_network_positions_kernel(
 		const float y = o_y + tr * d_y;
 		const float z = o_z + tr * d_z;
 
+		const float dt = grid->get_dt(tr, cone_angle, dt_min, dt_max);
+
 		if (!bbox->contains(x, y, z)) {
+			assign_normalized_ray(
+				batch_size, sample_offset, n_steps_taken,
+				x, y, z,
+				d_x, d_y, d_z,
+				dt, inv_aabb_size,
+				out_pos_xyz, out_dir_xyz, out_dt
+			);
 			break;
 		}
-
-		float dt = grid->get_dt(t1, cone_angle, dt_min, dt_max);
+		
 		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
+
+		t0 = t1;
 
 		if (grid->is_occupied_at(grid_level, x, y, z)) {
 
-			const uint32_t step_offset_0 = sample_offset + n_steps_taken;
-			const uint32_t step_offset_1 = step_offset_0 + batch_size;
-			const uint32_t step_offset_2 = step_offset_1 + batch_size;
+			t1 += dt;
 
-			// assign normalized network inputs
-			out_dt[step_offset_0] = dt * inv_aabb_size;
-
-			out_pos_xyz[step_offset_0] = x * inv_aabb_size + 0.5f;
-			out_pos_xyz[step_offset_1] = y * inv_aabb_size + 0.5f;
-			out_pos_xyz[step_offset_2] = z * inv_aabb_size + 0.5f;
-
-			out_dir_xyz[step_offset_0] = 0.5f * d_x + 0.5f;
-			out_dir_xyz[step_offset_1] = 0.5f * d_y + 0.5f;
-			out_dir_xyz[step_offset_2] = 0.5f * d_z + 0.5f;
+			assign_normalized_ray(
+				batch_size, sample_offset, n_steps_taken,
+				x, y, z,
+				d_x, d_y, d_z,
+				dt, inv_aabb_size,
+				out_pos_xyz, out_dir_xyz, out_dt
+			);
 
 			++n_steps_taken;
+		
 		} else {
+
 			// otherwise we need to find the next occupied cell
-			dt += grid->get_dt_to_next_voxel(
+			t1 += grid->get_dt_to_next_voxel(
 				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,
@@ -382,12 +423,7 @@ __global__ void march_and_generate_network_positions_kernel(
 				grid_level
 			);
 		}
-
-		t0 = t1;
-		t1 += dt;
 	}
-
-	n_ray_steps[i] = n_steps_taken;
 }
 
 TURBO_NAMESPACE_END
