@@ -52,6 +52,9 @@ Dataset::Dataset(const string& file_path) {
     uint32_t aabb_size = std::min(json_data.value("aabb_scale", 16), 128);
     bounding_box = BoundingBox((float)aabb_size);
 
+    float global_near = json_data.value("near", 0.05f);
+    float global_far = json_data.value("far", 128.0f);
+
     DistortionParams dist_params(
         json_data.value("k1", 0.0f),
         json_data.value("k2", 0.0f),
@@ -63,8 +66,8 @@ Dataset::Dataset(const string& file_path) {
     path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
 
     for (json frame : json_data["frames"]) {
-        float near = frame.value("near", 2.0f);
-        float far = frame.value("far", 16.0f);
+        float near = frame.value("near", global_near);
+        float far = frame.value("far", global_far);
 
         Transform4f transform_matrix(frame["transform_matrix"]);
 
@@ -76,6 +79,7 @@ Dataset::Dataset(const string& file_path) {
         // images
         string file_path = frame["file_path"];
         path absolute_path = base_dir / file_path; // construct the absolute path using base_dir
+        
         // only add the image if it exists
         if (exists(absolute_path)) {
             images.emplace_back(absolute_path.string(), image_dimensions);
