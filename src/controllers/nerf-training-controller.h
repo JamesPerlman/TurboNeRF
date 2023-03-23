@@ -33,8 +33,8 @@ struct NeRFTrainingController {
 			return {
 				{"step", step},
 				{"n_rays", n_rays},
-				{"n_samples", n_samples}
-				{"loss", loss},
+				{"n_samples", n_samples},
+				{"loss", loss}
 			};
 		}
 	};
