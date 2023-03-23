@@ -74,12 +74,20 @@ Dataset::Dataset(const string& file_path) {
         Transform4f camera_matrix = transform_matrix.from_nerf();
 
         // TODO: per-camera dimensions
-        cameras.emplace_back(image_dimensions, near, far, focal_length, principal_point, camera_matrix, dist_params);
+        cameras.emplace_back(
+            image_dimensions,
+            near,
+            far,
+            focal_length,
+            principal_point,
+            camera_matrix,
+            dist_params
+        );
 
         // images
         string file_path = frame["file_path"];
         path absolute_path = base_dir / file_path; // construct the absolute path using base_dir
-        
+
         // only add the image if it exists
         if (exists(absolute_path)) {
             images.emplace_back(absolute_path.string(), image_dimensions);
