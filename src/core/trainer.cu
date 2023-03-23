@@ -215,7 +215,7 @@ void Trainer::generate_next_training_batch(
 
 // update occupancy grid
 
-float Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& training_step) {
+uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& training_step) {
 	const uint32_t grid_volume = ctx.nerf->occupancy_grid.volume_i;
 	const uint32_t n_bitfield_bytes = ctx.nerf->occupancy_grid.get_n_bitfield_elements();
 	const uint32_t n_levels = ctx.nerf->occupancy_grid.n_levels;
@@ -296,8 +296,7 @@ float Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& trai
 		ctx.stream
 	);
 
-	float bits_occupied = (float)n_bits_occupied / (grid_volume * n_levels);
-	return bits_occupied;
+	return n_bits_occupied;
 }
 
 float Trainer::train_step(

@@ -23,18 +23,30 @@ TURBO_NAMESPACE_BEGIN
 
 struct NeRFTrainingController {
 
-	struct Metrics {
+	struct TrainingMetrics {
 		uint32_t step;
-		float loss;
 		uint32_t n_rays;
 		uint32_t n_samples;
+		float loss;
 
 		std::map<std::string, std::any> as_map() const {
 			return {
 				{"step", step},
-				{"loss", loss},
 				{"n_rays", n_rays},
 				{"n_samples", n_samples}
+				{"loss", loss},
+			};
+		}
+	};
+
+	struct OccupancyGridMetrics {
+		uint32_t n_occupied;
+		uint32_t n_total;
+
+		std::map<std::string, std::any> as_map() const {
+			return {
+				{"n_occupied", n_occupied},
+				{"n_total", n_total}
 			};
 		}
 	};
@@ -42,14 +54,12 @@ struct NeRFTrainingController {
 	// constructor
 	NeRFTrainingController(Dataset* dataset, NeRFProxy* nerf_proxy, const uint32_t batch_size);
 
-	// public properties
-
 	// public methods
 	void prepare_for_training();
 	
-	Metrics train_step();
+	TrainingMetrics train_step();
 
-	float update_occupancy_grid(const uint32_t& training_step);
+	OccupancyGridMetrics update_occupancy_grid(const uint32_t& training_step);
 
 	uint32_t get_training_step() const {
 		return training_step;

@@ -121,13 +121,13 @@ void NeRFTrainingController::load_images(Trainer::Context& ctx) {
 }
 
 
-NeRFTrainingController::Metrics NeRFTrainingController::train_step() {
+NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
 	// TODO: multi-gpu training.  For now we just train on the first device.
 	auto& ctx = contexts[0];
 	float loss = trainer.train_step(ctx);
 	++training_step;
 
-	NeRFTrainingController::Metrics info;
+	NeRFTrainingController::TrainingMetrics info;
 	
 	info.loss = loss;
 	info.step = training_step;
@@ -137,12 +137,17 @@ NeRFTrainingController::Metrics NeRFTrainingController::train_step() {
 	return info;
 }
 
-float NeRFTrainingController::update_occupancy_grid(const uint32_t& training_step) {
+NeRFTrainingController::OccupancyGridMetrics NeRFTrainingController::update_occupancy_grid(const uint32_t& training_step) {
 	// TODO: multi-gpu training.  For now we just update the occupancy grid on the first device.
 	auto& ctx = contexts[0];
-	float occ_perc = trainer.update_occupancy_grid(ctx, training_step);
+	uint32_t n_bits_occupied = trainer.update_occupancy_grid(ctx, training_step);
 
-	return occ_perc;
+	NeRFTrainingController::OccupancyGridMetrics info;
+	
+	info.n_occupied = n_bits_occupied;
+	info.n_total = ctx.nerf->occupancy_grid.get_n_total_elements();
+
+	return info;
 }
 
 std::vector<size_t> NeRFTrainingController::get_cuda_memory_allocated() const {
