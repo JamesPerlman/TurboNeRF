@@ -319,6 +319,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .value("OnTrainingStart", BlenderBridge::ObservableEvent::OnTrainingStart)
         .value("OnTrainingStop", BlenderBridge::ObservableEvent::OnTrainingStop)
         .value("OnTrainingStep", BlenderBridge::ObservableEvent::OnTrainingStep)
+        .value("OnUpdateOccupancyGrid", BlenderBridge::ObservableEvent::OnUpdateOccupancyGrid)
         .value("OnPreviewStart", BlenderBridge::ObservableEvent::OnPreviewStart)
         .value("OnPreviewProgress", BlenderBridge::ObservableEvent::OnPreviewProgress)
         .value("OnPreviewComplete", BlenderBridge::ObservableEvent::OnPreviewComplete)

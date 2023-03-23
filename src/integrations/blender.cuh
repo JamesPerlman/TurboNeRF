@@ -29,6 +29,7 @@ class BlenderBridge
         OnTrainingStart,
         OnTrainingStop,
         OnTrainingStep,
+        OnUpdateOccupancyGrid,
         OnPreviewStart,
         OnPreviewProgress,
         OnPreviewComplete,
@@ -158,13 +159,18 @@ class BlenderBridge
     private:
 
     void runloop_worker() {
+        
+        // potential TODO here - the dispatch() calls will slow down the run loop depending on how many observers there are, and what the callbacks do
+        // so we may want to add them to a queue and dispatch them in another thread.  Although this can become problematic too.
+
         do {
             if (_is_training && _trainer.has_value()) {
                 // train a single step
                 auto metrics = _trainer->train_step();
                 auto training_step = _trainer->get_training_step();
                 if (training_step % 16 == 0) {
-                    _trainer->update_occupancy_grid(training_step);
+                    auto occ_metrics = _trainer->update_occupancy_grid(training_step);
+                    dispatch(ObservableEvent::OnUpdateOccupancyGrid, occ_metrics.as_map());
                 }
                 dispatch(ObservableEvent::OnTrainingStep, metrics.as_map());
             }
