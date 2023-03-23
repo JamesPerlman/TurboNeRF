@@ -263,6 +263,22 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         )
     ;
 
+    // TrainingController helpers
+
+    py::class_<NeRFTrainingController::TrainingMetrics>(m, "TrainingMetrics")
+        .def_readonly("step", &NeRFTrainingController::TrainingMetrics::step)
+        .def_readonly("loss", &NeRFTrainingController::TrainingMetrics::loss)
+        .def_readonly("n_rays", &NeRFTrainingController::TrainingMetrics::n_rays)
+        .def_readonly("n_samples", &NeRFTrainingController::TrainingMetrics::n_samples)
+    ;
+
+    py::class_<NeRFTrainingController::OccupancyGridMetrics>(m, "OccupancyGridMetrics")
+        .def_readonly("n_occupied", &NeRFTrainingController::OccupancyGridMetrics::n_occupied)
+        .def_readonly("n_total", &NeRFTrainingController::OccupancyGridMetrics::n_total)
+    ;
+
+    // TrainingController class
+
     py::class_<NeRFTrainingController>(m, "Trainer")
         .def(
             py::init<
