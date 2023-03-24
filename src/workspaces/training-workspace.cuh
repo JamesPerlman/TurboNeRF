@@ -54,6 +54,7 @@ struct TrainingWorkspace: Workspace {
 
 	// ray t components
 	float* ray_t;
+	float* ray_t_max;
 
 	// ray alive is basically just a check for if the ray hits the bounding box
 	bool* ray_alive;
@@ -123,6 +124,7 @@ struct TrainingWorkspace: Workspace {
 		ray_dir			= allocate<float>(stream, 3 * batch_size);
 		ray_inv_dir 	= allocate<float>(stream, 3 * batch_size);
 		ray_t 			= allocate<float>(stream, batch_size);
+		ray_t_max		= allocate<float>(stream, batch_size);
 		ray_alive 		= allocate<bool>(stream, batch_size);
 		ray_index 		= allocate<int>(stream, batch_size);
 

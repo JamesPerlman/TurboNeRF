@@ -112,21 +112,21 @@ struct alignas(float) Transform4f
         // multiplication operator with float3 - multiply by upper left 3x3, no translation
     inline NRC_HOST_DEVICE float3 mmul_ul3x3(const float3& v) const
     {
-        return make_float3(
+        return {
             m00 * v.x + m01 * v.y + m02 * v.z,
             m10 * v.x + m11 * v.y + m12 * v.z,
             m20 * v.x + m21 * v.y + m22 * v.z
-        );
+        };
     }
 
     // multiplication operator with float3 - assume we want v to be inferred as homogeneous
     inline NRC_HOST_DEVICE float3 operator*(const float3& v) const
     {
-        return make_float3(
+        return {
             m00 * v.x + m01 * v.y + m02 * v.z + m03,
             m10 * v.x + m11 * v.y + m12 * v.z + m13,
             m20 * v.x + m21 * v.y + m22 * v.z + m23
-        );
+        };
     }
 
     // multiplication operator with other Transform4f
@@ -153,7 +153,7 @@ struct alignas(float) Transform4f
     // convenience getter, returns the translation of this matrix as a float3
     inline NRC_HOST_DEVICE float3 get_translation() const
     {
-        return make_float3(m03, m13, m23);
+        return {m03, m13, m23};
     }
 
     float determinant() const

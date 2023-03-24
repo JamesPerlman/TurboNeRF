@@ -25,6 +25,7 @@ __global__ void generate_hexagonal_grid_of_rays_kernel(
     float* __restrict__ dir,
     float* __restrict__ idir,
     float* __restrict__ t,
+    float* __restrict__ t_max,
     int* __restrict__ index,
     bool* __restrict__ alive
 ) {
@@ -44,12 +45,7 @@ __global__ void generate_hexagonal_grid_of_rays_kernel(
     ix = ix - grid_offset.x + W / 2;
     iy = iy - grid_offset.y + H / 2;
 
-    const Camera cam = *camera;
-
-    const Ray local_ray = cam.local_ray_at_pixel_xy(ix, iy);
-    const Ray global_ray = cam.global_ray_from_local_ray(local_ray);
-
-    fill_ray_buffers(i, stride, global_ray, bbox, pos, dir, idir, t, index, alive);
+    fill_ray_buffers(i, stride, camera, bbox, ix, iy, pos, dir, idir, t, t_max, index, alive);
 }
 
 void HexagonalGridRayBatchCoordinator::generate_rays(
@@ -73,6 +69,7 @@ void HexagonalGridRayBatchCoordinator::generate_rays(
         ray_batch.dir,
         ray_batch.idir,
         ray_batch.t,
+        ray_batch.t_max,
         ray_batch.index,
         ray_batch.alive
     );

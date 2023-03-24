@@ -12,87 +12,6 @@ using namespace tcnn;
 
 TURBO_NAMESPACE_BEGIN
 
-// TODO: move this into a Camera utility kernel file
-// init_rays CUDA kernel
-__global__ void generate_rays_pinhole_kernel(
-	const uint32_t n_rays,
-	const uint32_t batch_size,
-	const BoundingBox* __restrict__ bbox,
-	const Camera* __restrict__ cam,
-	const uint32_t start_idx,
-	float* __restrict__ ray_ori,
-	float* __restrict__ ray_dir,
-	float* __restrict__ ray_idir,
-	float* __restrict__ ray_t,
-	float* __restrict__ ray_trans,
-    uint32_t* __restrict__ ray_idx,
-	bool* __restrict__ ray_alive,
-	bool* __restrict__ ray_active
-) {
-    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-
-	if (i >= n_rays) {
-		return;
-	}
-
-	uint32_t idx = start_idx + i;
-	
-	uint32_t x = idx % cam->resolution.x;
-	uint32_t y = idx / cam->resolution.x;
-
-	Ray local_ray = cam->local_ray_at_pixel_xy(x, y);
-
-    float3 global_origin = cam->transform * local_ray.o;
-	float3 global_direction = cam->transform * local_ray.d - cam->transform.get_translation();
-
-	// normalize ray directions
-	const float n = rnorm3df(global_direction.x, global_direction.y, global_direction.z);
-
-	const float dir_x = n * global_direction.x;
-	const float dir_y = n * global_direction.y;
-	const float dir_z = n * global_direction.z;
-
-	const float idir_x = 1.0f / dir_x;
-	const float idir_y = 1.0f / dir_y;
-	const float idir_z = 1.0f / dir_z;
-
-    // save data to buffers
-	uint32_t i_offset_0 = i;
-	uint32_t i_offset_1 = i_offset_0 + batch_size;
-	uint32_t i_offset_2 = i_offset_1 + batch_size;
-
-	ray_ori[i_offset_0] = global_origin.x;
-	ray_ori[i_offset_1] = global_origin.y;
-	ray_ori[i_offset_2] = global_origin.z;
-
-	ray_dir[i_offset_0] = dir_x;
-	ray_dir[i_offset_1] = dir_y;
-	ray_dir[i_offset_2] = dir_z;
-
-	ray_idir[i_offset_0] = idir_x;
-	ray_idir[i_offset_1] = idir_y;
-	ray_idir[i_offset_2] = idir_z;
-
-	float t;
-	const bool intersects_bbox = bbox->get_ray_t_intersection(
-		global_origin.x, global_origin.y, global_origin.z,
-		dir_x, dir_y, dir_z,
-		idir_x, idir_y, idir_z,
-		t
-	);
-
-	ray_t[i] = intersects_bbox ? fmaxf(0.0f, t) + 1e-5f : 0.0f;
-
-	ray_alive[i] = intersects_bbox;
-
-    ray_idx[i] = idx;
-
-	ray_active[i] = true;
-
-	ray_trans[i] = 1.0f;
-}
-
-
 __global__ void march_rays_to_first_occupied_cell_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
@@ -110,6 +29,7 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
     bool* __restrict__ ray_alive,
 	float* __restrict__ ray_ori,
     float* __restrict__ ray_t,
+	float* __restrict__ ray_t_max,
 
 	// output buffers (write-only)
 	float* __restrict__ network_pos,
@@ -145,8 +65,9 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 	// Perform raymarching
 	
 	float t = ray_t[i];
+	float t_max = ray_t_max[i];
 
-	while (true) {
+	while (t < t_max) {
 		const float x = o_x + t * d_x;
 		const float y = o_y + t * d_y;
 		const float z = o_z + t * d_z;
@@ -165,6 +86,7 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 			ray_ori[i_offset_1] = y;
 			ray_ori[i_offset_2] = z;
 			ray_t[i] = 0.0f;
+			ray_t_max[i] = t_max - t;
 
 			return;
 		} else {
@@ -177,7 +99,7 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 				grid_level
 			);
 		}
-	}
+	};
 }
 
 __global__ void march_rays_and_generate_network_inputs_kernel(
@@ -196,6 +118,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const float* __restrict__ ray_ori,
 	const float* __restrict__ ray_dir,
 	const float* __restrict__ ray_idir,
+	const float* __restrict__ ray_t_max,
 
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
@@ -237,16 +160,16 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	// Perform raymarching
 	
 	float t = ray_t[i];
+	float t_max = ray_t_max[i];
+
 	uint32_t n_steps = 0;
 
-	while (n_steps < n_steps_max) {
+	while (n_steps < n_steps_max && t < t_max) {
 		const float x = o_x + t * d_x;
 		const float y = o_y + t * d_y;
 		const float z = o_z + t * d_z;
 
 		if (!bbox->contains(x, y, z)) {
-			// if the ray is outside the bounding box on the first step, we terminate it
-			ray_alive[i] = n_steps > 0;
 			break;
 		}
 
@@ -283,6 +206,11 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			);
 		}
 	}
+	
+	if (n_steps == 0) {
+		ray_alive[i] = false;
+		return;
+	}
 
 	ray_t[i] = t;
 	n_ray_steps[i] = n_steps;
@@ -298,6 +226,7 @@ __global__ void compact_rays_kernel(
 	const int* __restrict__ in_idx, // this is the ray-pixel index
 	const bool* __restrict__ in_active,
 	const float* __restrict__ in_t,
+	const float* __restrict__ in_t_max,
 	const float* __restrict__ in_origin,
 	const float* __restrict__ in_dir,
 	const float* __restrict__ in_idir,
@@ -307,6 +236,7 @@ __global__ void compact_rays_kernel(
 	int* __restrict__ out_idx,
 	bool* __restrict__ out_active,
 	float* __restrict__ out_t,
+	float* __restrict__ out_t_max,
 	float* __restrict__ out_origin,
 	float* __restrict__ out_dir,
 	float* __restrict__ out_idir,
@@ -324,6 +254,7 @@ __global__ void compact_rays_kernel(
 	out_idx[c_idx]		= in_idx[e_idx];
 	out_active[c_idx]	= in_active[e_idx];
 	out_t[c_idx]		= in_t[e_idx];
+	out_t_max[c_idx]	= in_t_max[e_idx];
 	out_trans[c_idx]	= in_trans[e_idx];
 
 	// local references to pointer offsets

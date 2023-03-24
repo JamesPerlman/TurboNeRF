@@ -99,6 +99,7 @@ void Trainer::generate_next_training_batch(
 		ctx.workspace.ray_dir,
 		ctx.workspace.ray_inv_dir,
 		ctx.workspace.ray_t,
+		ctx.workspace.ray_t_max,
 		ctx.workspace.ray_alive
 	);
 
@@ -116,9 +117,12 @@ void Trainer::generate_next_training_batch(
 		dt_min,
 		dt_max,
 
-		// output buffers
+		// input buffers
 		ctx.workspace.ray_dir,
 		ctx.workspace.ray_inv_dir,
+		ctx.workspace.ray_t_max,
+
+		// output buffers
 		ctx.workspace.ray_alive,
 		ctx.workspace.ray_origin,
 		ctx.workspace.ray_t,
@@ -200,6 +204,7 @@ void Trainer::generate_next_training_batch(
 		ctx.workspace.ray_dir,
 		ctx.workspace.ray_inv_dir,
 		ctx.workspace.ray_t,
+		ctx.workspace.ray_t_max,
 		ctx.workspace.ray_offset,
 		ctx.workspace.ray_alive,
 

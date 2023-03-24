@@ -12,22 +12,6 @@
 
 TURBO_NAMESPACE_BEGIN
 
-__global__ void generate_rays_pinhole_kernel(
-	const uint32_t n_rays,
-	const uint32_t batch_size,
-	const BoundingBox* __restrict__ bbox,
-	const Camera* __restrict__ cam,
-	const uint32_t start_idx,
-	float* __restrict__ ray_ori,
-	float* __restrict__ ray_dir,
-	float* __restrict__ ray_idir,
-	float* __restrict__ ray_t,
-	float* __restrict__ ray_trans,
-    uint32_t* __restrict__ ray_idx,
-	bool* __restrict__ ray_alive,
-	bool* __restrict__ ray_active
-);
-
 __global__ void march_rays_to_first_occupied_cell_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
@@ -45,6 +29,7 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
     bool* __restrict__ ray_alive,
 	float* __restrict__ ray_ori,
     float* __restrict__ ray_t,
+	float* __restrict__ ray_t_max,
 
 	// output buffers (write-only)
 	float* __restrict__ network_pos,
@@ -68,6 +53,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const float* __restrict__ ray_ori,
 	const float* __restrict__ ray_dir,
 	const float* __restrict__ ray_idir,
+	const float* __restrict__ ray_t_max,
 
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
@@ -90,6 +76,7 @@ __global__ void compact_rays_kernel(
 	const int* __restrict__ in_idx, // this is the ray-pixel index
 	const bool* __restrict__ in_active,
 	const float* __restrict__ in_t,
+	const float* __restrict__ in_t_max,
 	const float* __restrict__ in_origin,
 	const float* __restrict__ in_dir,
 	const float* __restrict__ in_idir,
@@ -99,6 +86,7 @@ __global__ void compact_rays_kernel(
 	int* __restrict__ out_idx,
 	bool* __restrict__ out_active,
 	float* __restrict__ out_t,
+	float* __restrict__ out_t_max,
 	float* __restrict__ out_origin,
 	float* __restrict__ out_dir,
 	float* __restrict__ out_idir,

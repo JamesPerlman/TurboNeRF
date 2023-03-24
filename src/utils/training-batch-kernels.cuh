@@ -100,15 +100,11 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	float* __restrict__ dir_xyz,
 	float* __restrict__ idir_xyz,
 	float* __restrict__ ray_t,
+	float* __restrict__ ray_t_max,
 	bool* __restrict__ ray_alive
 ) {
 	uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 	if (i >= n_rays) return;
-
-	const uint32_t i_offset_0 = i;
-	const uint32_t i_offset_1 = i_offset_0 + batch_size;
-	const uint32_t i_offset_2 = i_offset_1 + batch_size;
-	const uint32_t i_offset_3 = i_offset_2 + batch_size;
 	
 	const uint32_t image_idx = static_cast<uint32_t>(static_cast<float>(i) / n_rays_per_image);
 	const uint32_t pixel_idx = random_pixel_index(i, n_pixels_per_image, n_rays_per_image, random_pixel_chunk_size, random[i]);
@@ -118,8 +114,49 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 
 	const Camera cam = cameras[image_idx];
 	
-	const uint32_t img_offset = image_idx * image_data_stride;
+	Ray global_ray = cam.global_ray_at_pixel_xy(x, y);
 
+	const float3 global_ori = global_ray.o;
+	const float3 global_dir = global_ray.d;
+
+	const float dir_x = global_dir.x;
+	const float dir_y = global_dir.y;
+	const float dir_z = global_dir.z;
+	
+	const float idir_x = 1.0f / dir_x;
+	const float idir_y = 1.0f / dir_y;
+	const float idir_z = 1.0f / dir_z;
+	
+	float t;
+	const bool intersects_bbox = bbox->get_ray_t_intersection(
+		global_ori.x, global_ori.y, global_ori.z,
+		dir_x, dir_y, dir_z,
+		idir_x, idir_y, idir_z,
+		t
+	);
+	
+	if (!intersects_bbox) {
+		ray_alive[i] = false;
+		return;
+	}
+
+	// calculate t_max
+	const float t_max = cam.far - cam.near;
+	t = max(0.0f, t + 1e-5f);
+
+	if (t_max < t) {
+		ray_alive[i] = false;
+		return;
+	}
+
+	// local indices for contiguous buffers
+	const uint32_t i_offset_0 = i;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
+	const uint32_t i_offset_3 = i_offset_2 + batch_size;
+	
+	// assign ground-truth pixel
+	const uint32_t img_offset = image_idx * image_data_stride;
 	const stbi_uc* __restrict__ pixel = image_data + img_offset + 4 * pixel_idx;
 
 	const float r = __srgb_to_linear((float)pixel[0] / 255.0f);
@@ -131,25 +168,11 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	pix_rgba[i_offset_1] = g * a;
 	pix_rgba[i_offset_2] = b * a;
 	pix_rgba[i_offset_3] = a;
-	
-	// TODO: optimize (we can likely eliminate some allocations here)
-	Ray local_ray = cam.local_ray_at_pixel_xy(x, y);
-	Ray global_ray = cam.global_ray_from_local_ray(local_ray);
 
-	const float3 global_origin = global_ray.o;
-	const float3 global_direction = global_ray.d;
-
-	ori_xyz[i_offset_0] = global_origin.x;
-	ori_xyz[i_offset_1] = global_origin.y;
-	ori_xyz[i_offset_2] = global_origin.z;
-
-	const float dir_x = global_direction.x;
-	const float dir_y = global_direction.y;
-	const float dir_z = global_direction.z;
-	
-	const float idir_x = 1.0f / dir_x;
-	const float idir_y = 1.0f / dir_y;
-	const float idir_z = 1.0f / dir_z;
+	// assign ray properties
+	ori_xyz[i_offset_0] = global_ori.x;
+	ori_xyz[i_offset_1] = global_ori.y;
+	ori_xyz[i_offset_2] = global_ori.z;
 	
 	dir_xyz[i_offset_0] = dir_x;
 	dir_xyz[i_offset_1] = dir_y;
@@ -159,16 +182,9 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	idir_xyz[i_offset_1] = idir_y;
 	idir_xyz[i_offset_2] = idir_z;
 	
-	float t;
-	const bool intersects_bbox = bbox->get_ray_t_intersection(
-		global_origin.x, global_origin.y, global_origin.z,
-		dir_x, dir_y, dir_z,
-		idir_x, idir_y, idir_z,
-		t
-	);
-
-	ray_alive[i] = intersects_bbox;
-	ray_t[i] = intersects_bbox ? fmaxf(0.0f, t + 1e-5f) : 0.0f;
+	ray_t[i] = t;
+	ray_t_max[i] = t_max;
+	ray_alive[i] = true;
 }
 
 // CONSIDER: move rays inside bounding box first?
@@ -181,9 +197,12 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	const float cone_angle,
 	const float dt_min,
 	const float dt_max,
+	
 	// input buffers
 	const float* __restrict__ dir_xyz,
 	const float* __restrict__ idir_xyz,
+	const float* __restrict__ ray_t_max,
+
 	// output/mixed use buffers
 	bool* __restrict__ ray_alive,
 	float* __restrict__ ori_xyz,
@@ -220,8 +239,9 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	uint32_t n_steps_taken = 0;
 
 	float t = ray_t[i];
+	float t_max = ray_t_max[i];
 
-	while (true) {
+	while (t < t_max) {
 		const float x = o_x + t * d_x;
 		const float y = o_y + t * d_y;
 		const float z = o_z + t * d_z;
@@ -257,7 +277,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 				grid_level
 			);
 		}
-	}
+	};
 
 	if (n_steps_taken == 0) {
 		ray_alive[i] = false;
@@ -322,6 +342,7 @@ __global__ void march_and_generate_network_positions_kernel(
 	const float* __restrict__ in_dir_xyz,
 	const float* __restrict__ in_idir_xyz,
 	const float* __restrict__ in_ray_t,
+	const float* __restrict__ in_ray_t_max,
 	const uint32_t* __restrict__ ray_offset,
 	const bool* __restrict__ ray_alive,
 
@@ -393,7 +414,7 @@ __global__ void march_and_generate_network_positions_kernel(
 			);
 			break;
 		}
-		
+
 		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
 
 		t0 = t1;

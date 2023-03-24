@@ -111,6 +111,7 @@ void Renderer::perform_task(
         workspace.ray_dir[active_buf_idx],
         workspace.ray_idir[active_buf_idx],
         workspace.ray_t[active_buf_idx],
+        workspace.ray_t_max[active_buf_idx],
         workspace.ray_trans[active_buf_idx],
         workspace.ray_idx[active_buf_idx],
         workspace.ray_active[active_buf_idx],
@@ -145,6 +146,7 @@ void Renderer::perform_task(
         workspace.ray_alive,
         workspace.ray_origin[active_buf_idx],
         workspace.ray_t[active_buf_idx],
+        workspace.ray_t_max[active_buf_idx],
 
         // output buffers
         workspace.network_pos,
@@ -180,6 +182,9 @@ void Renderer::perform_task(
             workspace.ray_origin[active_buf_idx],
             workspace.ray_dir[active_buf_idx],
             workspace.ray_idir[active_buf_idx],
+            workspace.ray_t_max[active_buf_idx],
+
+            // dual-use buffers
             workspace.ray_alive,
             workspace.ray_active[active_buf_idx],
             workspace.ray_t[active_buf_idx],
@@ -284,6 +289,7 @@ void Renderer::perform_task(
                 workspace.ray_idx[active_buf_idx],
                 workspace.ray_active[active_buf_idx],
                 workspace.ray_t[active_buf_idx],
+                workspace.ray_t_max[active_buf_idx],
                 workspace.ray_origin[active_buf_idx],
                 workspace.ray_dir[active_buf_idx],
                 workspace.ray_idir[active_buf_idx],
@@ -293,6 +299,7 @@ void Renderer::perform_task(
                 workspace.ray_idx[compact_buf_idx],
                 workspace.ray_active[compact_buf_idx],
                 workspace.ray_t[compact_buf_idx],
+                workspace.ray_t_max[compact_buf_idx],
                 workspace.ray_origin[compact_buf_idx],
                 workspace.ray_dir[compact_buf_idx],
                 workspace.ray_idir[compact_buf_idx],

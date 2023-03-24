@@ -21,6 +21,7 @@ __global__ void generate_rectangular_grid_of_rays_kernel(
     float* __restrict__ dir,
     float* __restrict__ idir,
     float* __restrict__ t,
+    float* __restrict__ t_max,
     int* __restrict__ index,
     bool* __restrict__ alive
 ) {
@@ -30,20 +31,18 @@ __global__ void generate_rectangular_grid_of_rays_kernel(
         return;
     }
 
-    int iy = divide(i, grid_resolution.x);  // (i / grid_resolution.x)
-    int ix = i - iy * grid_resolution.x;    // (i % grid_resolution.x) 
+    int y = divide(i, grid_resolution.x);  // (i / grid_resolution.x)
+    int x = i - y * grid_resolution.x;    // (i % grid_resolution.x) 
 
     // calculate x and y in grid space
-    int x = (float)grid_size.x * (float)ix / (float)grid_resolution.x;
-    int y = (float)grid_size.y * (float)iy / (float)grid_resolution.y;
+    int gx = (float)grid_size.x * (float)x / (float)grid_resolution.x;
+    int gy = (float)grid_size.y * (float)y / (float)grid_resolution.y;
 
-    // normalize to camera space
-    const Camera cam = *camera;
+    // get pixel indices
+    int ix = gx + grid_offset.x;
+    int iy = gy + grid_offset.y;
 
-    Ray local_ray = cam.local_ray_at_pixel_xy(x + grid_offset.x, y + grid_offset.y);
-    Ray global_ray = cam.global_ray_from_local_ray(local_ray);
-
-    fill_ray_buffers(i, stride, global_ray, bbox, pos, dir, idir, t, index, alive);
+    fill_ray_buffers(i, stride, camera, bbox, ix, iy, pos, dir, idir, t, t_max, index, alive);
 }
 
 void RectangularGridRayBatchCoordinator::generate_rays(
@@ -64,6 +63,7 @@ void RectangularGridRayBatchCoordinator::generate_rays(
         ray_batch.dir,
         ray_batch.idir,
         ray_batch.t,
+        ray_batch.t_max,
         ray_batch.index,
         ray_batch.alive
     );

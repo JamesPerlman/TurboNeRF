@@ -48,25 +48,30 @@ public:
 inline __device__ void fill_ray_buffers(
     const int& i,
     const int& stride,
-    const Ray& global_ray,
+    const Camera* __restrict__ cam,
     const BoundingBox* __restrict__ bbox,
+    const int& pix_idx_x,
+    const int& pix_idx_y,
     float* __restrict__ pos,
     float* __restrict__ dir,
     float* __restrict__ idir,
     float* __restrict__ t,
+    float* __restrict__ t_max,
     int* __restrict__ index,
     bool* __restrict__ alive
 ) {
     int i_offset_0 = i;
     int i_offset_1 = i_offset_0 + stride;
     int i_offset_2 = i_offset_1 + stride;
-    
-	const float3 global_origin = global_ray.o;
-	const float3 global_direction = global_ray.d;
 
-	const float dir_x = global_direction.x;
-	const float dir_y = global_direction.y;
-	const float dir_z = global_direction.z;
+    const Ray global_ray = cam->global_ray_at_pixel_xy((float)pix_idx_x, (float)pix_idx_y);
+    
+	const float3 global_ori = global_ray.o;
+	const float3 global_dir = global_ray.d;
+
+	const float dir_x = global_dir.x;
+	const float dir_y = global_dir.y;
+	const float dir_z = global_dir.z;
 	
 	const float idir_x = 1.0f / dir_x;
 	const float idir_y = 1.0f / dir_y;
@@ -75,21 +80,30 @@ inline __device__ void fill_ray_buffers(
     // make sure this ray intersects the bbox
 	float _t;
 	const bool intersects_bbox = bbox->get_ray_t_intersection(
-		global_origin.x, global_origin.y, global_origin.z,
+		global_ori.x, global_ori.y, global_ori.z,
 		dir_x, dir_y, dir_z,
 		idir_x, idir_y, idir_z,
 		_t
 	);
 
+
     if (!intersects_bbox) {
-        // no "alive" bit
+        alive[i] = false;
+        return;
+    }
+    
+    // calculate t_max
+    const float _t_max = cam->far - cam->near;
+    _t = fmaxf(0.0f, _t + 1e-5f);
+
+    if (_t_max < _t) {
         alive[i] = false;
         return;
     }
 
-	pos[i_offset_0] = global_origin.x;
-	pos[i_offset_1] = global_origin.y;
-	pos[i_offset_2] = global_origin.z;
+	pos[i_offset_0] = global_ori.x;
+	pos[i_offset_1] = global_ori.y;
+	pos[i_offset_2] = global_ori.z;
 	
 	dir[i_offset_0] = dir_x;
 	dir[i_offset_1] = dir_y;
@@ -100,7 +114,8 @@ inline __device__ void fill_ray_buffers(
 	idir[i_offset_2] = idir_z;
 
     // set t-value to a position just barely within the bbox
-	t[i] = fmaxf(0.0f, _t + 1e-5f);
+	t[i] = _t;
+    t_max[i] = _t_max;
     index[i] = i;
 	alive[i] = true;
 };

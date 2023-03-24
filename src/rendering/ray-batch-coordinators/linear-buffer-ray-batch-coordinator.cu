@@ -18,6 +18,7 @@ __global__ void generate_linear_buffer_of_rays_kernel(
     float* __restrict__ dir,
     float* __restrict__ idir,
     float* __restrict__ t,
+    float* __restrict__ t_max,
     int* __restrict__ index,
     bool* __restrict__ alive
 ) {
@@ -31,13 +32,8 @@ __global__ void generate_linear_buffer_of_rays_kernel(
     const int w = camera->resolution.x;
     const int iy = divide(ii, w);
     const int ix = ii - iy * w; 
-    
-    const Camera cam = *camera;
 
-    const Ray local_ray = cam.local_ray_at_pixel_xy(ix, iy);
-    const Ray global_ray = cam.global_ray_from_local_ray(local_ray);
-
-    fill_ray_buffers(i, stride, global_ray, bbox, pos, dir, idir, t, index, alive);
+    fill_ray_buffers(i, stride, camera, bbox, ix, iy, pos, dir, idir, t, t_max, index, alive);
 }
 
 void LinearBufferRayBatchCoordinator::generate_rays(
@@ -56,6 +52,7 @@ void LinearBufferRayBatchCoordinator::generate_rays(
         ray_batch.dir,
         ray_batch.idir,
         ray_batch.t,
+        ray_batch.t_max,
         ray_batch.index,
         ray_batch.alive
     );

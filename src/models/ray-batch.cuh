@@ -11,6 +11,7 @@ struct RayBatch {
     float* dir;
     float* idir;
     float* t;
+    float* t_max;
     float* transmittance;
     int* index;
     bool* active;

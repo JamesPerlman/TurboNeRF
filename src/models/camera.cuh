@@ -67,29 +67,34 @@ struct Camera {
 
 	// returns a ray in the camera's local coordinate system
 
-	inline __device__ Ray local_ray_at_pixel_xy(
+	inline __device__ Ray global_ray_at_pixel_xy(
 		const float& x,
 		const float& y
 	) const {
-		const float cx = principal_point.x;
-		const float cy = principal_point.y;
 		
-		const float xn = (x - cx) / focal_length.x;
-		const float yn = (y - cy) / focal_length.y;
+		// this represents a position at a plane 1 unit away from the camera's origin
+		float3 v = {
+			(x - principal_point.x) / focal_length.x,
+			(y - principal_point.y) / focal_length.y,
+			1.0f
+		};
+
+		// magnitude of the position vector
+		float v_len = l2_norm(v);
+
+		// transform the direction vector to global coordinates
+		float3 global_dir = transform.mmul_ul3x3(v);
+
+		// we need to normalize the global direction vector
+		global_dir = rnorm3df(global_dir.x, global_dir.y, global_dir.z) * global_dir;
+
+		// the ray's origin is at a plane `near` units away from the camera's origin
+		float3 global_ori = transform.get_translation() + near * (v_len * global_dir);
 		
-		float3 ray_d = make_float3(xn, yn, 1.0f);
-		float3 ray_o = near * ray_d;
-
-		return Ray{ ray_o, ray_d };
-	}
-	
-	inline __device__ Ray global_ray_from_local_ray(const Ray& local_ray) const {
-		float3 global_origin = transform * local_ray.o;
-		float3 global_direction = transform.mmul_ul3x3(local_ray.d);
-
-		// normalize ray directions
-		const float n = rnorm3df(global_direction.x, global_direction.y, global_direction.z);
-		return Ray{ global_origin, n * global_direction };
+		return Ray{
+			global_ori, // origin, at near plane in global coordinates
+			global_dir // direction, normalized
+		};
 	}
 };
 
