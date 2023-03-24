@@ -238,30 +238,6 @@ struct Matrix4f
     }
 };
 
-// multiplication float * float3
-inline NRC_HOST_DEVICE float3 operator*(const float& s, const float3& v)
-{
-    return {s * v.x, s * v.y, s * v.z};
-}
-
-// division float3 / float
-inline NRC_HOST_DEVICE float3 operator/(const float3& v, const float& s)
-{
-    return {v.x / s, v.y / s, v.z / s};
-}
-
-// addition float3 + float3
-inline NRC_HOST_DEVICE float3 operator+(const float3& a, const float3& b)
-{
-    return {a.x + b.x, a.y + b.y, a.z + b.z};
-}
-
-// subtraction float3 - float3
-inline NRC_HOST_DEVICE float3 operator-(const float3& a, const float3& b)
-{
-    return {a.x - b.x, a.y - b.y, a.z - b.z};
-}
-
 // l2 squared norm of a float3
 inline NRC_HOST_DEVICE float l2_squared_norm(const float3& v)
 {

@@ -7,6 +7,7 @@
 #include "../common.h"
 
 #include "../utils/linalg/transform4f.cuh"
+#include "../utils/tuple-math.cuh"
 #include "ray.h"
 
 TURBO_NAMESPACE_BEGIN
@@ -22,6 +23,16 @@ struct DistortionParams {
 	// constructor
 	DistortionParams(float k1 = 0.0f, float k2 = 0.0f, float k3 = 0.0f, float p1 = 0.0f, float p2 = 0.0f)
 		: k1(k1), k2(k2), k3(k3), p1(p1), p2(p2) { }
+	
+	// equality operator
+	inline __host__ bool operator==(const DistortionParams& other) const {
+		return
+			k1 == other.k1 &&
+			k2 == other.k2 &&
+			k3 == other.k3 &&
+			p1 == other.p1 &&
+			p2 == other.p2;
+	}
 };
 
 struct Camera {
@@ -95,6 +106,23 @@ struct Camera {
 			global_ori, // origin, at near plane in global coordinates
 			global_dir // direction, normalized
 		};
+	}
+
+	// equality operator
+	inline __host__ bool operator==(const Camera& other) const {
+		return
+			resolution == other.resolution &&
+			near == other.near &&
+			far == other.far &&
+			focal_length == other.focal_length &&
+			principal_point == other.principal_point &&
+			transform == other.transform &&
+			dist_params == other.dist_params;
+	}
+
+	// inequality operator
+	inline __host__ bool operator!=(const Camera& other) const {
+		return !(*this == other);
 	}
 };
 

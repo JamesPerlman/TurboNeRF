@@ -221,6 +221,15 @@ struct alignas(float) Transform4f
         
         return result;
     }
+
+    // equality operator
+    bool operator==(const Transform4f& x) const
+    {
+        return
+            m00 == x.m00 && m01 == x.m01 && m02 == x.m02 && m03 == x.m03 &&
+            m10 == x.m10 && m11 == x.m11 && m12 == x.m12 && m13 == x.m13 &&
+            m20 == x.m20 && m21 == x.m21 && m22 == x.m22 && m23 == x.m23;
+    }
 };
 
 TURBO_NAMESPACE_END

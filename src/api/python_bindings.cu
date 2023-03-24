@@ -136,6 +136,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("principal_point", &Camera::principal_point)
         .def_readonly("transform", &Camera::transform)
         .def_readonly("dist_params", &Camera::dist_params)
+        .def(py::self == py::self)
+        .def(py::self != py::self)
     ;
 
     py::class_<Dataset>(m, "Dataset")

@@ -127,6 +127,7 @@ set(HEADERS
 	src/utils/stream-compaction.cuh
 	src/utils/training-batch-kernels.cuh
 	src/utils/training-network-kernels.cuh
+	src/utils/tuple-math.cuh
 
 	# services
 	src/services/device-manager.cuh
