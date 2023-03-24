@@ -33,12 +33,20 @@ public:
     void free(const cudaStream_t& stream = 0) override {
         if (width == 0 || height == 0)
             return;
-        
+
+        if (rgba_cpu == nullptr || rgba_gpu == nullptr)
+            return;
+
         CUDA_CHECK_THROW(cudaFreeHost(rgba_cpu));
         CUDA_CHECK_THROW(cudaFree(rgba_gpu));
+
+        rgba_cpu = nullptr;
+        rgba_gpu = nullptr;
     }
 
     void open_for_cuda_access(std::function<void(float* rgba)> handle, const cudaStream_t& stream = 0) override {
+        if (rgba_gpu == nullptr)
+            return;
         // allow writing to device memory
         handle(rgba_gpu);
         _dirty = true;
@@ -46,6 +54,9 @@ public:
 
     void synchronize() {
         // copy to CPU memory if needed
+        if (rgba_cpu == nullptr || rgba_gpu == nullptr)
+            return;
+            
         if (_dirty) {
             CUDA_CHECK_THROW(cudaMemcpy(rgba_cpu, rgba_gpu, width * height * 4 * sizeof(float), cudaMemcpyDeviceToHost));
             _dirty = false;

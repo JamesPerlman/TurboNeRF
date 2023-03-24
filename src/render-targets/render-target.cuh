@@ -51,6 +51,9 @@ public:
     void save_image(const std::string& filename, const cudaStream_t& stream = 0) {
         CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
         open_for_cuda_access([&](float* rgba) {
+            if (rgba == nullptr)
+                return;
+            
             save_buffer_to_image(stream, filename, rgba, width, height, 4);
         });
     };
