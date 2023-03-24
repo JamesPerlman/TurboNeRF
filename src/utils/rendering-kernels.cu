@@ -207,13 +207,9 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 		}
 	}
 	
-	if (n_steps == 0) {
-		ray_alive[i] = false;
-		return;
-	}
-
-	ray_t[i] = t;
 	n_ray_steps[i] = n_steps;
+	ray_alive[i] = n_steps > 0;
+	ray_t[i] = t;
 }
 
 // ray compaction
