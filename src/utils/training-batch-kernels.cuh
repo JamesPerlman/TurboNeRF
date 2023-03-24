@@ -291,7 +291,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
  * 
  */
 
-inline __device__ void assign_normalized_ray(
+inline __device__ void assign_normalized_ray_sample(
 	const uint32_t& batch_size,
 	const uint32_t& sample_offset,
 	const uint32_t& n_steps_taken,
@@ -405,7 +405,7 @@ __global__ void march_and_generate_network_positions_kernel(
 		const float dt = grid->get_dt(tr, cone_angle, dt_min, dt_max);
 
 		if (!bbox->contains(x, y, z)) {
-			assign_normalized_ray(
+			assign_normalized_ray_sample(
 				batch_size, sample_offset, n_steps_taken,
 				x, y, z,
 				d_x, d_y, d_z,
@@ -423,7 +423,7 @@ __global__ void march_and_generate_network_positions_kernel(
 
 			t1 += dt;
 
-			assign_normalized_ray(
+			assign_normalized_ray_sample(
 				batch_size, sample_offset, n_steps_taken,
 				x, y, z,
 				d_x, d_y, d_z,
