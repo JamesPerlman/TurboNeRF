@@ -51,7 +51,7 @@ Dataset::Dataset(const string& file_path) {
 
     uint32_t aabb_size = std::min(json_data.value("aabb_scale", 16), 128);
     float scene_scale = json_data.value("scene_scale", 1.0f);
-    
+
     bounding_box = BoundingBox((float)aabb_size);
 
     float global_near = json_data.value("near", 0.05f);
@@ -82,6 +82,7 @@ Dataset::Dataset(const string& file_path) {
             far,
             focal_length,
             principal_point,
+            float2{0.0f, 0.0f},
             camera_matrix,
             dist_params
         );

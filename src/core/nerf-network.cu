@@ -294,7 +294,7 @@ void NerfNetwork::inference(
 
 		// Inference (color network)
 		GPUMatrixDynamic color_network_input_matrix(
-			density_network_output_matrix.data(),
+			concat_buffer,
 			color_network->input_width(),
 			batch_size,
 			MatrixLayout::RowMajor

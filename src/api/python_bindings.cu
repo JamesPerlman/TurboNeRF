@@ -118,6 +118,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
                 float,
                 float2,
                 float2,
+                float2,
                 Transform4f,
                 DistortionParams
             >(),
@@ -126,6 +127,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("far"),
             py::arg("focal_length"),
             py::arg("principal_point"),
+            py::arg("shift"),
             py::arg("transform"),
             py::arg("dist_params") = DistortionParams()
         )
@@ -134,6 +136,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("far", &Camera::far)
         .def_readonly("focal_length", &Camera::focal_length)
         .def_readonly("principal_point", &Camera::principal_point)
+        .def_readonly("shift", &Camera::shift)
         .def_readonly("transform", &Camera::transform)
         .def_readonly("dist_params", &Camera::dist_params)
         .def(py::self == py::self)

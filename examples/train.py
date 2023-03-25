@@ -32,6 +32,7 @@ render_buf = tn.CPURenderBuffer()
 render_buf.set_size(512, 512)
 principal_point = (render_buf.width / 2, render_buf.height / 2)
 focal_len = (500, 500)
+shift = (0, 0)
 
 # Just pull a random camera from the dataset
 cam6 = dataset.cameras[6]
@@ -43,6 +44,7 @@ render_cam = tn.Camera(
     cam6.far,
     focal_len,
     principal_point,
+    shift,
     cam6.transform,
     cam6.dist_params
 )

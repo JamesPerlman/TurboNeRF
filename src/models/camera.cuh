@@ -42,6 +42,8 @@ struct Camera {
 	const float2 focal_length;
 	const float2 resolution_f;
 	const float2 principal_point;
+	const float2 shift;
+	const float2 shift_px;
 	const Transform4f transform;
 	const DistortionParams dist_params;
 
@@ -52,15 +54,18 @@ struct Camera {
 		float far,
 		float2 focal_length,
 		float2 principal_point,
+		float2 shift,
 		Transform4f transform,
 		DistortionParams dist_params = DistortionParams()
 	)
 		: resolution(resolution)
-		, resolution_f(make_float2(resolution.x, resolution.y))
+		, resolution_f{(float)resolution.x, (float)resolution.y}
 		, near(near)
 		, far(far)
 		, focal_length(focal_length)
 		, principal_point(principal_point)
+		, shift(shift)
+		, shift_px(shift * resolution_f - principal_point)
 		, transform(transform)
 		, dist_params(dist_params)
 	{ };
@@ -71,6 +76,7 @@ struct Camera {
 			int2{ 0, 0 },
 			0.0f,
 			0.0f,
+			float2{ 0.0f, 0.0f },
 			float2{ 0.0f, 0.0f },
 			float2{ 0.0f, 0.0f },
 			Transform4f::Identity()
@@ -85,8 +91,8 @@ struct Camera {
 		
 		// this represents a position at a plane 1 unit away from the camera's origin
 		float3 v = {
-			(x - principal_point.x) / focal_length.x,
-			(y - principal_point.y) / focal_length.y,
+			(x + shift_px.x) / focal_length.x,
+			(y + shift_px.y) / focal_length.y,
 			1.0f
 		};
 
@@ -97,7 +103,7 @@ struct Camera {
 		float3 global_dir = transform.mmul_ul3x3(v);
 
 		// we need to normalize the global direction vector
-		global_dir = rnorm3df(global_dir.x, global_dir.y, global_dir.z) * global_dir;
+		global_dir = global_dir / l2_norm(global_dir);
 
 		// the ray's origin is at a plane `near` units away from the camera's origin
 		float3 global_ori = transform.get_translation() + near * (v_len * global_dir);
@@ -116,6 +122,8 @@ struct Camera {
 			far == other.far &&
 			focal_length == other.focal_length &&
 			principal_point == other.principal_point &&
+			shift == other.shift &&
+			shift_px == other.shift_px &&
 			transform == other.transform &&
 			dist_params == other.dist_params;
 	}

@@ -1,4 +1,4 @@
-#include <stdio.h>
+﻿#include <stdio.h>
 #include <iostream>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
@@ -45,7 +45,7 @@ static const std::string HELP_OUTPUT = R"(
 )";
 
 bool check_is_directory(const std::string&); 
-bool check_is_json_file(const std::string &);
+bool check_is_json_file(const std::string&);
 
 int main(int argc, char* argv[])
 {
@@ -129,6 +129,7 @@ int main(int argc, char* argv[])
 				cam0.far,
 				cam0.focal_length,
 				cam0.principal_point,
+				cam0.shift,
 				cam0.transform,
 				cam0.dist_params
 			);
