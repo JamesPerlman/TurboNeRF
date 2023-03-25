@@ -47,6 +47,27 @@ struct alignas(float) Transform4f
         m20 = data[2][0]; m21 = data[2][1]; m22 = data[2][2]; m23 = data[2][3];
     }
 
+    // to_matrix()
+    Matrix4f to_matrix() const
+    {
+        return Matrix4f{
+            m00, m01, m02, m03,
+            m10, m11, m12, m13,
+            m20, m21, m22, m23,
+            0.0f, 0.0f, 0.0f, 1.0f
+        };
+    }
+
+    // to_json()
+    nlohmann::json to_json() const
+    {
+        return nlohmann::json{
+            {m00, m01, m02, m03},
+            {m10, m11, m12, m13},
+            {m20, m21, m22, m23}
+        };
+    }
+
     /** Debug **/
 
     void print() const
@@ -196,19 +217,17 @@ struct alignas(float) Transform4f
 
     // coordinate transformations
     Transform4f from_nerf() const {
-        Transform4f nerf_matrix(*this);
-        Transform4f result = nerf_matrix;
+        Transform4f result = *this;
+
         // invert column 1
-        result.m01 = -nerf_matrix.m01;
-        result.m11 = -nerf_matrix.m11;
-        result.m21 = -nerf_matrix.m21;
-        // result.m31 = -nerf_matrix.m31;
+        result.m01 = -result.m01;
+        result.m11 = -result.m11;
+        result.m21 = -result.m21;
 
         // invert column 2
-        result.m02 = -nerf_matrix.m02;
-        result.m12 = -nerf_matrix.m12;
-        result.m22 = -nerf_matrix.m22;
-        // result.m32 = -nerf_matrix.m32;
+        result.m02 = -result.m02;
+        result.m12 = -result.m12;
+        result.m22 = -result.m22;
 
         // roll axes xyz -> yzx
         const Transform4f tmp = result;
@@ -219,6 +238,31 @@ struct alignas(float) Transform4f
         // z -> x
         result.m20 = tmp.m00; result.m21 = tmp.m01; result.m22 = tmp.m02; result.m23 = tmp.m03;
         
+        return result;
+    }
+
+    Transform4f to_nerf() const {
+        Transform4f result = *this;
+
+        // roll axes yzx -> xyz
+        const Transform4f tmp = result;
+        // x -> z
+        result.m00 = tmp.m20; result.m01 = tmp.m21; result.m02 = tmp.m22; result.m03 = tmp.m23;
+        // y -> x
+        result.m10 = tmp.m00; result.m11 = tmp.m01; result.m12 = tmp.m02; result.m13 = tmp.m03;
+        // z -> y
+        result.m20 = tmp.m10; result.m21 = tmp.m11; result.m22 = tmp.m12; result.m23 = tmp.m13;
+
+        // invert column 1
+        result.m01 = -result.m01;
+        result.m11 = -result.m11;
+        result.m21 = -result.m21;
+
+        // invert column 2
+        result.m02 = -result.m02;
+        result.m12 = -result.m12;
+        result.m22 = -result.m22;
+
         return result;
     }
 
