@@ -1,8 +1,10 @@
+#include <json/json.hpp>
 #include <pybind11/functional.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11_json/pybind11_json.hpp>
 #include <string>
 #include <vector>
 
@@ -148,6 +150,14 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::init<const string&>(),
             py::arg("file_path")
         )
+        .def(
+            py::init<const BoundingBox&, const vector<Camera>&, const vector<TrainingImage>&>(),
+            py::arg("bounding_box"),
+            py::arg("cameras"),
+            py::arg("images")
+        )
+        .def("to_json", &Dataset::to_json)
+        .def_readwrite("file_path", &Dataset::file_path)
         .def_readonly("cameras", &Dataset::cameras)
         .def_readonly("image_dimensions", &Dataset::image_dimensions)
         .def_readonly("bounding_box", &Dataset::bounding_box)

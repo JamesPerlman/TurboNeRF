@@ -12,11 +12,11 @@ TURBO_NAMESPACE_BEGIN
 
 struct TrainingImage {
 	int2 dimensions;
-	string filepath = "";
+	string file_path = "";
 	std::shared_ptr<stbi_uc> data_cpu;
 	int channels = 0;
 	
-	TrainingImage(string filepath, int2 dimensions) : filepath(filepath), dimensions(dimensions) {};
+	TrainingImage(string file_path, int2 dimensions) : file_path(file_path), dimensions(dimensions) {};
 	void load_cpu(int n_channels = 0);
 };
 

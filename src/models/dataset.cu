@@ -13,7 +13,9 @@ using namespace filesystem;
 using json = nlohmann::json;
 using namespace turbo;
 
-Dataset::Dataset(const string& file_path) {
+Dataset::Dataset(const string& file_path)
+    : file_path(file_path)
+{
     ifstream input_file(file_path);
     json json_data;
     input_file >> json_data;
@@ -101,6 +103,19 @@ Dataset::Dataset(const string& file_path) {
     images.shrink_to_fit();
 }
 
+Dataset::Dataset(
+    const BoundingBox& bounding_box,
+    const vector<Camera>& cameras,
+    const vector<TrainingImage>& images
+)   : bounding_box(bounding_box)
+    , cameras(cameras)
+    , images(images)
+{
+    image_dimensions = images[0].dimensions;
+    n_pixels_per_image = image_dimensions.x * image_dimensions.y;
+    n_channels_per_image = images[0].channels;
+}
+
 // this method was written (mostly) by ChatGPT!
 void Dataset::load_images_in_parallel(std::function<void(const size_t, const TrainingImage&)> post_load_image) {
     const size_t num_threads = std::thread::hardware_concurrency(); // get the number of available hardware threads
@@ -124,4 +139,53 @@ void Dataset::load_images_in_parallel(std::function<void(const size_t, const Tra
     for (auto& thread : threads) {
         thread.join();
     }
+}
+
+json Dataset::to_json() const {
+    json json_data;
+
+    json_data["w"] = image_dimensions.x;
+    json_data["h"] = image_dimensions.y;
+
+    json_data["cx"] = cameras[0].principal_point.x;
+    json_data["cy"] = cameras[0].principal_point.y;
+
+    json_data["fl_x"] = cameras[0].focal_length.x;
+    json_data["fl_y"] = cameras[0].focal_length.y;
+
+    json_data["k1"] = cameras[0].dist_params.k1;
+    json_data["k2"] = cameras[0].dist_params.k2;
+    json_data["k3"] = cameras[0].dist_params.k3;
+    json_data["p1"] = cameras[0].dist_params.p1;
+    json_data["p2"] = cameras[0].dist_params.p2;
+
+    json_data["aabb_scale"] = bounding_box.size_x;
+    json_data["scene_scale"] = 1.0f;
+
+    json frames = json::array();
+
+    for (size_t i = 0; i < cameras.size(); ++i) {
+        json frame;
+
+        frame["near"] = cameras[i].near;
+        frame["far"] = cameras[i].far;
+
+        frame["transform_matrix"] = cameras[i].transform.to_nerf().to_matrix().to_json();
+
+        path image_path(images[i].file_path);
+        path relative_path = image_path.lexically_relative(file_path.value().parent_path());
+        
+        // convert to posix
+        string path_string = relative_path.string();
+        std::replace(path_string.begin(), path_string.end(), '\\', '/');
+
+        // save as posix
+        frame["file_path"] = path_string;
+        
+        frames.push_back(frame);
+    }
+
+    json_data["frames"] = frames;
+
+    return json_data;
 }
