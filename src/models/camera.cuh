@@ -82,8 +82,7 @@ struct Camera {
 			Transform4f::Identity()
 		) {};
 
-	// returns a ray in the camera's local coordinate system
-
+	// returns a ray in the world's coordinate system
 	inline __device__ Ray global_ray_at_pixel_xy(
 		const float& x,
 		const float& y
