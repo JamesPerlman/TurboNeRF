@@ -148,6 +148,17 @@ struct Matrix4f
         m30 = data[3][0]; m31 = data[3][1]; m32 = data[3][2]; m33 = data[3][3];
     }
 
+    // to_json
+    nlohmann::json to_json() const
+    {
+        return nlohmann::json{
+            {m00, m01, m02, m03},
+            {m10, m11, m12, m13},
+            {m20, m21, m22, m23},
+            {m30, m31, m32, m33}
+        };
+    }
+
     // multiplication operator with float3 - multiply by upper left 3x3, no translation
     inline NRC_HOST_DEVICE float3 mmul_ul3x3(const float3& v) const
     {
