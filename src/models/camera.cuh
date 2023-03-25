@@ -43,7 +43,7 @@ struct Camera {
 	const float2 resolution_f;
 	const float2 principal_point;
 	const float2 shift;
-	const float2 shift_px;
+	const float2 offset_px;
 	const Transform4f transform;
 	const DistortionParams dist_params;
 
@@ -65,7 +65,7 @@ struct Camera {
 		, focal_length(focal_length)
 		, principal_point(principal_point)
 		, shift(shift)
-		, shift_px(shift * resolution_f - principal_point)
+		, offset_px(shift * resolution_f - principal_point)
 		, transform(transform)
 		, dist_params(dist_params)
 	{ };
@@ -91,8 +91,8 @@ struct Camera {
 		
 		// this represents a position at a plane 1 unit away from the camera's origin
 		float3 v = {
-			(x + shift_px.x) / focal_length.x,
-			(y + shift_px.y) / focal_length.y,
+			(x + offset_px.x) / focal_length.x,
+			(y + offset_px.y) / focal_length.y,
 			1.0f
 		};
 
@@ -123,7 +123,7 @@ struct Camera {
 			focal_length == other.focal_length &&
 			principal_point == other.principal_point &&
 			shift == other.shift &&
-			shift_px == other.shift_px &&
+			offset_px == other.offset_px &&
 			transform == other.transform &&
 			dist_params == other.dist_params;
 	}
