@@ -81,7 +81,6 @@ void Trainer::generate_next_training_batch(
 		ctx.workspace.batch_size,
 		ctx.dataset->images.size(),
 		ctx.dataset->n_pixels_per_image,
-		ctx.dataset->n_pixels_per_image * ctx.dataset->n_channels_per_image,
 		ctx.dataset->image_dimensions,
 		n_rays_per_image,
 		chunk_size,

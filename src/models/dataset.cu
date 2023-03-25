@@ -30,7 +30,6 @@ Dataset::Dataset(const string& file_path)
 
     image_dimensions = make_int2((int)w, (int)h);
     n_pixels_per_image = (uint32_t)(w * h);
-    n_channels_per_image = 4;
 
     float cx = json_data.value("cx", 0.5f * w);
     float cy = json_data.value("cy", 0.5f * h);
@@ -113,7 +112,6 @@ Dataset::Dataset(
 {
     image_dimensions = images[0].dimensions;
     n_pixels_per_image = image_dimensions.x * image_dimensions.y;
-    n_channels_per_image = images[0].channels;
 }
 
 // this method was written (mostly) by ChatGPT!
@@ -127,7 +125,7 @@ void Dataset::load_images_in_parallel(std::function<void(const size_t, const Tra
         threads.emplace_back([&] {
             std::size_t local_index;
             while ((local_index = index.fetch_add(1)) < images.size()) {
-                images[local_index].load_cpu(n_channels_per_image);
+                images[local_index].load_cpu();
                 if (post_load_image) {
                     post_load_image(local_index, images[local_index]);
                 }
@@ -181,7 +179,7 @@ json Dataset::to_json() const {
 
         // save as posix
         frame["file_path"] = path_string;
-        
+
         frames.push_back(frame);
     }
 

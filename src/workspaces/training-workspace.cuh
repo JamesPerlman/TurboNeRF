@@ -79,7 +79,6 @@ struct TrainingWorkspace: Workspace {
 	// primitives
 	size_t n_images;
 	size_t n_pixels_per_image;
-	size_t n_channels_per_image;
 	uint32_t n_samples_per_batch;
 
 	// member functions
@@ -87,7 +86,6 @@ struct TrainingWorkspace: Workspace {
 		const cudaStream_t& stream,
 		const size_t& n_images,
 		const size_t& n_pixels_per_image,
-		const size_t& n_channels_per_image,
 		const uint32_t& n_samples_per_batch,
 		const uint32_t& n_occ_grid_levels,
 		const uint32_t& n_occ_grid_cells_per_dimension,
@@ -98,11 +96,10 @@ struct TrainingWorkspace: Workspace {
 
 		this->n_images = n_images;
 		this->n_pixels_per_image = n_pixels_per_image;
-		this->n_channels_per_image = n_channels_per_image;
 		this->n_samples_per_batch = n_samples_per_batch;
 		
 		batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
-		size_t n_pixel_elements = n_channels_per_image * n_pixels_per_image * n_images;
+		size_t n_pixel_elements = 4 * n_pixels_per_image * n_images;
 
 		// need to upgrade to C++20 to use typename parameters in lambdas :(
 		// auto alloc = []<typename T>(size_t size) { return allocate<T>(stream, size); };

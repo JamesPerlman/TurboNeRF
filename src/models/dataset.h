@@ -20,7 +20,6 @@ struct Dataset {
 	std::vector<Camera> cameras;
 	std::vector<TrainingImage> images;
 	uint32_t n_pixels_per_image;
-	uint32_t n_channels_per_image;
 	int2 image_dimensions;
 	BoundingBox bounding_box;
 	std::optional<filesystem::path> file_path;

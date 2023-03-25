@@ -17,7 +17,7 @@ struct TrainingImage {
 	int channels = 0;
 	
 	TrainingImage(string file_path, int2 dimensions) : file_path(file_path), dimensions(dimensions) {};
-	void load_cpu(int n_channels = 0);
+	void load_cpu();
 };
 
 TURBO_NAMESPACE_END

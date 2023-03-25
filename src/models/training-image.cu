@@ -9,6 +9,6 @@
 
 using namespace turbo;
 
-void TrainingImage::load_cpu(int n_channels) {
-	data_cpu.reset(stbi_load(file_path.c_str(), &dimensions.x, &dimensions.y, &channels, n_channels));
+void TrainingImage::load_cpu() {
+	data_cpu.reset(stbi_load(file_path.c_str(), &dimensions.x, &dimensions.y, &channels, 4));
 }

@@ -54,7 +54,6 @@ void NeRFTrainingController::prepare_for_training() {
 		ctx.stream,
 		ctx.dataset->images.size(),
 		ctx.dataset->n_pixels_per_image,
-		ctx.dataset->n_channels_per_image,
 		ctx.batch_size,
 		ctx.nerf->occupancy_grid.n_levels,
 		ctx.nerf->occupancy_grid.resolution_i,
@@ -102,7 +101,7 @@ void NeRFTrainingController::prepare_for_training() {
 void NeRFTrainingController::load_images(Trainer::Context& ctx) {
 	// make sure images are all loaded into CPU and GPU
 	// TODO: can we read images from a stream and load them directly into GPU memory? Probably!
-	size_t n_image_elements = ctx.dataset->n_channels_per_image * ctx.dataset->n_pixels_per_image;
+	size_t n_image_elements = 4 * ctx.dataset->n_pixels_per_image;
 	size_t image_size = n_image_elements * sizeof(stbi_uc);
 
 	ctx.dataset->load_images_in_parallel(

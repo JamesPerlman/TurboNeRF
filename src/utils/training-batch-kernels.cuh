@@ -82,7 +82,6 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t batch_size,
 	const uint32_t n_images,
 	const uint32_t n_pixels_per_image,
-	const uint32_t image_data_stride,
 	const int2 image_dimensions,
 	const float n_rays_per_image,
 	const float random_pixel_chunk_size,
@@ -156,8 +155,8 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t i_offset_3 = i_offset_2 + batch_size;
 	
 	// assign ground-truth pixel
-	const uint32_t img_offset = image_idx * image_data_stride;
-	const stbi_uc* __restrict__ pixel = image_data + img_offset + 4 * pixel_idx;
+	const uint32_t img_offset = n_pixels_per_image * image_idx;
+	const stbi_uc* __restrict__ pixel = image_data + 4 * (img_offset + pixel_idx);
 
 	const float r = __srgb_to_linear((float)pixel[0] / 255.0f);
 	const float g = __srgb_to_linear((float)pixel[1] / 255.0f);
