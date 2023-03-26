@@ -244,15 +244,6 @@ struct alignas(float) Transform4f
     Transform4f to_nerf() const {
         Transform4f result = *this;
 
-        // roll axes yzx -> xyz
-        const Transform4f tmp = result;
-        // x -> z
-        result.m00 = tmp.m20; result.m01 = tmp.m21; result.m02 = tmp.m22; result.m03 = tmp.m23;
-        // y -> x
-        result.m10 = tmp.m00; result.m11 = tmp.m01; result.m12 = tmp.m02; result.m13 = tmp.m03;
-        // z -> y
-        result.m20 = tmp.m10; result.m21 = tmp.m11; result.m22 = tmp.m12; result.m23 = tmp.m13;
-
         // invert column 1
         result.m01 = -result.m01;
         result.m11 = -result.m11;
@@ -263,8 +254,18 @@ struct alignas(float) Transform4f
         result.m12 = -result.m12;
         result.m22 = -result.m22;
 
+        // roll axes yzx -> xyz
+        const Transform4f tmp = result;
+        // x -> z
+        result.m00 = tmp.m20; result.m01 = tmp.m21; result.m02 = tmp.m22; result.m03 = tmp.m23;
+        // y -> x
+        result.m10 = tmp.m00; result.m11 = tmp.m01; result.m12 = tmp.m02; result.m13 = tmp.m03;
+        // z -> y
+        result.m20 = tmp.m10; result.m21 = tmp.m11; result.m22 = tmp.m12; result.m23 = tmp.m13;
+
         return result;
     }
+
 
     // equality operator
     bool operator==(const Transform4f& x) const
