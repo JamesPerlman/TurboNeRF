@@ -21,6 +21,7 @@
 #include "../services/device-manager.cuh"
 #include "../services/nerf-manager.cuh"
 #include "../utils/linalg/transform4f.cuh"
+#include "../utils/linalg.cuh"
 #include "pybind_cpp_utils.cuh"
 #include "pybind_cuda.cuh"
 
@@ -61,6 +62,41 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
      * Utility classes
      */
 
+    py::class_<Matrix4f>(m, "Matrix4f", py::buffer_protocol())
+        .def(
+            py::init(
+                [](py::array_t<float> arr) {
+                    const bool is_2d = arr.ndim() == 2;
+                    const bool is_4x4 = arr.shape(0) == 4 && arr.shape(1) == 4;
+                    
+                    if (!is_2d || !is_4x4) {
+                        throw std::runtime_error("Invalid shape for Matrix4f");
+                    }
+
+                    auto buf = arr.request();
+                    auto ptr = (float*)buf.ptr;
+                    return Matrix4f{
+                        ptr[0],  ptr[1],  ptr[2],  ptr[3],
+                        ptr[4],  ptr[5],  ptr[6],  ptr[7],
+                        ptr[8],  ptr[9],  ptr[10], ptr[11],
+                        ptr[12], ptr[13], ptr[14], ptr[15]
+                    };
+                }
+            ),
+            py::arg("matrix")
+        )
+        .def_buffer([](Matrix4f &m) -> py::buffer_info {
+            return py::buffer_info(
+                m.data(),
+                sizeof(float),
+                py::format_descriptor<float>::format(),
+                2,
+                {4, 4},
+                {sizeof(float) * 4, sizeof(float)}
+            );
+        })
+    ;
+
     py::class_<Transform4f>(m, "Transform4f", py::buffer_protocol())
         .def(
             py::init(
@@ -95,6 +131,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             );
         })
         .def("from_nerf", &Transform4f::from_nerf)
+        .def("to_nerf", &Transform4f::to_nerf)
+        .def("to_matrix", &Transform4f::to_matrix)
     ;
 
     /**

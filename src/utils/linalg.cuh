@@ -22,12 +22,14 @@ inline NRC_HOST_DEVICE float lerp(const float &a, const float &b, const float &t
 }
 
 
-struct Matrix4f
+struct alignas(float) Matrix4f
 {
     float m00, m01, m02, m03;
     float m10, m11, m12, m13;
     float m20, m21, m22, m23;
     float m30, m31, m32, m33;
+    
+    float* data() { return &m00; }
 
     Matrix4f() = default;
 
