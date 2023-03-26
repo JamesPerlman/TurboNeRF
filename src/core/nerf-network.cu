@@ -488,7 +488,7 @@ void NerfNetwork::backward(
 	ray_rgba_to_loss_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
-		1.0f / (4.0f * (float)n_rays),
+		1.0f / (float)n_rays,
 		workspace.ray_rgba,
 		target_rgba,
 		workspace.grad_dL_dR
