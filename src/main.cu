@@ -138,6 +138,7 @@ int main(int argc, char* argv[])
 				render_cam,
 				proxy_ptrs,
 				&render_buffer,
+				RenderModifiers(),
 				RenderFlags::Final,
 				// on_complete
 				[]() {},

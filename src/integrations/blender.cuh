@@ -270,7 +270,11 @@ class BlenderBridge
         _renderer.cancel();
     }
 
-    void request_render(const Camera& camera, std::vector<NeRFProxy*>& proxies) {
+    void request_render(
+        const Camera& camera,
+        std::vector<NeRFProxy*>& proxies,
+        const RenderModifiers& modifiers = RenderModifiers()
+    ) {
         if (_is_rendering) {
             return;
         }
@@ -280,12 +284,13 @@ class BlenderBridge
         cancel_preview();
         stop_training();
 
-        _render_queue.push([this, camera, proxies]() {
+        _render_queue.push([this, camera, proxies, modifiers]() {
             _render_target.set_size(camera.resolution.x, camera.resolution.y);
             auto request = std::make_shared<RenderRequest>(
                 camera,
                 proxies,
                 &this->_render_target,
+                modifiers,
                 RenderFlags::Final,
                 // on_complete
                 [this]() {
@@ -342,18 +347,24 @@ class BlenderBridge
         _previewer.cancel();
     }
 
-    void request_preview(const Camera& camera, std::vector<NeRFProxy*>& proxies, const RenderFlags& flags) {
+    void request_preview(
+        const Camera& camera,
+        std::vector<NeRFProxy*>& proxies,
+        const RenderFlags& flags,
+        const RenderModifiers& modifiers = RenderModifiers()    
+    ) {
         cancel_preview();
 
         if (_is_rendering) {
             return;
         }
 
-        _render_queue.push([this, camera, proxies, flags]() {
+        _render_queue.push([this, camera, proxies, modifiers, flags]() {
             auto request = std::make_shared<RenderRequest>(
                 camera,
                 proxies,
                 &_preview_target,
+                modifiers,
                 flags,
                 // on_complete
                 [this]() {

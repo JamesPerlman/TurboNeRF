@@ -278,13 +278,25 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def(py::self &= py::self)
     ;
 
+    py::class_<RenderProperties>(m, "RenderProperties")
+        .def(py::init<>())
+        .def_readwrite("show_near_planes", &RenderProperties::show_near_planes)
+        .def_readwrite("show_far_planes", &RenderProperties::show_far_planes)
+    ;
+
+    py::class_<RenderModifiers>(m, "RenderModifiers")
+        .def(py::init<>())
+        .def_readwrite("properties", &RenderModifiers::properties)
+    ;
+
     py::class_<RenderRequest, std::shared_ptr<RenderRequest>>(m, "RenderRequest")
         .def(
             py::init<
                 const Camera&,
                 std::vector<NeRFProxy*>&,
                 RenderTarget*,
-                RenderFlags,
+                const RenderModifiers&,
+                const RenderFlags&,
                 OnCompleteCallback,
                 OnProgressCallback,
                 OnCancelCallback
@@ -292,6 +304,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("camera"),
             py::arg("nerfs"),
             py::arg("output"),
+            py::arg("modifiers") = RenderModifiers(),
             py::arg("flags") = RenderFlags::Final,
             py::arg("on_complete") = nullptr,
             py::arg("on_progress") = nullptr,
@@ -407,7 +420,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             "request_render",
             &BlenderBridge::request_render,
             py::arg("camera"),
-            py::arg("proxies")
+            py::arg("proxies"),
+            py::arg("modifiers") = RenderModifiers()
         )
         .def("get_render_rgba", [](BlenderBridge& bb) {
             float* rgba = bb.get_render_rgba();
@@ -437,7 +451,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             &BlenderBridge::request_preview,
             py::arg("camera"),
             py::arg("proxies"),
-            py::arg("flags")
+            py::arg("flags"),
+            py::arg("modifiers") = RenderModifiers()
         )
         .def(
             "resize_preview_surface",

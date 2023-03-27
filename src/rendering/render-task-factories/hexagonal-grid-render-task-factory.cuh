@@ -145,6 +145,7 @@ public:
             pn_w * pn_h,
             request->camera,
             request->proxies[0]->get_nerf_ptrs(),
+            request->modifiers,
             std::unique_ptr<RayBatchCoordinator>(
                 new HexagonalGridRayBatchCoordinator(
                     { pn_w, pn_h },
@@ -162,6 +163,7 @@ public:
                 n_rays,
                 request->camera,
                 request->proxies[0]->get_nerf_ptrs(),
+                request->modifiers,
                 std::unique_ptr<RayBatchCoordinator>(
                     new HexagonalTileRayBatchCoordinator(
                         n_rays,

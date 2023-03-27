@@ -4,6 +4,7 @@
 #include "../common.h"
 #include "camera.cuh"
 #include "nerf.cuh"
+#include "render-modifiers.cuh"
 
 TURBO_NAMESPACE_BEGIN
 
@@ -18,10 +19,9 @@ private:
 
 public:
     const int n_rays;
-
     const Camera camera;
-    
     std::vector<NeRF*> nerfs;
+    const RenderModifiers modifiers;
 
     // this is a bit smelly.  batch_coordinator performs the task of creating a ray batch and writing the results to the output buffer
     std::unique_ptr<RayBatchCoordinator> batch_coordinator;
@@ -30,11 +30,13 @@ public:
         const int& n_rays,
         const Camera& camera,
         const std::vector<NeRF*>& nerfs,
+        const RenderModifiers& modifiers,
         std::unique_ptr<RayBatchCoordinator> batch_coordinator
     )
         : n_rays(n_rays)
         , camera(camera)
         , nerfs(nerfs)
+        , modifiers(modifiers)
         , batch_coordinator(std::move(batch_coordinator))
     { };
 

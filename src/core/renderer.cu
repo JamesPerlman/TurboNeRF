@@ -130,7 +130,7 @@ void Renderer::perform_task(
     const float dt_max = nerf->bounding_box.size_x * dt_min;
     const float cone_angle = NeRFConstants::cone_angle;
 
-    bool show_training_cameras = true;
+    bool show_training_cameras = task.modifiers.properties.show_near_planes || task.modifiers.properties.show_far_planes;
     if (show_training_cameras) {
         // clear bg rgba first
         CUDA_CHECK_THROW(
@@ -149,6 +149,8 @@ void Renderer::perform_task(
             nerf->dataset_ws.n_images,
             nerf->dataset_ws.image_dims,
             nerf->dataset_ws.n_pixels_per_image,
+            task.modifiers.properties.show_near_planes,
+            task.modifiers.properties.show_far_planes,
             nerf->dataset_ws.cameras,
             nerf->dataset_ws.image_data,
             workspace.ray_origin[active_buf_idx],

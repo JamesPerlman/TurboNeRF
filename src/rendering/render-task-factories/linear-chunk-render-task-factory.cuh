@@ -33,6 +33,7 @@ public:
                 n_rays,
                 request->camera,
                 request->proxies[0]->get_nerf_ptrs(),
+                request->modifiers,
                 std::unique_ptr<RayBatchCoordinator>(
                     new LinearBufferRayBatchCoordinator(
                         n_rays,

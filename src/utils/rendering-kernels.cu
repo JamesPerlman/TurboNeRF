@@ -158,6 +158,8 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	const uint32_t n_cameras,
 	const int2 training_img_dims,
 	const uint32_t n_pix_per_training_img,
+	const bool show_near_planes,
+	const bool show_far_planes,
 	const Camera* __restrict__ cameras,
 	const stbi_uc* __restrict__ train_img_data,
 	const float* __restrict__ ray_ori,
@@ -196,50 +198,54 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 		const Transform4f c2w = cam.transform;
 		const Transform4f w2c = c2w.inverse();
 		const float3 c2w_xyz = c2w.get_translation();
+		
+		if (show_near_planes) {
+			float t_near;
+			float2 uv_near;
 
-		float t_near;
-		float2 uv_near;
+			bool intersects_near = intersects_plane_at_distance(
+				cam,
+				cam.near,
+				c2w,
+				w2c,
+				c2w_xyz,
+				ray_o,
+				ray_d,
+				uv_near,
+				t_near
+			);
 
-		bool intersects_near = intersects_plane_at_distance(
-			cam,
-			cam.near,
-			c2w,
-			w2c,
-			c2w_xyz,
-			ray_o,
-			ray_d,
-			uv_near,
-			t_near
-		);
-
-		if (intersects_near && t_near < t_min) {
-			t_min = t_near;
-			t_min_uv = uv_near;
-			t_min_cam_idx = i;
-			continue;
+			if (intersects_near && t_near < t_min) {
+				t_min = t_near;
+				t_min_uv = uv_near;
+				t_min_cam_idx = i;
+				continue;
+			}
 		}
 
-		// need to check the far plane now
-		float t_far;
-		float2 uv_far;
+		if (show_far_planes) {
+			// need to check the far plane now
+			float t_far;
+			float2 uv_far;
 
-		bool intersects_far = intersects_plane_at_distance(
-			cam,
-			cam.far,
-			c2w,
-			w2c,
-			c2w_xyz,
-			ray_o,
-			ray_d,
-			uv_far,
-			t_far
-		);
+			bool intersects_far = intersects_plane_at_distance(
+				cam,
+				cam.far,
+				c2w,
+				w2c,
+				c2w_xyz,
+				ray_o,
+				ray_d,
+				uv_far,
+				t_far
+			);
 
-		if (intersects_far && t_far < t_min) {
-			t_min = t_far;
-			t_min_uv = uv_far;
-			t_min_cam_idx = i;
-			continue;
+			if (intersects_far && t_far < t_min) {
+				t_min = t_far;
+				t_min_uv = uv_far;
+				t_min_cam_idx = i;
+				continue;
+			}
 		}
 	}
 

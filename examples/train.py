@@ -65,6 +65,7 @@ for i in range(1024):
             render_cam,
             [nerf],
             render_buf,
+            tn.RenderModifiers(),
             tn.RenderFlags.Final
         )
 

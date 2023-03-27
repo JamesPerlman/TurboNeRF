@@ -7,6 +7,7 @@
 #include "../utils/render-flags.cuh"
 #include "../common.h"
 #include "camera.cuh"
+#include "render-modifiers.cuh"
 #include "nerf-proxy.cuh"
 
 TURBO_NAMESPACE_BEGIN
@@ -24,6 +25,7 @@ private:
 public:
     const Camera camera;
     std::vector<NeRFProxy*> proxies;
+    RenderModifiers modifiers;
     RenderTarget* output;
     const RenderFlags flags;
 
@@ -31,6 +33,7 @@ public:
         const Camera camera,
         std::vector<NeRFProxy*> proxies,
         RenderTarget* output,
+        const RenderModifiers& modifiers,
         const RenderFlags& flags = RenderFlags::Final,
         OnCompleteCallback on_complete = nullptr,
         OnProgressCallback on_progress = nullptr,
@@ -38,6 +41,7 @@ public:
     )
         : camera(camera)
         , proxies(proxies)
+        , modifiers(modifiers)
         , output(output)
         , flags(flags)
         , _on_complete(on_complete)

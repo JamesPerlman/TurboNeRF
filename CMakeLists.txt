@@ -94,6 +94,7 @@ set(HEADERS
 	src/models/ray.h
 	src/models/ray-batch.cuh
 	src/models/render-pattern.cuh
+	src/models/render-modifiers.cuh
 	src/models/render-request.cuh
 	src/models/render-task.cuh
 	src/models/training-image.cuh
