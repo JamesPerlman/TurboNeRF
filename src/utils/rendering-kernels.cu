@@ -119,6 +119,38 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 	ray_alive[i] = false;
 }
 
+inline __device__ bool intersects_plane_at_distance(
+	const Camera& cam,
+	const float& dist,
+	const Transform4f& c2w,
+	const Transform4f& w2c,
+	const float3& c2w_xyz,
+	const float3& ray_o,
+	const float3& ray_d,
+	float2& uv,
+	float& t
+) {
+	// hacky but less operations
+	const float3 v{ c2w.m02 * dist, c2w.m12 * dist, c2w.m22 * dist };
+	const float3 plane_center = v + c2w_xyz;
+	const float3 plane_normal = normalized(v);
+	const float2 near_size{
+		dist * cam.resolution_f.x / cam.focal_length.x,
+		dist * cam.resolution_f.y / cam.focal_length.y
+	};
+
+	return ray_plane_intersection(
+		ray_o,
+		ray_d,
+		plane_center,
+		plane_normal,
+		near_size,
+		w2c,
+		uv,
+		t
+	);
+}
+
 __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
@@ -165,25 +197,17 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 		const Transform4f w2c = c2w.inverse();
 		const float3 c2w_xyz = c2w.get_translation();
 
-		// hacky but less operations
-		const float3 v_near{ c2w.m02 * cam.near, c2w.m12 * cam.near, c2w.m22 * cam.near };
-		const float3 near_center = v_near + c2w_xyz;
-		const float3 near_normal = normalized(v_near);
-		const float2 near_size{
-			cam.near * cam.resolution_f.x / cam.focal_length.x,
-			cam.near * cam.resolution_f.y / cam.focal_length.y
-		};
-		
 		float t_near;
 		float2 uv_near;
 
-		bool intersects_near = ray_plane_intersection(
+		bool intersects_near = intersects_plane_at_distance(
+			cam,
+			cam.near,
+			c2w,
+			w2c,
+			c2w_xyz,
 			ray_o,
 			ray_d,
-			near_center,
-			near_normal,
-			near_size,
-			w2c,
 			uv_near,
 			t_near
 		);
@@ -196,24 +220,17 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 		}
 
 		// need to check the far plane now
-		const float3 v_far{ c2w.m02 * cam.far, c2w.m12 * cam.far, c2w.m22 * cam.far };
-		const float3 far_center = v_far + c2w_xyz;
-		const float3 far_normal = normalized(v_far);
-		const float2 far_size{
-			cam.far * cam.resolution_f.x / cam.focal_length.x,
-			cam.far * cam.resolution_f.y / cam.focal_length.y
-		};
-
 		float t_far;
 		float2 uv_far;
 
-		bool intersects_far = ray_plane_intersection(
+		bool intersects_far = intersects_plane_at_distance(
+			cam,
+			cam.far,
+			c2w,
+			w2c,
+			c2w_xyz,
 			ray_o,
 			ray_d,
-			far_center,
-			far_normal,
-			far_size,
-			w2c,
 			uv_far,
 			t_far
 		);
