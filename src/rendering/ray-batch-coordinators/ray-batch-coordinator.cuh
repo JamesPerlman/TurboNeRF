@@ -77,29 +77,7 @@ inline __device__ void fill_ray_buffers(
 	const float idir_y = 1.0f / dir_y;
 	const float idir_z = 1.0f / dir_z;
 	
-    // make sure this ray intersects the bbox
-	float _t;
-	const bool intersects_bbox = bbox->get_ray_t_intersection(
-		global_ori.x, global_ori.y, global_ori.z,
-		dir_x, dir_y, dir_z,
-		idir_x, idir_y, idir_z,
-		_t
-	);
-
-
-    if (!intersects_bbox) {
-        alive[i] = false;
-        return;
-    }
-    
-    // calculate t_max
-    const float _t_max = cam->far - cam->near;
-    _t = fmaxf(0.0f, _t + 1e-5f);
-
-    if (_t_max < _t) {
-        alive[i] = false;
-        return;
-    }
+    // assign ray properties
 
 	pos[i_offset_0] = global_ori.x;
 	pos[i_offset_1] = global_ori.y;
@@ -114,8 +92,8 @@ inline __device__ void fill_ray_buffers(
 	idir[i_offset_2] = idir_z;
 
     // set t-value to a position just barely within the bbox
-	t[i] = _t;
-    t_max[i] = _t_max;
+	t[i] = 0.0f;
+    t_max[i] = cam->far - cam->near;
     index[i] = i;
 	alive[i] = true;
 };

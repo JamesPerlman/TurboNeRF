@@ -8,6 +8,9 @@
 
 #include "../math/transform4f.cuh"
 #include "../math/tuple-math.cuh"
+
+#include "../utils/camera-kernels.cuh"
+
 #include "ray.h"
 
 TURBO_NAMESPACE_BEGIN
@@ -32,6 +35,10 @@ struct DistortionParams {
 			k3 == other.k3 &&
 			p1 == other.p1 &&
 			p2 == other.p2;
+	}
+
+	inline __host__ __device__ bool is_any_nonzero() const {
+		return k1 != 0.0f || k2 != 0.0f || k3 != 0.0f || p1 != 0.0f || p2 != 0.0f;
 	}
 };
 
@@ -84,9 +91,26 @@ struct Camera {
 
 	// returns a ray in the world's coordinate system
 	inline __device__ Ray global_ray_at_pixel_xy(
-		const float& x,
-		const float& y
+		float x,
+		float y
 	) const {
+		if (dist_params.is_any_nonzero()) {
+			const float xd = (x - principal_point.x) / focal_length.x;
+			const float yd = (y - principal_point.y) / focal_length.y;
+
+			float xu, yu;
+			radial_and_tangential_undistort(
+				xd, yd,
+				dist_params.k1, dist_params.k2, dist_params.k3,
+				dist_params.p1, dist_params.p2,
+				1e-9f,
+				10,
+				xu, yu
+			);
+
+			x = xu * focal_length.x + principal_point.x;
+			y = yu * focal_length.y + principal_point.y;
+		}
 		
 		// this represents a position at a plane 1 unit away from the camera's origin
 		float3 v = {

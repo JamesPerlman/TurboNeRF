@@ -64,7 +64,6 @@ public:
 	float train_step(Context& ctx);
 	uint32_t update_occupancy_grid(Context& ctx, const uint32_t& training_step);
 	void generate_next_training_batch(Context& ctx);
-	void create_pixel_undistort_map(Context& ctx);
 };
 
 TURBO_NAMESPACE_END

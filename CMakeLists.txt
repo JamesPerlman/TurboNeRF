@@ -136,6 +136,7 @@ set(HEADERS
 	src/services/nerf-manager.cuh
 
 	# workspaces
+	src/workspaces/dataset-workspace.cuh
 	src/workspaces/network-params-workspace.cuh
 	src/workspaces/network-workspace.cuh
 	src/workspaces/occupancy-grid-workspace.cuh
@@ -171,7 +172,6 @@ set(SOURCES
 
 	# utils
 	src/utils/bit-utils.cu
-	src/utils/camera-kernels.cu
 	src/utils/gpu-image.cu
 	src/utils/occupancy-grid-kernels.cu
 	src/utils/rendering-kernels.cu

@@ -89,7 +89,6 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	// input buffers
 	const BoundingBox* __restrict__ bbox,
 	const Camera* __restrict__ cameras,
-	const float* __restrict__ undistort_map,
 	const stbi_uc* __restrict__ image_data,
 	const float* __restrict__ random,
 
@@ -108,8 +107,8 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t image_idx = static_cast<uint32_t>(static_cast<float>(i) / n_rays_per_image);
 	const uint32_t pixel_idx = random_pixel_index(i, n_pixels_per_image, n_rays_per_image, random_pixel_chunk_size, random[i]);
 
-	const float x = undistort_map[pixel_idx + 0 * n_pixels_per_image];
-	const float y = undistort_map[pixel_idx + 1 * n_pixels_per_image];
+	const float x = (float)(pixel_idx % image_dimensions.x);
+	const float y = (float)(pixel_idx / image_dimensions.x);
 
 	const Camera cam = cameras[image_idx];
 	
@@ -141,7 +140,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 
 	// calculate t_max
 	const float t_max = cam.far - cam.near;
-	t = max(0.0f, t + 1e-5f);
+	t = fmaxf(0.0f, t + 1e-5f);
 
 	if (t_max < t) {
 		ray_alive[i] = false;

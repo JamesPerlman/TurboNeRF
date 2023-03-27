@@ -101,10 +101,4 @@ inline __device__ void radial_and_tangential_undistort(
     }
 }
 
-__global__ void generate_undistorted_pixel_map_kernel(
-    const uint32_t n_pixels,
-    const Camera camera,
-    float* __restrict__ out_buf
-);
-
 TURBO_NAMESPACE_END

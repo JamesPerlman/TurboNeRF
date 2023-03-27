@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <stbi/stb_image.h>
 #include <stdint.h>
 #include <tiny-cuda-nn/common.h>
 
@@ -35,6 +36,22 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 	float* __restrict__ network_pos,
 	float* __restrict__ network_dir,
 	float* __restrict__ network_dt
+);
+
+__global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const uint32_t out_rgba_stride,
+	const uint32_t n_cameras,
+	const int2 training_img_dims,
+	const uint32_t n_pix_per_training_img,
+	const Camera* __restrict__ cameras,
+	const stbi_uc* __restrict__ train_img_data,
+	const float* __restrict__ ray_ori,
+	const float* __restrict__ ray_dir,
+	const int* __restrict__ ray_idx,
+	float* __restrict__ ray_t_max,
+	float* __restrict__ out_rgba_buf
 );
 
 __global__ void march_rays_and_generate_network_inputs_kernel(
@@ -109,6 +126,14 @@ __global__ void composite_samples_kernel(
     bool* __restrict__ ray_alive,
 	float* __restrict__ ray_trans,
     float* __restrict__ output_rgba
+);
+
+__global__ void alpha_composite_kernel(
+    const uint32_t n_pixels,
+    const uint32_t img_stride,
+    const float* rgba_fg,
+    const float* rgba_bg,
+	float* rgba_out
 );
 
 TURBO_NAMESPACE_END

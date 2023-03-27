@@ -130,7 +130,7 @@ struct alignas(float) Transform4f
 
     /** Operators **/
 
-        // multiplication operator with float3 - multiply by upper left 3x3, no translation
+    // multiplication operator with float3 - multiply by upper left 3x3, no translation
     inline NRC_HOST_DEVICE float3 mmul_ul3x3(const float3& v) const
     {
         return {
@@ -177,7 +177,7 @@ struct alignas(float) Transform4f
         return {m03, m13, m23};
     }
 
-    float determinant() const
+    inline __host__ __device__ float determinant() const
     {
         return 0.0f
             + m00 * (m11 * m22 - m12 * m21)
@@ -185,7 +185,7 @@ struct alignas(float) Transform4f
             + m02 * (m10 * m21 - m11 * m20);
     }
 
-    Transform4f inverse() const
+    inline __host__ __device__ Transform4f inverse() const
     {
         const float m11_x_m22_m_m12_x_m21 = m11 * m22 - m12 * m21;
         const float m10_x_m22_m_m12_x_m20 = m10 * m22 - m12 * m20;

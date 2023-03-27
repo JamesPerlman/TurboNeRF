@@ -1,8 +1,10 @@
 
 #include <device_launch_parameters.h>
+#include <stbi/stb_image.h>
 
 #include "rendering-kernels.cuh"
 #include "../core/occupancy-grid.cuh"
+#include "../math/geometric-intersections.cuh"
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
 #include "../utils/color-utils.cuh"
@@ -62,20 +64,32 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 	const float id_y = ray_idir[i_offset_1];
 	const float id_z = ray_idir[i_offset_2];
 
-	// Perform raymarching
-	
-	float t = ray_t[i];
+    // make sure this ray intersects the bbox
+	float _t;
+	const bool intersects_bbox = bbox->get_ray_t_intersection(
+		o_x, o_y, o_z,
+		d_x, d_y, d_z,
+		id_x, id_y, id_z,
+		_t
+	);
+
+	if (!intersects_bbox) {
+		ray_alive[i] = false;
+		return;
+	}
+
+    float t = fmaxf(ray_t[i], _t + 1e-5f);
 	float t_max = ray_t_max[i];
 
+	// Perform raymarching
+	
 	while (t < t_max) {
 		const float x = o_x + t * d_x;
 		const float y = o_y + t * d_y;
 		const float z = o_z + t * d_z;
 
 		if (!bbox->contains(x, y, z)) {
-			ray_alive[i] = false;
-
-			return;
+			break;
 		}
 
 		const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
@@ -100,6 +114,150 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 			);
 		}
 	};
+
+	// if we get here, then the ray has terminated
+	ray_alive[i] = false;
+}
+
+__global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const uint32_t out_rgba_stride,
+	const uint32_t n_cameras,
+	const int2 training_img_dims,
+	const uint32_t n_pix_per_training_img,
+	const Camera* __restrict__ cameras,
+	const stbi_uc* __restrict__ train_img_data,
+	const float* __restrict__ ray_ori,
+	const float* __restrict__ ray_dir,
+	const int* __restrict__ ray_idx,
+	float* __restrict__ ray_t_max,
+	float* __restrict__ out_rgba_buf
+) {
+	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= n_rays) return;
+
+	const uint32_t i_offset_0 = idx;
+	const uint32_t i_offset_1 = i_offset_0 + batch_size;
+	const uint32_t i_offset_2 = i_offset_1 + batch_size;
+
+	const float3 ray_o = make_float3(
+		ray_ori[i_offset_0],
+		ray_ori[i_offset_1],
+		ray_ori[i_offset_2]
+	);
+
+	const float3 ray_d = make_float3(
+		ray_dir[i_offset_0],
+		ray_dir[i_offset_1],
+		ray_dir[i_offset_2]
+	);
+
+	float t_min = FLT_MAX;
+	float2 t_min_uv;
+	int t_min_cam_idx = -1;
+
+	// we are looking for the minimum t-value of any plane that intersects this ray
+	for (int i = 0; i < n_cameras; ++i) {
+		const Camera cam = cameras[i];
+		const Transform4f c2w = cam.transform;
+		const Transform4f w2c = c2w.inverse();
+		const float3 c2w_xyz = c2w.get_translation();
+
+		// hacky but less operations
+		const float3 v_near{ c2w.m02 * cam.near, c2w.m12 * cam.near, c2w.m22 * cam.near };
+		const float3 near_center = v_near + c2w_xyz;
+		const float3 near_normal = normalized(v_near);
+		const float2 near_size{
+			cam.near * cam.resolution_f.x / cam.focal_length.x,
+			cam.near * cam.resolution_f.y / cam.focal_length.y
+		};
+		
+		float t_near;
+		float2 uv_near;
+
+		bool intersects_near = ray_plane_intersection(
+			ray_o,
+			ray_d,
+			near_center,
+			near_normal,
+			near_size,
+			w2c,
+			uv_near,
+			t_near
+		);
+
+		if (intersects_near && t_near < t_min) {
+			t_min = t_near;
+			t_min_uv = uv_near;
+			t_min_cam_idx = i;
+			continue;
+		}
+
+		// need to check the far plane now
+		const float3 v_far{ c2w.m02 * cam.far, c2w.m12 * cam.far, c2w.m22 * cam.far };
+		const float3 far_center = v_far + c2w_xyz;
+		const float3 far_normal = normalized(v_far);
+		const float2 far_size{
+			cam.far * cam.resolution_f.x / cam.focal_length.x,
+			cam.far * cam.resolution_f.y / cam.focal_length.y
+		};
+
+		float t_far;
+		float2 uv_far;
+
+		bool intersects_far = ray_plane_intersection(
+			ray_o,
+			ray_d,
+			far_center,
+			far_normal,
+			far_size,
+			w2c,
+			uv_far,
+			t_far
+		);
+
+		if (intersects_far && t_far < t_min) {
+			t_min = t_far;
+			t_min_uv = uv_far;
+			t_min_cam_idx = i;
+			continue;
+		}
+	}
+
+	// did we intersect anything?
+	if (t_min_cam_idx > -1) {
+		int2 pix_xy{
+			(int)(t_min_uv.x * (float)training_img_dims.x),
+			(int)(t_min_uv.y * (float)training_img_dims.y)
+		};
+
+		// clamp to the image bounds
+		pix_xy.x = clamp(pix_xy.x, 0, training_img_dims.x - 1);
+		pix_xy.y = clamp(pix_xy.y, 0, training_img_dims.y - 1);
+
+		// get the pixel index
+		const int train_pix_offset = n_pix_per_training_img * t_min_cam_idx;
+		const int train_pix_idx = pix_xy.y * training_img_dims.x + pix_xy.x;
+
+		const stbi_uc* train_rgba = train_img_data + 4 * (train_pix_offset + train_pix_idx);
+
+		// output pixel index
+		const int out_idx_offset_0 = ray_idx[idx];
+		const int out_idx_offset_1 = out_idx_offset_0 + (int)out_rgba_stride;
+		const int out_idx_offset_2 = out_idx_offset_1 + (int)out_rgba_stride;
+		const int out_idx_offset_3 = out_idx_offset_2 + (int)out_rgba_stride;
+		
+		// write the pixel
+		out_rgba_buf[out_idx_offset_0] = __srgb_to_linear((float)train_rgba[0] / 255.0f);
+		out_rgba_buf[out_idx_offset_1] = __srgb_to_linear((float)train_rgba[1] / 255.0f);
+		out_rgba_buf[out_idx_offset_2] = __srgb_to_linear((float)train_rgba[2] / 255.0f);
+		out_rgba_buf[out_idx_offset_3] = (float)train_rgba[3] / 255.0f;
+
+		// set t_max
+		ray_t_max[idx] = t_min;
+	}
 }
 
 __global__ void march_rays_and_generate_network_inputs_kernel(
@@ -354,6 +512,47 @@ __global__ void composite_samples_kernel(
 	output_rgba[idx_offset_3] = out_a;
 
 	ray_trans[idx] = trans;
+}
+
+// Thank you Copilot + GPT-4!
+__global__ void alpha_composite_kernel(
+    const uint32_t n_pixels,
+    const uint32_t img_stride,
+    const float* rgba_fg,
+    const float* rgba_bg,
+	float* rgba_out
+) {
+    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx >= n_pixels) return;
+
+    const uint32_t idx_offset_0 = idx;
+    const uint32_t idx_offset_1 = idx_offset_0 + img_stride;
+    const uint32_t idx_offset_2 = idx_offset_1 + img_stride;
+    const uint32_t idx_offset_3 = idx_offset_2 + img_stride;
+
+    const float fg_r = rgba_fg[idx_offset_0];
+    const float fg_g = rgba_fg[idx_offset_1];
+    const float fg_b = rgba_fg[idx_offset_2];
+    const float fg_a = rgba_fg[idx_offset_3];
+
+    const float bg_r = rgba_bg[idx_offset_0];
+    const float bg_g = rgba_bg[idx_offset_1];
+    const float bg_b = rgba_bg[idx_offset_2];
+    const float bg_a = rgba_bg[idx_offset_3];
+
+    const float out_a = fg_a + bg_a * (1.0f - fg_a);
+    rgba_out[idx_offset_3] = out_a;
+
+    if (out_a > 0.0f) {
+        const float out_r = (fg_r * fg_a + bg_r * bg_a * (1.0f - fg_a)) / out_a;
+        const float out_g = (fg_g * fg_a + bg_g * bg_a * (1.0f - fg_a)) / out_a;
+        const float out_b = (fg_b * fg_a + bg_b * bg_a * (1.0f - fg_a)) / out_a;
+
+        rgba_out[idx_offset_0] = out_r;
+        rgba_out[idx_offset_1] = out_g;
+        rgba_out[idx_offset_2] = out_b;
+    }
 }
 
 TURBO_NAMESPACE_END

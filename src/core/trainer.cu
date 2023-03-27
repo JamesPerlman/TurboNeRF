@@ -22,24 +22,6 @@ using namespace turbo;
 using namespace tcnn;
 using namespace nlohmann;
 
-
-void Trainer::create_pixel_undistort_map(
-	Trainer::Context& ctx
-) {
-	const Camera& camera = ctx.dataset->cameras[0];
-	const uint32_t w = camera.resolution.x;
-	const uint32_t h = camera.resolution.y;
-
-	const uint32_t n_pixels = w * h;
-
-	// create the undistort map for camera 0 - assumption: all cameras have identical dist_params params
-	generate_undistorted_pixel_map_kernel<<<n_blocks_linear(n_pixels), n_threads_linear, 0, ctx.stream>>>(
-		n_pixels,
-		camera,
-		ctx.workspace.undistort_map
-	);
-}
-
 /**
  * generate_next_training_batch does the following:
   * 
@@ -84,12 +66,11 @@ void Trainer::generate_next_training_batch(
 		ctx.dataset->image_dimensions,
 		n_rays_per_image,
 		chunk_size,
-		ctx.workspace.bounding_box,
 
 		// input buffers
-		ctx.workspace.cameras.data(),
-		ctx.workspace.undistort_map,
-		ctx.workspace.image_data,
+		ctx.nerf->dataset_ws.bounding_box,
+		ctx.nerf->dataset_ws.cameras,
+		ctx.nerf->dataset_ws.image_data,
 		ctx.workspace.random_float,
 
 		// output buffers
@@ -110,7 +91,7 @@ void Trainer::generate_next_training_batch(
 	march_and_count_steps_per_ray_kernel<<<n_blocks_linear(ctx.n_rays_in_batch), n_threads_linear, 0, ctx.stream>>>(
 		ctx.n_rays_in_batch,
 		ctx.workspace.batch_size,
-		ctx.workspace.bounding_box,
+		ctx.nerf->dataset_ws.bounding_box,
 		ctx.workspace.occupancy_grid,
 		cone_angle,
 		dt_min,
@@ -190,7 +171,7 @@ void Trainer::generate_next_training_batch(
 	march_and_generate_network_positions_kernel<<<n_blocks_linear(ctx.n_rays_in_batch), n_threads_linear, 0, ctx.stream>>>(
 		ctx.n_rays_in_batch,
 		ctx.workspace.batch_size,
-		ctx.workspace.bounding_box,
+		ctx.nerf->dataset_ws.bounding_box,
 		1.0f / ctx.dataset->bounding_box.size_x,
 		ctx.workspace.occupancy_grid,
 		dt_min,

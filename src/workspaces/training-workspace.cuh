@@ -23,13 +23,7 @@ struct TrainingWorkspace: Workspace {
 
 	uint32_t batch_size;
 
-	BoundingBox* bounding_box;
 	OccupancyGrid* occupancy_grid;
-
-	stbi_uc* image_data;
-
-	// the data in this buffer maps pixel centers to their undistorted positions
-	float* undistort_map;
 
 	float* random_float;
 
@@ -73,19 +67,12 @@ struct TrainingWorkspace: Workspace {
     float* sample_dt;
 	float* sample_dir;
 
-	// GPUMemory managed properties
-	tcnn::GPUMemory<Camera> cameras;
-
 	// primitives
-	size_t n_images;
-	size_t n_pixels_per_image;
 	uint32_t n_samples_per_batch;
 
 	// member functions
 	void enlarge(
 		const cudaStream_t& stream,
-		const size_t& n_images,
-		const size_t& n_pixels_per_image,
 		const uint32_t& n_samples_per_batch,
 		const uint32_t& n_occ_grid_levels,
 		const uint32_t& n_occ_grid_cells_per_dimension,
@@ -94,21 +81,14 @@ struct TrainingWorkspace: Workspace {
 	) {
 		free_allocations();
 
-		this->n_images = n_images;
-		this->n_pixels_per_image = n_pixels_per_image;
 		this->n_samples_per_batch = n_samples_per_batch;
 		
 		batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
-		size_t n_pixel_elements = 4 * n_pixels_per_image * n_images;
 
 		// need to upgrade to C++20 to use typename parameters in lambdas :(
 		// auto alloc = []<typename T>(size_t size) { return allocate<T>(stream, size); };
 
 		occupancy_grid 	= allocate<OccupancyGrid>(stream, 1);
-		bounding_box 	= allocate<BoundingBox>(stream, 1);
-		image_data 		= allocate<stbi_uc>(stream, n_pixel_elements);
-
-		undistort_map	= allocate<float>(stream, 2 * n_pixels_per_image);
 
 		random_float 	= allocate<float>(stream, 4 * batch_size);
 

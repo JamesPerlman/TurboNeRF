@@ -52,24 +52,11 @@ void NeRFTrainingController::prepare_for_training() {
 	// This allocates memory for all the elements we need during training
 	ctx.workspace.enlarge(
 		ctx.stream,
-		ctx.dataset->images.size(),
-		ctx.dataset->n_pixels_per_image,
 		ctx.batch_size,
 		ctx.nerf->occupancy_grid.n_levels,
 		ctx.nerf->occupancy_grid.resolution_i,
 		ctx.network.get_concat_buffer_width(),
 		ctx.network.get_padded_output_width()
-	);
-
-	// Copy dataset's BoundingBox to the GPU
-	CUDA_CHECK_THROW(
-		cudaMemcpyAsync(
-			ctx.workspace.bounding_box,
-			&ctx.dataset->bounding_box,
-			sizeof(BoundingBox),
-			cudaMemcpyHostToDevice,
-			ctx.stream
-		)
 	);
 
 	// Copy nerf's OccupancyGrid to the GPU
@@ -83,14 +70,37 @@ void NeRFTrainingController::prepare_for_training() {
 		)
 	);
 
+	// make sure dataset workspace is allocated
+	ctx.nerf->dataset_ws.enlarge(
+		ctx.stream,
+		ctx.dataset->images.size(),
+		ctx.dataset->image_dimensions
+	);
+
+	// Copy dataset's BoundingBox to the GPU
+	CUDA_CHECK_THROW(
+		cudaMemcpyAsync(
+			ctx.nerf->dataset_ws.bounding_box,
+			&ctx.dataset->bounding_box,
+			sizeof(BoundingBox),
+			cudaMemcpyHostToDevice,
+			ctx.stream
+		)
+	);
+
 	// Copy training cameras to the GPU
-	ctx.workspace.cameras.resize_and_copy_from_host(ctx.dataset->cameras);
+	CUDA_CHECK_THROW(
+		cudaMemcpyAsync(
+			ctx.nerf->dataset_ws.cameras,
+			ctx.dataset->cameras.data(),
+			ctx.dataset->cameras.size() * sizeof(Camera),
+			cudaMemcpyHostToDevice,
+			ctx.stream
+		)
+	);
 
 	// Load all images into GPU memory!
 	load_images(ctx);
-
-	// create the undistort map for camera 0 - assumption: all cameras have identical dist_params params
-	trainer.create_pixel_undistort_map(ctx);
 
 	training_step = 0;
 
@@ -107,7 +117,7 @@ void NeRFTrainingController::load_images(Trainer::Context& ctx) {
 	ctx.dataset->load_images_in_parallel(
 		[this, &image_size, &n_image_elements, &ctx](const size_t& image_index, const TrainingImage& image) {
 			CUDA_CHECK_THROW(cudaMemcpyAsync(
-				ctx.workspace.image_data + image_index * n_image_elements,
+				ctx.nerf->dataset_ws.image_data + image_index * n_image_elements,
 				image.data_cpu.get(),
 				image_size,
 				cudaMemcpyHostToDevice,

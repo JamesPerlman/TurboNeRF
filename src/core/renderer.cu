@@ -118,6 +118,7 @@ void Renderer::perform_task(
         workspace.ray_alive
     };
     
+    // TODO: optimization here - add "clip to bbox" option to avoid extra computations for rays that don't intersect bbox
     task.batch_coordinator->generate_rays(
         workspace.camera,
         workspace.bounding_box,
@@ -128,6 +129,35 @@ void Renderer::perform_task(
     const float dt_min = NeRFConstants::min_step_size;
     const float dt_max = nerf->bounding_box.size_x * dt_min;
     const float cone_angle = NeRFConstants::cone_angle;
+
+    bool show_training_cameras = true;
+    if (show_training_cameras) {
+        // clear bg rgba first
+        CUDA_CHECK_THROW(
+            cudaMemsetAsync(
+                workspace.bg_rgba,
+                0,
+                4 * n_rays * sizeof(float),
+                stream
+            )
+        );
+        // then draw clipping planes
+        draw_training_img_clipping_planes_and_assign_t_max_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+            n_rays,
+            n_rays,
+            n_rays,
+            nerf->dataset_ws.n_images,
+            nerf->dataset_ws.image_dims,
+            nerf->dataset_ws.n_pixels_per_image,
+            nerf->dataset_ws.cameras,
+            nerf->dataset_ws.image_data,
+            workspace.ray_origin[active_buf_idx],
+            workspace.ray_dir[active_buf_idx],
+            workspace.ray_idx[active_buf_idx],
+            workspace.ray_t_max[active_buf_idx],
+            workspace.bg_rgba
+        );
+    }
 
     march_rays_to_first_occupied_cell_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
         n_rays,
@@ -153,6 +183,7 @@ void Renderer::perform_task(
         workspace.network_dir,
         workspace.network_dt
     );
+
 
     // ray marching loop
     uint32_t n_rays_alive = n_rays;
@@ -317,6 +348,16 @@ void Renderer::perform_task(
 
             n_steps = 0;
         }                                                                                                                                                                                                                                                                                                              
+    }
+
+    if (show_training_cameras) {
+        alpha_composite_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+            n_rays,
+            n_rays,
+            workspace.rgba,
+            workspace.bg_rgba,
+            workspace.rgba
+        );
     }
 };
 

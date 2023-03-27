@@ -53,6 +53,19 @@ inline NRC_HOST_DEVICE float l2_norm(const float3& v)
     return sqrtf(l2_squared_norm(v));
 }
 
+// returns a normalized float3
+inline NRC_HOST_DEVICE float3 normalized(const float3& v)
+{
+    return v / l2_norm(v);
+}
+
+
+// dot product of two float3
+inline NRC_HOST_DEVICE float dot(const float3& a, const float3& b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
 /** float2 **/
 
 // element-wise multiplication float2 * float2

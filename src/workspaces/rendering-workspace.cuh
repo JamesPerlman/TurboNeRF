@@ -50,6 +50,8 @@ struct RenderingWorkspace: Workspace {
 
 	// output buffers
 	float* rgba;
+	float* bg_rgba;
+
 	uint32_t n_rays = 0;
 
 	void enlarge(
@@ -116,6 +118,7 @@ struct RenderingWorkspace: Workspace {
 
 		// output
 		rgba			= allocate<float>(stream, n_output_pixel_elements);
+		bg_rgba			= allocate<float>(stream, n_output_pixel_elements);
 
 		this->n_rays = n_rays;
 	};
