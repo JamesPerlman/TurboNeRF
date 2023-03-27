@@ -1,8 +1,8 @@
 #include "../../models/camera.cuh"
 #include "../../models/ray.h"
 #include "../../models/ray-batch.cuh"
-#include "../../utils/device-math.cuh"
-#include "../../utils/hexagon-grid.cuh"
+#include "../../math/device-math.cuh"
+#include "../../math/hexagon-grid.cuh"
 #include "../../common.h"
 #include "hexagonal-tile-ray-batch-coordinator.cuh"
 

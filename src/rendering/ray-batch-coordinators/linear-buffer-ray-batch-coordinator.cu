@@ -1,5 +1,5 @@
 #include "../../models/camera.cuh"
-#include "../../utils/device-math.cuh"
+#include "../../math/device-math.cuh"
 #include "../../common.h"
 #include "linear-buffer-ray-batch-coordinator.cuh"
 

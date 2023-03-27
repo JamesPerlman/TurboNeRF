@@ -1,7 +1,7 @@
 #include "../../models/camera.cuh"
 #include "../../models/ray.h"
 #include "../../models/ray-batch.cuh"
-#include "../../utils/device-math.cuh"
+#include "../../math/device-math.cuh"
 #include "../../common.h"
 #include "rectangular-grid-ray-batch-coordinator.cuh"
 

@@ -15,13 +15,6 @@
 
 TURBO_NAMESPACE_BEGIN
 
-
-inline NRC_HOST_DEVICE float lerp(const float &a, const float &b, const float &t)
-{
-    return a + (b - a) * t;
-}
-
-
 struct alignas(float) Matrix4f
 {
     float m00, m01, m02, m03;
@@ -207,60 +200,11 @@ struct alignas(float) Matrix4f
         };
     }
 
-    // multiplication between two 4x4 transform matrices.  It's assumed that the last line of each matrix is always 0 0 0 1.
-    inline NRC_HOST_DEVICE Matrix4f mmul_fast_transform(const Matrix4f& x) const
-    {
-        return Matrix4f{
-            m00 * x.m00 + m01 * x.m10 + m02 * x.m20,
-            m00 * x.m01 + m01 * x.m11 + m02 * x.m21,
-            m00 * x.m02 + m01 * x.m12 + m02 * x.m22,
-            m00 * x.m03 + m01 * x.m13 + m02 * x.m23 + m03,
-
-            m10 * x.m00 + m11 * x.m10 + m12 * x.m20,
-            m10 * x.m01 + m11 * x.m11 + m12 * x.m21,
-            m10 * x.m02 + m11 * x.m12 + m12 * x.m22,
-            m10 * x.m03 + m11 * x.m13 + m12 * x.m23 + m13,
-
-            m20 * x.m00 + m21 * x.m10 + m22 * x.m20,
-            m20 * x.m01 + m21 * x.m11 + m22 * x.m21,
-            m20 * x.m02 + m21 * x.m12 + m22 * x.m22,
-            m20 * x.m03 + m21 * x.m13 + m22 * x.m23 + m23,
-
-            0.0f,
-            0.0f,
-            0.0f,
-            1.0f
-        };
-    }
-
     // convenience getter, returns the translation of this matrix as a float3
     inline NRC_HOST_DEVICE float3 get_translation() const
     {
         return make_float3(m03, m13, m23);
     }
-
-    // linear interpolation between two matrices
-    inline NRC_HOST_DEVICE Matrix4f lerp_to(const Matrix4f& x, const float& t)
-    {
-        return Matrix4f{
-            lerp(m00, x.m00, t), lerp(m01, x.m01, t), lerp(m02, x.m02, t), lerp(m03, x.m03, t),
-            lerp(m10, x.m10, t), lerp(m11, x.m11, t), lerp(m12, x.m12, t), lerp(m13, x.m13, t),
-            lerp(m20, x.m20, t), lerp(m21, x.m21, t), lerp(m22, x.m22, t), lerp(m23, x.m23, t),
-            lerp(m30, x.m30, t), lerp(m31, x.m31, t), lerp(m32, x.m32, t), lerp(m33, x.m33, t)
-        };
-    }
 };
-
-// l2 squared norm of a float3
-inline NRC_HOST_DEVICE float l2_squared_norm(const float3& v)
-{
-    return v.x * v.x + v.y * v.y + v.z * v.z;
-}
-
-// l2 norm of a float3
-inline NRC_HOST_DEVICE float l2_norm(const float3& v)
-{
-    return sqrtf(l2_squared_norm(v));
-}
 
 TURBO_NAMESPACE_END

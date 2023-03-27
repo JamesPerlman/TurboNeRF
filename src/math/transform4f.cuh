@@ -7,8 +7,8 @@
 
 #include <json/json.hpp>
 
-#include "../../common.h"
-#include "../linalg.cuh"
+#include "../common.h"
+#include "matrix4f.cuh"
 
 TURBO_NAMESPACE_BEGIN
 

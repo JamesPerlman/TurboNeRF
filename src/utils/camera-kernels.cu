@@ -1,4 +1,4 @@
-#include "../utils/device-math.cuh"
+#include "../math/device-math.cuh"
 #include "camera-kernels.cuh"
 
 TURBO_NAMESPACE_BEGIN

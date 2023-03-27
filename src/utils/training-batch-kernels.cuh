@@ -10,7 +10,7 @@
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
 #include "../utils/color-utils.cuh"
-#include "../utils/linalg/transform4f.cuh"
+#include "../math/transform4f.cuh"
 
 TURBO_NAMESPACE_BEGIN
 

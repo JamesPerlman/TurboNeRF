@@ -78,6 +78,13 @@ set(HEADERS
 	src/core/renderer.cuh
 	src/core/trainer.cuh
 
+	# math
+	src/math/device-math.cuh
+	src/math/hexagon-grid.cuh
+	src/math/matrix4f.cuh
+	src/math/transform4f.cuh
+	src/math/tuple-math.cuh
+
 	# models
 	src/models/bounding-box.cuh
 	src/models/camera.cuh
@@ -113,11 +120,7 @@ set(HEADERS
 	src/utils/camera-kernels.cuh
 	src/utils/color-utils.cuh
 	src/utils/common-network-kernels.cuh
-	src/utils/device-math.cuh
 	src/utils/gpu-image.cuh
-	src/utils/hexagon-grid.cuh
-	src/utils/linalg/transform4f.cuh
-	src/utils/linalg.cuh
 	src/utils/nerf-constants.cuh
 	src/utils/occupancy-grid-kernels.cuh
 	src/utils/parallel-utils.cuh
@@ -127,7 +130,6 @@ set(HEADERS
 	src/utils/stream-compaction.cuh
 	src/utils/training-batch-kernels.cuh
 	src/utils/training-network-kernels.cuh
-	src/utils/tuple-math.cuh
 
 	# services
 	src/services/device-manager.cuh

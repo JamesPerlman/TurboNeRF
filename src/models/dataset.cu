@@ -6,7 +6,7 @@
 #include <thread>
 
 #include "dataset.h"
-#include "../utils/linalg/transform4f.cuh"
+#include "../math/transform4f.cuh"
 
 using namespace std;
 using namespace filesystem;

@@ -17,9 +17,9 @@
 #include "models/render-request.cuh"
 #include "services/nerf-manager.cuh"
 #include "render-targets/cuda-render-buffer.cuh"
-#include "utils/linalg/transform4f.cuh"
+#include "math/transform4f.cuh"
 
-#include "utils/linalg/transform4f.cuh"
+#include "math/transform4f.cuh"
 
 #include <tiny-cuda-nn/common.h>
 #include "utils/nerf-constants.cuh"

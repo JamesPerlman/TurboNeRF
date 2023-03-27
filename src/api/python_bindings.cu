@@ -11,6 +11,8 @@
 #include "../controllers/nerf-rendering-controller.h"
 #include "../controllers/nerf-training-controller.h"
 #include "../integrations/blender.cuh"
+#include "../math/transform4f.cuh"
+#include "../math/matrix4f.cuh"
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
 #include "../models/dataset.h"
@@ -20,8 +22,6 @@
 #include "../render-targets/opengl-render-surface.cuh"
 #include "../services/device-manager.cuh"
 #include "../services/nerf-manager.cuh"
-#include "../utils/linalg/transform4f.cuh"
-#include "../utils/linalg.cuh"
 #include "pybind_cpp_utils.cuh"
 #include "pybind_cuda.cuh"
 

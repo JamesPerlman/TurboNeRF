@@ -6,8 +6,8 @@
 
 #include "../common.h"
 
-#include "../utils/linalg/transform4f.cuh"
-#include "../utils/tuple-math.cuh"
+#include "../math/transform4f.cuh"
+#include "../math/tuple-math.cuh"
 #include "ray.h"
 
 TURBO_NAMESPACE_BEGIN

@@ -41,6 +41,18 @@ inline NRC_HOST_DEVICE bool operator!=(const float3& a, const float3& b)
     return a.x != b.x || a.y != b.y || a.z != b.z;
 }
 
+// l2 squared norm of a float3
+inline NRC_HOST_DEVICE float l2_squared_norm(const float3& v)
+{
+    return v.x * v.x + v.y * v.y + v.z * v.z;
+}
+
+// l2 norm of a float3
+inline NRC_HOST_DEVICE float l2_norm(const float3& v)
+{
+    return sqrtf(l2_squared_norm(v));
+}
+
 /** float2 **/
 
 // element-wise multiplication float2 * float2

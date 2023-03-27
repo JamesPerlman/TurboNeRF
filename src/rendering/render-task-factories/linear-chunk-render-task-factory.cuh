@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../utils/hexagon-grid.cuh"
+#include "../../math/hexagon-grid.cuh"
 #include "../ray-batch-coordinators/linear-buffer-ray-batch-coordinator.cuh"
 #include "render-task-factory.cuh"
 
