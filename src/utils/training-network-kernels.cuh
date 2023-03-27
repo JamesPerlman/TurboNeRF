@@ -274,7 +274,7 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 __global__ void ray_rgba_to_loss_backward_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
-	const float inv_nrays,
+	const float inv_4nrays,
 	const float* __restrict__ ray_rgba,
 	const float* __restrict__ target_rgba,
 	float* __restrict__ dL_dR
@@ -295,11 +295,10 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
 	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
 
-	const float inv_3nrays = inv_nrays / 3.0f;
-	dL_dR[r_idx] = inv_3nrays * smooth_l1_loss_backward(dr);
-	dL_dR[g_idx] = inv_3nrays * smooth_l1_loss_backward(dg);
-	dL_dR[b_idx] = inv_3nrays * smooth_l1_loss_backward(db);
-	dL_dR[a_idx] = inv_nrays * smooth_l1_loss_backward(da);
+	dL_dR[r_idx] = inv_4nrays * smooth_l1_loss_backward(dr);
+	dL_dR[g_idx] = inv_4nrays * smooth_l1_loss_backward(dg);
+	dL_dR[b_idx] = inv_4nrays * smooth_l1_loss_backward(db);
+	dL_dR[a_idx] = inv_4nrays * smooth_l1_loss_backward(da);
 }
 
 TURBO_NAMESPACE_END
