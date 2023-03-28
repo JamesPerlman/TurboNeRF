@@ -91,10 +91,10 @@ int main(int argc, char* argv[])
 
 	auto nerf_manager = turbo::NeRFManager();
 
-	auto nerf = nerf_manager.create(dataset.bounding_box);
+	auto nerf = nerf_manager.create(dataset);
 
 	// set up training controller
-	auto trainer = turbo::NeRFTrainingController(&dataset, nerf, NeRFConstants::batch_size);
+	auto trainer = turbo::NeRFTrainingController(nerf, NeRFConstants::batch_size);
 	trainer.prepare_for_training();
 
 	// set up rendering controller

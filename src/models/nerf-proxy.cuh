@@ -18,6 +18,9 @@ TURBO_NAMESPACE_BEGIN
 struct NeRFProxy {
     std::vector<NeRF> nerfs;
     bool visible = true;
+    Dataset dataset;
+
+    NeRFProxy(const Dataset& dataset) : dataset(dataset) {};
     
     // TODO:
     // transform
@@ -26,7 +29,7 @@ struct NeRFProxy {
     // distortions
 
     BoundingBox get_bounding_box() const {
-        return nerfs[0].bounding_box;
+        return dataset.bounding_box;
     }
 
     std::vector<NeRF*> get_nerf_ptrs() {

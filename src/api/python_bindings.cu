@@ -179,6 +179,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("shift", &Camera::shift)
         .def_readonly("transform", &Camera::transform)
         .def_readonly("dist_params", &Camera::dist_params)
+        .def_readwrite("is_visible", &Camera::is_visible)
         .def(py::self == py::self)
         .def(py::self != py::self)
     ;
@@ -212,6 +213,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     py::class_<NeRFProxy>(m, "NeRF")
         .def("get_bounding_box", &NeRFProxy::get_bounding_box)
+        .def_readonly("dataset", &NeRFProxy::dataset)
     ;
 
     py::enum_<RenderPattern>(m, "RenderPattern")
@@ -348,11 +350,9 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<NeRFTrainingController>(m, "Trainer")
         .def(
             py::init<
-                Dataset*,
                 NeRFProxy*,
                 const uint32_t&
             >(),
-            py::arg("dataset"),
             py::arg("nerf"),
             py::arg("batch_size")
         )
@@ -405,7 +405,6 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def(
             "prepare_for_training",
             &BlenderBridge::prepare_for_training,
-            py::arg("dataset"),
             py::arg("proxy"),
             py::arg("batch_size")
         )

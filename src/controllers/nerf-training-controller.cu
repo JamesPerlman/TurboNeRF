@@ -17,16 +17,16 @@ using namespace nlohmann;
 
 TURBO_NAMESPACE_BEGIN
 
-NeRFTrainingController::NeRFTrainingController(Dataset* dataset, NeRFProxy* nerf_proxy, const uint32_t batch_size)
+NeRFTrainingController::NeRFTrainingController(NeRFProxy* nerf_proxy, const uint32_t batch_size)
 {
 	contexts.reserve(DeviceManager::get_device_count());
 	DeviceManager::foreach_device(
-		[this, nerf_proxy, batch_size, dataset](const int& device_id, const cudaStream_t& stream) {
+		[this, nerf_proxy, batch_size](const int& device_id, const cudaStream_t& stream) {
 			NeRF* nerf = &nerf_proxy->nerfs[device_id];
 			contexts.emplace_back(
 				stream,
 				TrainingWorkspace(device_id),
-				dataset,
+				&nerf_proxy->dataset,
 				nerf,
 				NerfNetwork(device_id),
 				batch_size

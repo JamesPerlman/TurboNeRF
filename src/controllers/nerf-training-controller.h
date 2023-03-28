@@ -52,7 +52,7 @@ struct NeRFTrainingController {
 	};
 
 	// constructor
-	NeRFTrainingController(Dataset* dataset, NeRFProxy* nerf_proxy, const uint32_t batch_size);
+	NeRFTrainingController(NeRFProxy* nerf_proxy, const uint32_t batch_size);
 
 	// public methods
 	void prepare_for_training();

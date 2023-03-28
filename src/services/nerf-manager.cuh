@@ -34,15 +34,15 @@ public:
 
 	// create a new nerf
 	NeRFProxy* create(
-		const BoundingBox& bbox
+		const Dataset& dataset
 	) {
-		proxies.emplace_back();
+		proxies.emplace_back(dataset);
 
 		NeRFProxy& proxy = proxies.back();
 		proxy.nerfs.reserve(DeviceManager::get_device_count());
 
 		DeviceManager::foreach_device([&](const int& device_id, const cudaStream_t& stream) {
-			proxy.nerfs.emplace_back(device_id, bbox);
+			proxy.nerfs.emplace_back(device_id, dataset.bounding_box);
 			NeRF& nerf = proxy.nerfs.back();
 		});
 

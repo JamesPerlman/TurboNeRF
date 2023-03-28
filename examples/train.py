@@ -21,9 +21,9 @@ manager = tn.Manager()
 
 dataset = tn.Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json")
 
-nerf = manager.create(dataset.bounding_box)
+nerf = manager.create(dataset)
 
-trainer = tn.Trainer(dataset, nerf, batch_size=2<<21)
+trainer = tn.Trainer(nerf, batch_size=2<<21)
 
 renderer = tn.Renderer(pattern=tn.RenderPattern.LinearChunks)
 
