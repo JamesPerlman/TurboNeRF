@@ -54,6 +54,9 @@ struct Camera {
 	const Transform4f transform;
 	const DistortionParams dist_params;
 
+	// mutatable properties
+	bool is_visible = true;
+
 	// constructor
 	Camera(
 		int2 resolution,

@@ -141,6 +141,7 @@ void Renderer::perform_task(
                 stream
             )
         );
+
         // then draw clipping planes
         draw_training_img_clipping_planes_and_assign_t_max_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
             n_rays,
@@ -155,7 +156,6 @@ void Renderer::perform_task(
             nerf->dataset_ws.image_data,
             workspace.ray_origin[active_buf_idx],
             workspace.ray_dir[active_buf_idx],
-            workspace.ray_idx[active_buf_idx],
             workspace.ray_t_max[active_buf_idx],
             workspace.bg_rgba
         );

@@ -164,7 +164,6 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	const stbi_uc* __restrict__ train_img_data,
 	const float* __restrict__ ray_ori,
 	const float* __restrict__ ray_dir,
-	const int* __restrict__ ray_idx,
 	float* __restrict__ ray_t_max,
 	float* __restrict__ out_rgba_buf
 ) {
@@ -195,6 +194,10 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	// we are looking for the minimum t-value of any plane that intersects this ray
 	for (int i = 0; i < n_cameras; ++i) {
 		const Camera cam = cameras[i];
+		
+		if (!cam.is_visible)
+			continue;
+
 		const Transform4f c2w = cam.transform;
 		const Transform4f w2c = c2w.inverse();
 		const float3 c2w_xyz = c2w.get_translation();
@@ -207,7 +210,7 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 				cam,
 				cam.near,
 				c2w,
-				w2c,
+				w2c,  
 				c2w_xyz,
 				ray_o,
 				ray_d,
@@ -249,6 +252,12 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 		}
 	}
 
+	// output pixel index
+	const int out_idx_offset_0 = idx;
+	const int out_idx_offset_1 = out_idx_offset_0 + (int)out_rgba_stride;
+	const int out_idx_offset_2 = out_idx_offset_1 + (int)out_rgba_stride;
+	const int out_idx_offset_3 = out_idx_offset_2 + (int)out_rgba_stride;
+	
 	// did we intersect anything?
 	if (t_min_cam_idx > -1) {
 		int2 pix_xy{
@@ -265,12 +274,6 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 		const int train_pix_idx = pix_xy.y * training_img_dims.x + pix_xy.x;
 
 		const stbi_uc* train_rgba = train_img_data + 4 * (train_pix_offset + train_pix_idx);
-
-		// output pixel index
-		const int out_idx_offset_0 = ray_idx[idx];
-		const int out_idx_offset_1 = out_idx_offset_0 + (int)out_rgba_stride;
-		const int out_idx_offset_2 = out_idx_offset_1 + (int)out_rgba_stride;
-		const int out_idx_offset_3 = out_idx_offset_2 + (int)out_rgba_stride;
 		
 		// write the pixel
 		out_rgba_buf[out_idx_offset_0] = __srgb_to_linear((float)train_rgba[0] / 255.0f);
@@ -280,6 +283,12 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 
 		// set t_max
 		ray_t_max[idx] = t_min;
+	} else {
+		// clear output pixel
+		out_rgba_buf[out_idx_offset_0] = 0.0f;
+		out_rgba_buf[out_idx_offset_1] = 0.0f;
+		out_rgba_buf[out_idx_offset_2] = 0.0f;
+		out_rgba_buf[out_idx_offset_3] = 0.0f;
 	}
 }
 

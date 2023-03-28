@@ -51,7 +51,6 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	const stbi_uc* __restrict__ train_img_data,
 	const float* __restrict__ ray_ori,
 	const float* __restrict__ ray_dir,
-	const int* __restrict__ ray_idx,
 	float* __restrict__ ray_t_max,
 	float* __restrict__ out_rgba_buf
 );
