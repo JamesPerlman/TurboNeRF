@@ -195,7 +195,7 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	for (int i = 0; i < n_cameras; ++i) {
 		const Camera cam = cameras[i];
 		
-		if (!cam.is_visible)
+		if (!cam.show_image_planes)
 			continue;
 
 		const Transform4f c2w = cam.transform;

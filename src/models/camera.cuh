@@ -43,19 +43,17 @@ struct DistortionParams {
 };
 
 struct Camera {
-	const int2 resolution;
-	const float near;
-	const float far;
-	const float2 focal_length;
-	const float2 resolution_f;
-	const float2 principal_point;
-	const float2 shift;
-	const float2 offset_px;
-	const Transform4f transform;
-	const DistortionParams dist_params;
-
-	// mutatable properties
-	bool is_visible = true;
+	int2 resolution;
+	float near;
+	float far;
+	float2 focal_length;
+	float2 resolution_f;
+	float2 principal_point;
+	float2 shift;
+	float2 offset_px;
+	Transform4f transform;
+	DistortionParams dist_params;
+	bool show_image_planes = true;
 
 	// constructor
 	Camera(

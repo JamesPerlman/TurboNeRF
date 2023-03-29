@@ -18,6 +18,7 @@ using namespace nlohmann;
 TURBO_NAMESPACE_BEGIN
 
 NeRFTrainingController::NeRFTrainingController(NeRFProxy* nerf_proxy, const uint32_t batch_size)
+	: nerf_proxy(nerf_proxy)
 {
 	contexts.reserve(DeviceManager::get_device_count());
 	DeviceManager::foreach_device(
@@ -88,17 +89,6 @@ void NeRFTrainingController::prepare_for_training() {
 		)
 	);
 
-	// Copy training cameras to the GPU
-	CUDA_CHECK_THROW(
-		cudaMemcpyAsync(
-			ctx.nerf->dataset_ws.cameras,
-			ctx.dataset->cameras.data(),
-			ctx.dataset->cameras.size() * sizeof(Camera),
-			cudaMemcpyHostToDevice,
-			ctx.stream
-		)
-	);
-
 	// Load all images into GPU memory!
 	load_images(ctx);
 
@@ -129,10 +119,13 @@ void NeRFTrainingController::load_images(Trainer::Context& ctx) {
 	printf("All images loaded to GPU.\n");
 }
 
-
 NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
+
 	// TODO: multi-gpu training.  For now we just train on the first device.
 	auto& ctx = contexts[0];
+
+	nerf_proxy->update_dataset_if_necessary(ctx.stream);
+	
 	float loss = trainer.train_step(ctx);
 	++training_step;
 

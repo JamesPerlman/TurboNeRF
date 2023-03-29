@@ -17,8 +17,10 @@ TURBO_NAMESPACE_BEGIN
 
 struct NeRFProxy {
     std::vector<NeRF> nerfs;
-    bool visible = true;
     Dataset dataset;
+    
+    bool is_visible = true;
+    bool is_dataset_dirty = true;
 
     NeRFProxy(const Dataset& dataset) : dataset(dataset) {};
     
@@ -39,6 +41,29 @@ struct NeRFProxy {
             ptrs.emplace_back(&nerf);
         }
         return ptrs;
+    }
+
+    void update_dataset_if_necessary(const cudaStream_t& stream) {
+        // supported changes: Everything about Cameras, except how many there are.
+        // aka the number of cameras must remain the same as when the nerf_proxy was constructed.
+        if (!is_dataset_dirty) {
+            return;
+        }
+
+        // TODO: do for all NeRFs
+        auto& nerf = nerfs[0];
+        
+        CUDA_CHECK_THROW(
+            cudaMemcpyAsync(
+                nerf.dataset_ws.cameras,
+                dataset.cameras.data(),
+                dataset.cameras.size() * sizeof(Camera),
+                cudaMemcpyHostToDevice,
+                stream
+            )
+        );
+
+        is_dataset_dirty = false;
     }
 };
 

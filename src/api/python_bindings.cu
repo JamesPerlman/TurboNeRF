@@ -4,6 +4,7 @@
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/stl/filesystem.h>
 #include <pybind11_json/pybind11_json.hpp>
 #include <string>
 #include <vector>
@@ -45,7 +46,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
      */
 
     m.doc() = "TurboNeRF Python Bindings";
-    m.attr("__version__") = "0.0.6-3";
+    m.attr("__version__") = "0.0.6-4";
 
     /**
      * Global functions
@@ -148,6 +149,11 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("p1") = 0.0f,
             py::arg("p2") = 0.0f
         )
+        .def_readwrite("k1", &DistortionParams::k1)
+        .def_readwrite("k2", &DistortionParams::k2)
+        .def_readwrite("k3", &DistortionParams::k3)
+        .def_readwrite("p1", &DistortionParams::p1)
+        .def_readwrite("p2", &DistortionParams::p2)
     ;
 
     py::class_<Camera>(m, "Camera")
@@ -171,15 +177,15 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("transform"),
             py::arg("dist_params") = DistortionParams()
         )
-        .def_readonly("resolution", &Camera::resolution)
-        .def_readonly("near", &Camera::near)
-        .def_readonly("far", &Camera::far)
-        .def_readonly("focal_length", &Camera::focal_length)
-        .def_readonly("principal_point", &Camera::principal_point)
-        .def_readonly("shift", &Camera::shift)
-        .def_readonly("transform", &Camera::transform)
-        .def_readonly("dist_params", &Camera::dist_params)
-        .def_readwrite("is_visible", &Camera::is_visible)
+        .def_readwrite("resolution", &Camera::resolution)
+        .def_readwrite("near", &Camera::near)
+        .def_readwrite("far", &Camera::far)
+        .def_readwrite("focal_length", &Camera::focal_length)
+        .def_readwrite("principal_point", &Camera::principal_point)
+        .def_readwrite("shift", &Camera::shift)
+        .def_readwrite("transform", &Camera::transform)
+        .def_readwrite("dist_params", &Camera::dist_params)
+        .def_readwrite("show_image_planes", &Camera::show_image_planes)
         .def(py::self == py::self)
         .def(py::self != py::self)
     ;
@@ -195,11 +201,18 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("cameras"),
             py::arg("images")
         )
+        .def("copy", &Dataset::copy)
         .def("to_json", &Dataset::to_json)
+        .def(
+            "set_camera_at",
+            [](Dataset& ds, int index, Camera& cam) {
+                ds.cameras[index] = cam;
+            }
+        )
         .def_readwrite("file_path", &Dataset::file_path)
-        .def_readonly("cameras", &Dataset::cameras)
+        .def_readwrite("cameras", &Dataset::cameras)
+        .def_readwrite("bounding_box", &Dataset::bounding_box)
         .def_readonly("image_dimensions", &Dataset::image_dimensions)
-        .def_readonly("bounding_box", &Dataset::bounding_box)
     ;
     
     // TODO: split into Training and Rendering bbox?
@@ -213,6 +226,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     py::class_<NeRFProxy>(m, "NeRF")
         .def("get_bounding_box", &NeRFProxy::get_bounding_box)
+        .def_readwrite("is_visible", &NeRFProxy::is_visible)
+        .def_readwrite("is_dataset_dirty", &NeRFProxy::is_dataset_dirty)
         .def_readonly("dataset", &NeRFProxy::dataset)
     ;
 

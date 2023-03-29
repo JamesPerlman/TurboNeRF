@@ -187,3 +187,9 @@ json Dataset::to_json() const {
 
     return json_data;
 }
+
+Dataset Dataset::copy() const {
+    Dataset dataset(bounding_box, cameras, images);
+    dataset.file_path = file_path;
+    return dataset;
+}

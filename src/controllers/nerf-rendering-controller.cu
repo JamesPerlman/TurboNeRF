@@ -75,6 +75,7 @@ void NeRFRenderingController::submit(
     }
 
     // prepare for rendering and dispatch tasks
+	request->proxies[0]->update_dataset_if_necessary(ctx.stream);
     renderer.prepare_for_rendering(ctx, request->camera, request->proxies[0]->nerfs[0], n_rays_max);
 
     // preview task cannot be canceled

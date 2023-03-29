@@ -72,9 +72,13 @@ private:
 	Trainer trainer;
 
 	uint32_t training_step;
+
+	NeRFProxy* nerf_proxy;
 	
 	// private methods
 	void load_images(Trainer::Context& ctx);
+
+	void update_dataset_if_necessary();
 	
     std::vector<size_t> get_cuda_memory_allocated() const;
 };
