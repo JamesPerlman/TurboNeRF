@@ -241,18 +241,18 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	
 	// did we intersect anything?
 	if (t_min_cam_idx > -1) {
-		int2 pix_xy{
-			(int)(t_min_uv.x * (float)training_img_dims.x),
-			(int)(t_min_uv.y * (float)training_img_dims.y)
-		};
+
+		const int pix_ix = (int)(t_min_uv.x * (float)training_img_dims.x);
+		const int pix_iy = (int)(t_min_uv.y * (float)training_img_dims.y);
 
 		// clamp to the image bounds
-		pix_xy.x = clamp(pix_xy.x, 0, training_img_dims.x - 1);
-		pix_xy.y = clamp(pix_xy.y, 0, training_img_dims.y - 1);
+		const uint32_t pix_x = (uint32_t)clamp(pix_ix, 0, training_img_dims.x - 1);
+		const uint32_t pix_y = (uint32_t)clamp(pix_iy, 0, training_img_dims.y - 1);
 
 		// get the pixel index
-		const int train_pix_offset = n_pix_per_training_img * t_min_cam_idx;
-		const int train_pix_idx = pix_xy.y * training_img_dims.x + pix_xy.x;
+		const uint32_t train_pix_offset = n_pix_per_training_img * (uint32_t)t_min_cam_idx;
+		const uint32_t pix_w = (uint32_t)training_img_dims.x;
+		const uint32_t train_pix_idx = pix_y * pix_w + pix_x;
 
 		const stbi_uc* train_rgba = train_img_data + 4 * (train_pix_offset + train_pix_idx);
 		
