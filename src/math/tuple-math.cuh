@@ -68,6 +68,12 @@ inline NRC_HOST_DEVICE float dot(const float3& a, const float3& b)
 
 /** float2 **/
 
+// multiplication float * float2
+inline NRC_HOST_DEVICE float2 operator*(const float& s, const float2& v)
+{
+    return {s * v.x, s * v.y};
+}
+
 // element-wise multiplication float2 * float2
 inline NRC_HOST_DEVICE float2 operator*(const float2& a, const float2& b)
 {

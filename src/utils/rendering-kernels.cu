@@ -119,38 +119,6 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 	ray_alive[i] = false;
 }
 
-inline __device__ bool intersects_plane_at_distance(
-	const Camera& cam,
-	const float& dist,
-	const Transform4f& c2w,
-	const Transform4f& w2c,
-	const float3& c2w_xyz,
-	const float3& ray_o,
-	const float3& ray_d,
-	float2& uv,
-	float& t
-) {
-	// hacky but less operations
-	const float3 v{ c2w.m02 * dist, c2w.m12 * dist, c2w.m22 * dist };
-	const float3 plane_center = v + c2w_xyz;
-	const float3 plane_normal = normalized(v);
-	const float2 near_size{
-		dist * cam.resolution_f.x / cam.focal_length.x,
-		dist * cam.resolution_f.y / cam.focal_length.y
-	};
-
-	return ray_plane_intersection(
-		ray_o,
-		ray_d,
-		plane_center,
-		plane_normal,
-		near_size,
-		w2c,
-		uv,
-		t
-	);
-}
-
 __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
@@ -201,22 +169,34 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 		const Transform4f c2w = cam.transform;
 		const Transform4f w2c = c2w.inverse();
 		const float3 c2w_xyz = c2w.get_translation();
+		const float3 r2{ c2w.m02, c2w.m12, c2w.m22 };
+		const float m = l2_norm(r2);
+		const float3 plane_normal = r2 / m;
+		const float2 base_size{
+			cam.resolution_f.x / cam.focal_length.x,
+			cam.resolution_f.y / cam.focal_length.y
+		};
 		
+
+
 		if (show_near_planes) {
+			const float3 near_center = cam.near * plane_normal + c2w_xyz;
+			const float2 near_size = (cam.near / m) * base_size;	
+
 			float t_near;
 			float2 uv_near;
 
-			bool intersects_near = intersects_plane_at_distance(
-				cam,
-				cam.near,
-				c2w,
-				w2c,  
-				c2w_xyz,
+			bool intersects_near = ray_plane_intersection(
 				ray_o,
 				ray_d,
+				near_center,
+				plane_normal,
+				near_size,
+				w2c,
 				uv_near,
 				t_near
 			);
+		
 
 			if (intersects_near && t_near < t_min) {
 				t_min = t_near;
@@ -227,18 +207,19 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 		}
 
 		if (show_far_planes) {
-			// need to check the far plane now
+			const float3 far_center = cam.far * plane_normal + c2w_xyz;
+			const float2 far_size = (cam.far / m) * base_size;	
+
 			float t_far;
 			float2 uv_far;
 
-			bool intersects_far = intersects_plane_at_distance(
-				cam,
-				cam.far,
-				c2w,
-				w2c,
-				c2w_xyz,
+			bool intersects_far = ray_plane_intersection(
 				ray_o,
 				ray_d,
+				far_center,
+				plane_normal,
+				far_size,
+				w2c,
 				uv_far,
 				t_far
 			);
