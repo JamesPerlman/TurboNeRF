@@ -56,6 +56,7 @@ __global__ void resize_floats_to_uint32_with_max(
 
 // actually it would probably be better if we put the random pixels in perfectly contiguous memory 
 
+// THIS IS NOW CURRENTLY UNUSED
 inline __device__ uint32_t random_pixel_index(
 	const uint32_t global_chunk_index,
 	const uint32_t n_pixels_per_image, // total number of pixels in each image
