@@ -31,34 +31,33 @@ Dataset::Dataset(const string& file_path)
     image_dimensions = make_int2((int)w, (int)h);
     n_pixels_per_image = (uint32_t)(w * h);
 
-    float cx = json_data.value("cx", 0.5f * w);
-    float cy = json_data.value("cy", 0.5f * h);
-    float2 principal_point = make_float2(cx, cy);
-    
-    // TODO: per-camera focal length
-    // if "fl_x" and "fl_y" are specified, these values are the focal lengths for their respective axes (in pixels)
-    float fl_x, fl_y;
-    if (json_data.contains("fl_x")) {
-        fl_x = json_data["fl_x"];
-        fl_y = json_data.value("fl_y", fl_x);
-    } else if (json_data.contains("camera_angle_x")) {
-        float ca_x = json_data["camera_angle_x"];
-        float ca_y = json_data.value("camera_angle_y", ca_x);
-        fl_x = 0.5f * w / tanf(0.5f * ca_x);
-        fl_y = 0.5f * h / tanf(0.5f * ca_y);
-    }
-    
-    float2 focal_length = make_float2(fl_x, fl_y);
-
     uint32_t aabb_size = std::min(json_data.value("aabb_scale", 16), 128);
     float scene_scale = json_data.value("scene_scale", 1.0f);
 
+    // principal point
+    float global_cx = json_data.value("cx", 0.5f * w);
+    float global_cy = json_data.value("cy", 0.5f * h);
+    
+    // if "fl_x" and "fl_y" are specified, these values are the focal lengths for their respective axes (in pixels)
+    float global_fl_x, global_fl_y;
+    if (json_data.contains("camera_angle_x")) {
+        float ca_x = json_data["camera_angle_x"];
+        float ca_y = json_data.value("camera_angle_y", ca_x);
+        global_fl_x = 0.5f * w / tanf(0.5f * ca_x);
+        global_fl_y = 0.5f * h / tanf(0.5f * ca_y);
+    } else {
+        global_fl_x = json_data.value("fl_x", 1000.0f);
+        global_fl_y = json_data.value("fl_y", global_fl_x);
+    }
+
     bounding_box = BoundingBox((float)aabb_size);
+
+    float2 global_focal_length{global_fl_x, global_fl_y};
 
     float global_near = json_data.value("near", 0.05f);
     float global_far = json_data.value("far", 128.0f);
 
-    DistortionParams dist_params(
+    DistortionParams global_dist_params(
         json_data.value("k1", 0.0f),
         json_data.value("k2", 0.0f),
         json_data.value("k3", 0.0f),
@@ -76,13 +75,27 @@ Dataset::Dataset(const string& file_path)
 
         Transform4f camera_matrix = Transform4f::Scale(scene_scale) * transform_matrix.from_nerf();
 
+        const float cx = frame.value("cx", global_cx);
+        const float cy = frame.value("cy", global_cy);
+
+        const float fl_x = frame.value("fl_x", global_fl_x);
+        const float fl_y = frame.value("fl_y", fl_x);
+
+        DistortionParams dist_params(
+            frame.value("k1", global_dist_params.k1),
+            frame.value("k2", global_dist_params.k2),
+            frame.value("k3", global_dist_params.k3),
+            frame.value("p1", global_dist_params.p1),
+            frame.value("p2", global_dist_params.p2)
+        );
+
         // TODO: per-camera dimensions
         cameras.emplace_back(
             image_dimensions,
             near,
             far,
-            focal_length,
-            principal_point,
+            float2{fl_x, fl_y},
+            float2{cx, cy},
             float2{0.0f, 0.0f},
             camera_matrix,
             dist_params
@@ -145,18 +158,6 @@ json Dataset::to_json() const {
     json_data["w"] = image_dimensions.x;
     json_data["h"] = image_dimensions.y;
 
-    json_data["cx"] = cameras[0].principal_point.x;
-    json_data["cy"] = cameras[0].principal_point.y;
-
-    json_data["fl_x"] = cameras[0].focal_length.x;
-    json_data["fl_y"] = cameras[0].focal_length.y;
-
-    json_data["k1"] = cameras[0].dist_params.k1;
-    json_data["k2"] = cameras[0].dist_params.k2;
-    json_data["k3"] = cameras[0].dist_params.k3;
-    json_data["p1"] = cameras[0].dist_params.p1;
-    json_data["p2"] = cameras[0].dist_params.p2;
-
     json_data["aabb_scale"] = bounding_box.size_x;
     json_data["scene_scale"] = 1.0f;
 
@@ -167,6 +168,18 @@ json Dataset::to_json() const {
 
         frame["near"] = cameras[i].near;
         frame["far"] = cameras[i].far;
+
+        frame["cx"] = cameras[i].principal_point.x;
+        frame["cy"] = cameras[i].principal_point.y;
+
+        frame["fl_x"] = cameras[i].focal_length.x;
+        frame["fl_y"] = cameras[i].focal_length.y;
+
+        frame["k1"] = cameras[i].dist_params.k1;
+        frame["k2"] = cameras[i].dist_params.k2;
+        frame["k3"] = cameras[i].dist_params.k3;
+        frame["p1"] = cameras[i].dist_params.p1;
+        frame["p2"] = cameras[i].dist_params.p2;
 
         frame["transform_matrix"] = cameras[i].transform.to_nerf().to_matrix().to_json();
 
