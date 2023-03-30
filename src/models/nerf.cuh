@@ -24,6 +24,10 @@ struct NeRF {
         , params(device_id)
         , occupancy_grid(device_id, OccupancyGrid::get_max_n_levels(bounding_box.size_x), 128)
     { };
+
+    int aabb_scale() const {
+        return (int)bounding_box.size_x;
+    }
     
 };
 

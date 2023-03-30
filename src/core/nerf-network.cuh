@@ -71,7 +71,7 @@ private:
 	int aabb_scale = 0;
 	uint32_t batch_size = 0;
 	bool can_train = false;
-	
+
 	void update_aabb_scale_if_needed(const int& aabb_scale);
 
 	// Helper context
@@ -136,7 +136,6 @@ private:
 	);
 	
 	void enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size);
-
 };
 
 TURBO_NAMESPACE_END
