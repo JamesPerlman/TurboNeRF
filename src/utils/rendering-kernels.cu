@@ -246,13 +246,13 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 		const int pix_iy = (int)(t_min_uv.y * (float)training_img_dims.y);
 
 		// clamp to the image bounds
-		const uint32_t pix_x = (uint32_t)clamp(pix_ix, 0, training_img_dims.x - 1);
-		const uint32_t pix_y = (uint32_t)clamp(pix_iy, 0, training_img_dims.y - 1);
+		const size_t pix_x = (size_t)clamp(pix_ix, 0, training_img_dims.x - 1);
+		const size_t pix_y = (size_t)clamp(pix_iy, 0, training_img_dims.y - 1);
 
 		// get the pixel index
-		const uint32_t train_pix_offset = n_pix_per_training_img * (uint32_t)t_min_cam_idx;
-		const uint32_t pix_w = (uint32_t)training_img_dims.x;
-		const uint32_t train_pix_idx = pix_y * pix_w + pix_x;
+		const size_t train_pix_offset = n_pix_per_training_img * (size_t)t_min_cam_idx;
+		const size_t pix_w = (size_t)training_img_dims.x;
+		const size_t train_pix_idx = pix_y * pix_w + pix_x;
 
 		const stbi_uc* train_rgba = train_img_data + 4 * (train_pix_offset + train_pix_idx);
 		
