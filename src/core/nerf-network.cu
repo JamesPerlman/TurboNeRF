@@ -24,18 +24,14 @@ using json = nlohmann::json;
     constexpr float LOSS_SCALE = 1.0f;
 #endif
 
-
 // Constructor
 
-NerfNetwork::NerfNetwork(const int& device_id)
+NerfNetwork::NerfNetwork(const int& device_id, const int& aabb_scale)
 	: workspace(device_id)
 {
-
-	// These values are from the Instant-NGP paper, page 4. "Multiresolution Hash Encoding"
-	double n_levels = 16.0;
-	double N_min = 16.0;
-	double N_max = 2048.0 * 16.0; // TODO: according to the paper this "16" should be the scene size
-	double b = exp((log(N_max) - log(N_min)) / (n_levels - 1.0));
+	
+	// this creates the density network
+	update_aabb_scale_if_needed(aabb_scale);
 
 	// These network configurations were adapted from nerfstudio
 	
@@ -49,6 +45,43 @@ NerfNetwork::NerfNetwork(const int& device_id)
 		create_encoding<network_precision_t>(3, direction_encoding_config)
 	);
 
+	// Create the Color MLP
+
+	uint32_t color_network_in_dim = direction_encoding->padded_output_width() + density_network->padded_output_width();
+
+	const json color_network_config = {
+		{"otype", "FullyFusedMLP"},
+		{"activation", "ReLU"},
+		{"output_activation", "Sigmoid"},
+		{"n_neurons", 64},
+		{"n_hidden_layers", 2},
+		{"n_input_dims", color_network_in_dim},
+		{"n_output_dims", 3},
+	};
+
+	color_network.reset(
+		create_network<network_precision_t>(color_network_config)
+	);
+}
+
+void NerfNetwork::update_aabb_scale_if_needed(const int& aabb_scale) {
+	// there is no way to change the aabb_scale after the network is created
+	// so as a workaround we just recreate the network if the aabb_scale changes
+	// this will allow us to train multiple nerfs simultaneously using the same network
+
+	if (this->aabb_scale == (int)aabb_scale) {
+		return;
+	}
+
+	printf("UPDATING AABB_SCALE LOL.  IT IS NOW %d\n", (int)aabb_scale);
+
+	// These values are from the Instant-NGP paper, page 4. "Multiresolution Hash Encoding"
+	double N_min = 16.0;
+	double N_max = 2048.0 * (double)aabb_scale;
+	double n_levels = 16.0;
+
+	double b = exp((log(N_max) - log(N_min)) / (n_levels - 1.0));
+
 	// Create the Density MLP
 
 	json density_encoding_config = {
@@ -58,7 +91,7 @@ NerfNetwork::NerfNetwork(const int& device_id)
 		{"log2_hashmap_size", 19},
 		{"base_resolution", N_min},
 		{"per_level_scale", b},
-		// used by recommendation of Müller et al (instant-NGP paper, page 13 "Smooth Interpolation")
+		// We can use interpolation: Smoothstep here if needed.  See Müller et al (instant-NGP paper, page 13 "Smooth Interpolation")
 		{"interpolation", "Linear"},
 	};
 
@@ -79,23 +112,7 @@ NerfNetwork::NerfNetwork(const int& device_id)
 		)
 	);
 
-	// Create the Color MLP
-
-	uint32_t color_network_in_dim = direction_encoding->padded_output_width() + density_network->padded_output_width();
-
-	const json color_network_config = {
-		{"otype", "FullyFusedMLP"},
-		{"activation", "ReLU"},
-		{"output_activation", "Sigmoid"},
-		{"n_neurons", 64},
-		{"n_hidden_layers", 2},
-		{"n_input_dims", color_network_in_dim},
-		{"n_output_dims", 3},
-	};
-
-	color_network.reset(
-		create_network<network_precision_t>(color_network_config)
-	);
+	this->aabb_scale = (int)aabb_scale;
 }
 
 // initialize params and gradients for the networks (I have no idea if this is correct)
@@ -173,6 +190,7 @@ float NerfNetwork::train(
 	const uint32_t& batch_size,
 	const uint32_t& n_rays,
 	const uint32_t& n_samples,
+	const int& aabb_scale,
 	uint32_t* ray_steps,
 	uint32_t* ray_offset,
 	float* pos_batch,
@@ -182,6 +200,9 @@ float NerfNetwork::train(
 	network_precision_t* concat_buffer,
 	network_precision_t* output_buffer
 ) {
+
+	update_aabb_scale_if_needed(aabb_scale);
+
 	set_params(params_ws);
 
 	enlarge_workspace_if_needed(stream, batch_size);
@@ -236,6 +257,7 @@ void NerfNetwork::inference(
 	const cudaStream_t& stream,
 	NetworkParamsWorkspace& params_ws,
 	const uint32_t& batch_size,
+	const int& aabb_scale,
 	float* pos_batch,
 	float* dir_batch,
 	// density network output must have space available for (color_network->input_width() * batch_size) elements of type network_precision_t
@@ -245,6 +267,8 @@ void NerfNetwork::inference(
 	// if this flag is false, we only run inference on the density network
 	const bool& use_color_network
 ) {
+	update_aabb_scale_if_needed(aabb_scale);
+
 	set_params(params_ws);
 	
 	// Inference (density network)

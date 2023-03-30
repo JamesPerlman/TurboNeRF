@@ -29,7 +29,7 @@ NeRFRenderingController::NeRFRenderingController(
             contexts.emplace_back(
                 stream,
                 RenderingWorkspace(device_id),
-                NerfNetwork(device_id),
+                NerfNetwork(device_id, 16),
                 this->batch_size
             );
         }

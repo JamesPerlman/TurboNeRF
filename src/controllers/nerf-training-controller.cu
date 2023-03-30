@@ -29,7 +29,7 @@ NeRFTrainingController::NeRFTrainingController(NeRFProxy* nerf_proxy, const uint
 				TrainingWorkspace(device_id),
 				&nerf_proxy->dataset,
 				nerf,
-				NerfNetwork(device_id),
+				NerfNetwork(device_id, nerf->aabb_scale()),
 				batch_size
 			);
 		}

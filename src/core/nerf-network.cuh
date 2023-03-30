@@ -23,7 +23,7 @@ struct NerfNetwork {
 	std::shared_ptr<tcnn::Network<tcnn::network_precision_t>> color_network;
 	std::shared_ptr<tcnn::NGPAdamOptimizer<tcnn::network_precision_t>> optimizer;
 	
-	NerfNetwork(const int& device_id);
+	NerfNetwork(const int& device_id, const int& aabb_scale);
 
 	void prepare_for_training(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws);
 	
@@ -35,6 +35,7 @@ struct NerfNetwork {
 		const uint32_t& batch_size,
 		const uint32_t& n_rays,
 		const uint32_t& n_samples,
+		const int& aabb_scale,
 		uint32_t* ray_steps,
 		uint32_t* ray_offset,
 		float* pos_batch,
@@ -49,6 +50,7 @@ struct NerfNetwork {
 		const cudaStream_t& stream,
 		NetworkParamsWorkspace& params_ws,
 		const uint32_t& batch_size,
+		const int& aabb_scale,
 		float* pos_batch,
 		float* dir_batch,
 		tcnn::network_precision_t* concat_buffer,
@@ -66,9 +68,11 @@ struct NerfNetwork {
 
 private:
 
-	float aabb_size;
+	int aabb_scale = 0;
 	uint32_t batch_size = 0;
 	bool can_train = false;
+	
+	void update_aabb_scale_if_needed(const int& aabb_scale);
 
 	// Helper context
 	struct ForwardContext : public tcnn::Context {
@@ -132,6 +136,7 @@ private:
 	);
 	
 	void enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size);
+
 };
 
 TURBO_NAMESPACE_END

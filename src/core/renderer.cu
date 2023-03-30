@@ -234,6 +234,7 @@ void Renderer::perform_task(
             stream,
             nerf->params,
             network_batch,
+            nerf->aabb_scale(),
             workspace.network_pos,
             workspace.network_dir,
             workspace.network_concat,
