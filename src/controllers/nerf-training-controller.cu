@@ -21,6 +21,7 @@ NeRFTrainingController::NeRFTrainingController(NeRFProxy* nerf_proxy, const uint
 	: nerf_proxy(nerf_proxy)
 {
 	contexts.reserve(DeviceManager::get_device_count());
+	
 	DeviceManager::foreach_device(
 		[this, nerf_proxy, batch_size](const int& device_id, const cudaStream_t& stream) {
 			NeRF* nerf = &nerf_proxy->nerfs[device_id];
