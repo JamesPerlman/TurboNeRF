@@ -32,6 +32,7 @@ public:
 		uint32_t n_samples_in_batch;
 
 		curandGenerator_t rng;
+		unsigned long long rng_offset = 0;
 
 		Context(
 			const cudaStream_t& stream,

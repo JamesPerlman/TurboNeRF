@@ -39,10 +39,12 @@ using namespace nlohmann;
 void Trainer::generate_next_training_batch(
 	Trainer::Context& ctx
 ) {
-
+	
 	// Generate random floats for use in training
-
-	curandStatus_t status = curandGenerateUniform(ctx.rng, ctx.workspace.random_float, ctx.workspace.batch_size);
+	// increment the seed by the number of floats generated
+	curandStatus_t status = curandGenerateUniform(ctx.rng, ctx.workspace.random_float, 4 * ctx.workspace.batch_size);
+	ctx.rng_offset += (unsigned long long)(4 * ctx.workspace.batch_size);
+	curandSetGeneratorOffset(ctx.rng, ctx.rng_offset);
 	if (status != CURAND_STATUS_SUCCESS) {
 		throw std::runtime_error("Error generating random floats for training batch.");
 	}
@@ -224,6 +226,9 @@ uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& t
 			
 			// generate random floats for sampling
 			curandStatus_t status = curandGenerateUniform(ctx.rng, ctx.workspace.random_float, 4 * batch_size);
+			ctx.rng_offset += (unsigned long long)(4 * ctx.workspace.batch_size);
+			curandSetGeneratorOffset(ctx.rng, ctx.rng_offset);
+
 			if (status != CURAND_STATUS_SUCCESS) {
 				printf("Error generating random floats for occupancy grid update.\n");
 			}
