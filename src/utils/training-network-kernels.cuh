@@ -120,7 +120,7 @@ __global__ void sigma_to_ray_rgba_forward_kernel(
 		}
     }
 
-	const uint32_t idx_offset_0 = idx + 0 * batch_size;
+	const uint32_t idx_offset_0 = idx;
 	const uint32_t idx_offset_1 = idx_offset_0 + batch_size;
 	const uint32_t idx_offset_2 = idx_offset_1 + batch_size;
 	const uint32_t idx_offset_3 = idx_offset_2 + batch_size;
@@ -142,6 +142,7 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
     const float* __restrict__ dt_buf,
 	const float* __restrict__ alpha_buf,
     const tcnn::network_precision_t* __restrict__ sample_rgb_buf,
+	const float* __restrict__ random_rgb,
 	const float* __restrict__ ray_rgba_buf,
     const float* __restrict__ dL_dR_buf,
     float* __restrict__ dL_dsigma_buf,
@@ -180,10 +181,22 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	float* __restrict__ s_dL_dcolor_g = s_dL_dcolor_r + batch_size;
 	float* __restrict__ s_dL_dcolor_b = s_dL_dcolor_g + batch_size;
 
-	float cumsum_r = ray_rgba_buf[idx_offset_0];
-	float cumsum_g = ray_rgba_buf[idx_offset_1];
-	float cumsum_b = ray_rgba_buf[idx_offset_2];
-	float cumsum_a = ray_rgba_buf[idx_offset_3];
+	// we need to invert the random bg compositing operation to obtain the original color
+	// we could potentially save the original rgba in a buffer to avoid this operation
+
+	const float rand_r = random_rgb[idx_offset_0];
+	const float rand_g = random_rgb[idx_offset_1];
+	const float rand_b = random_rgb[idx_offset_2];
+
+	const float ray_a = ray_rgba_buf[idx_offset_3];
+	const float ray_r = (ray_rgba_buf[idx_offset_0] - (1.0f - ray_a) * rand_r)  / ray_a;
+	const float ray_g = (ray_rgba_buf[idx_offset_1] - (1.0f - ray_a) * rand_g)  / ray_a;
+	const float ray_b = (ray_rgba_buf[idx_offset_2] - (1.0f - ray_a) * rand_b)  / ray_a;
+
+	float cumsum_r = ray_r;
+	float cumsum_g = ray_g;
+	float cumsum_b = ray_b;
+	float cumsum_a = ray_a;
 
 	float trans = 1.0f;
 	for (int i = 0; i < n_samples; ++i) {
@@ -195,19 +208,23 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 		const float alpha = s_alpha[i];
 		
 		const float weight = trans * alpha;
-        const float k = dt * (trans - weight);
+        const float k = (trans - weight);
 
 		cumsum_r -= weight * r;
 		cumsum_g -= weight * g;
 		cumsum_b -= weight * b;
 		cumsum_a -= weight;
 
-        const float dRr_dsigma = -dt * cumsum_r + k * r;
-        const float dRg_dsigma = -dt * cumsum_g + k * g;
-        const float dRb_dsigma = -dt * cumsum_b + k * b;
-		const float dRa_dsigma = -dt * cumsum_a + k;
+        float dRr_dsigma = dt * (k * r - cumsum_r);
+        float dRg_dsigma = dt * (k * g - cumsum_g);
+        float dRb_dsigma = dt * (k * b - cumsum_b);
+		float dRa_dsigma = dt * (k * 1 - cumsum_a);
 
-        s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma + dL_dR_a * dRa_dsigma;
+		dRr_dsigma = dRr_dsigma * ray_a + (ray_r - rand_r) * dRa_dsigma;
+		dRg_dsigma = dRg_dsigma * ray_a + (ray_g - rand_g) * dRa_dsigma;
+		dRb_dsigma = dRb_dsigma * ray_a + (ray_b - rand_b) * dRa_dsigma;
+
+        s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma;
 
 		s_dL_dcolor_r[i] = dL_dR_r * weight;
 		s_dL_dcolor_g[i] = dL_dR_g * weight;
@@ -240,11 +257,14 @@ inline __device__ float smooth_l1_loss_backward(const float& x) {
 __global__ void ray_rgba_to_loss_forward_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
-	const float* __restrict__ ray_rgba,
-	const float* __restrict__ target_rgba,
+	const float* __restrict__ random_rgb,
+	float* __restrict__ ray_rgba,
+	float* __restrict__ target_rgba,
 	float* __restrict__ sse_loss
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (idx >= batch_size) return;
 
 	const uint32_t r_idx = idx;
 	const uint32_t g_idx = r_idx + batch_size;
@@ -259,46 +279,75 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 		return;
 	}
 
-	const float dr = ray_rgba[r_idx] - target_rgba[r_idx];
-	const float dg = ray_rgba[g_idx] - target_rgba[g_idx];
-	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
-	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
+	// https://github.com/cheind/pure-torch-ngp/blob/develop/torchngp/training.py#L301-L314
+	// mixing random colors with predicted and ground truth colors encourages the network to learn empty space
+	// THANK YOU CHEIND
 
-	sse_loss[r_idx] = smooth_l1_loss_forward(dr);
-	sse_loss[g_idx] = smooth_l1_loss_forward(dg);
-	sse_loss[b_idx] = smooth_l1_loss_forward(db);
-	sse_loss[a_idx] = smooth_l1_loss_forward(da);
+	// TODO: Clean this up.  Here is a suboptimal place to change this buffer data.
+	// Ideally ground truth colors should be mixed during batch generation.
+	// Predicted colors should be mixed during ray accumulation.
+	// "Sir, this is a loss function."
+
+	const float rand_r = random_rgb[r_idx];
+	const float rand_g = random_rgb[g_idx];
+	const float rand_b = random_rgb[b_idx];
+
+	const float gt_a = target_rgba[a_idx];
+	const float gt_r = target_rgba[r_idx] * gt_a + rand_r * (1.0f - gt_a);
+	const float gt_g = target_rgba[g_idx] * gt_a + rand_g * (1.0f - gt_a);
+	const float gt_b = target_rgba[b_idx] * gt_a + rand_b * (1.0f - gt_a);
+
+	target_rgba[r_idx] = gt_r;
+	target_rgba[g_idx] = gt_g;
+	target_rgba[b_idx] = gt_b;
+
+	const float ray_a = ray_rgba[a_idx];
+	const float ray_r = ray_rgba[r_idx] * ray_a + rand_r * (1.0f - ray_a);
+	const float ray_g = ray_rgba[g_idx] * ray_a + rand_g * (1.0f - ray_a);
+	const float ray_b = ray_rgba[b_idx] * ray_a + rand_b * (1.0f - ray_a);
+
+	ray_rgba[r_idx] = ray_r;
+	ray_rgba[g_idx] = ray_g;
+	ray_rgba[b_idx] = ray_b;
+
+	sse_loss[r_idx] = smooth_l1_loss_forward(ray_r - gt_r);
+	sse_loss[g_idx] = smooth_l1_loss_forward(ray_g - gt_g);
+	sse_loss[b_idx] = smooth_l1_loss_forward(ray_b - gt_b);
+	sse_loss[a_idx] = smooth_l1_loss_forward(ray_a - gt_a);
 }
 
 // dL/dR = (1/4) * (dL/dR_r + dL/dR_g + dL/dR_b + dL/dR_a)
 __global__ void ray_rgba_to_loss_backward_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
-	const float inv_4nrays,
-	const float* __restrict__ ray_rgba,
+	const float inv_3nrays,
 	const float* __restrict__ target_rgba,
+	float* __restrict__ ray_rgba,
 	float* __restrict__ dL_dR
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	if (idx >= n_rays) {
-		return;
-	}
+	if (idx >= n_rays) return;
 
 	const uint32_t r_idx = idx;
 	const uint32_t g_idx = r_idx + batch_size;
 	const uint32_t b_idx = g_idx + batch_size;
 	const uint32_t a_idx = b_idx + batch_size;
 
-	const float dr = ray_rgba[r_idx] - target_rgba[r_idx];
-	const float dg = ray_rgba[g_idx] - target_rgba[g_idx];
-	const float db = ray_rgba[b_idx] - target_rgba[b_idx];
-	const float da = ray_rgba[a_idx] - target_rgba[a_idx];
+	const float gt_a = target_rgba[a_idx];
+	const float gt_r = target_rgba[r_idx];
+	const float gt_g = target_rgba[g_idx];
+	const float gt_b = target_rgba[b_idx];
 
-	dL_dR[r_idx] = inv_4nrays * smooth_l1_loss_backward(dr);
-	dL_dR[g_idx] = inv_4nrays * smooth_l1_loss_backward(dg);
-	dL_dR[b_idx] = inv_4nrays * smooth_l1_loss_backward(db);
-	dL_dR[a_idx] = inv_4nrays * smooth_l1_loss_backward(da);
+	const float ray_a = ray_rgba[a_idx];
+	const float ray_r = ray_rgba[r_idx];
+	const float ray_g = ray_rgba[g_idx];
+	const float ray_b = ray_rgba[b_idx];
+
+	dL_dR[r_idx] = inv_3nrays * smooth_l1_loss_backward(ray_r - gt_r);
+	dL_dR[g_idx] = inv_3nrays * smooth_l1_loss_backward(ray_g - gt_g);
+	dL_dR[b_idx] = inv_3nrays * smooth_l1_loss_backward(ray_b - gt_b);
+	// dL_dR[a_idx] = inv_4nrays * smooth_l1_loss_backward(ray_a - gt_a);
 }
 
 TURBO_NAMESPACE_END

@@ -165,9 +165,9 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const float b = __srgb_to_linear((float)pixel[2] / 255.0f);
 	const float a = (float)pixel[3] / 255.0f;
 
-	pix_rgba[i_offset_0] = r * a;
-	pix_rgba[i_offset_1] = g * a;
-	pix_rgba[i_offset_2] = b * a;
+	pix_rgba[i_offset_0] = r;
+	pix_rgba[i_offset_1] = g;
+	pix_rgba[i_offset_2] = b;
 	pix_rgba[i_offset_3] = a;
 
 	// assign ray properties

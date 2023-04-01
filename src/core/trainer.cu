@@ -303,6 +303,7 @@ float Trainer::train_step(
 		ctx.n_rays_in_batch,
 		ctx.n_samples_in_batch,
 		ctx.nerf->aabb_scale(),
+		ctx.workspace.random_float + ctx.workspace.batch_size,
 		ctx.workspace.ray_step,
 		ctx.workspace.ray_offset,
 		ctx.workspace.sample_pos,

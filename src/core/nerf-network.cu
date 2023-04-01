@@ -189,6 +189,7 @@ float NerfNetwork::train(
 	const uint32_t& n_rays,
 	const uint32_t& n_samples,
 	const int& aabb_scale,
+	const float* random_rgb,
 	uint32_t* ray_steps,
 	uint32_t* ray_offset,
 	float* pos_batch,
@@ -213,6 +214,7 @@ float NerfNetwork::train(
 		n_samples,
 		ray_steps,
 		ray_offset,
+		random_rgb,
 		target_rgba,
 		pos_batch,
 		dir_batch,
@@ -239,6 +241,7 @@ float NerfNetwork::train(
 		ray_offset,
 		concat_buffer,
 		output_buffer,
+		random_rgb,
 		pos_batch,
 		dir_batch,
 		dt_batch,
@@ -351,7 +354,8 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	const uint32_t& n_samples,
 	const uint32_t* ray_steps,
 	const uint32_t* ray_offset,
-	const float* target_rgba,
+	const float* random_rgb,
+	float* target_rgba,
 	float* pos_batch,
 	float* dir_batch,
 	float* dt_batch,
@@ -461,6 +465,7 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	ray_rgba_to_loss_forward_kernel<<<n_blocks_linear(batch_size), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
+		random_rgb,
 		workspace.ray_rgba,
 		target_rgba,
 		workspace.loss_buf
@@ -496,6 +501,7 @@ void NerfNetwork::backward(
 	const uint32_t* ray_offset,
 	const tcnn::network_precision_t* network_density,
 	const tcnn::network_precision_t* network_color,
+	const float* random_rgb,
 	float* pos_batch,
 	float* dir_batch,
 	float* dt_batch,
@@ -510,11 +516,12 @@ void NerfNetwork::backward(
 	ray_rgba_to_loss_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
-		1.0f / (4.0f * (float)n_rays),
-		workspace.ray_rgba,
+		1.0f / (3.0f * (float)n_rays),
 		target_rgba,
+		workspace.ray_rgba,
 		workspace.grad_dL_dR
 	);
+
 
 	sigma_to_ray_rgba_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
@@ -524,6 +531,7 @@ void NerfNetwork::backward(
 		dt_batch,
 		workspace.alpha_buf,
 		network_color,
+		random_rgb,
 		workspace.ray_rgba,
 		workspace.grad_dL_dR,
 		workspace.grad_dL_dsigma,
