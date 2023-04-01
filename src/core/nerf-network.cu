@@ -69,11 +69,9 @@ void NerfNetwork::update_aabb_scale_if_needed(const int& aabb_scale) {
 	// so as a workaround we just recreate the network if the aabb_scale changes
 	// this will allow us to train multiple nerfs simultaneously using the same network
 
-	if (this->aabb_scale == (int)aabb_scale) {
+	if (this->aabb_scale == aabb_scale) {
 		return;
 	}
-
-	printf("UPDATING AABB_SCALE LOL.  IT IS NOW %d\n", (int)aabb_scale);
 
 	// These values are from the Instant-NGP paper, page 4. "Multiresolution Hash Encoding"
 	double N_min = 16.0;
@@ -112,7 +110,7 @@ void NerfNetwork::update_aabb_scale_if_needed(const int& aabb_scale) {
 		)
 	);
 
-	this->aabb_scale = (int)aabb_scale;
+	this->aabb_scale = aabb_scale;
 }
 
 // initialize params and gradients for the networks (I have no idea if this is correct)
