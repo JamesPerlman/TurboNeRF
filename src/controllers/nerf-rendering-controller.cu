@@ -24,6 +24,8 @@ NeRFRenderingController::NeRFRenderingController(
         this->batch_size = batch_size;
     }
 
+    contexts.reserve(DeviceManager::get_device_count());
+    
     DeviceManager::foreach_device(
         [this](const int& device_id, const cudaStream_t& stream) {
             contexts.emplace_back(
