@@ -173,7 +173,6 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
     const float dL_dR_r = dL_dR_buf[idx_offset_0];
 	const float dL_dR_g = dL_dR_buf[idx_offset_1];
 	const float dL_dR_b = dL_dR_buf[idx_offset_2];
-	const float dL_dR_a = dL_dR_buf[idx_offset_3];
 
     float* __restrict__ s_dL_dsigma = dL_dsigma_buf + sample_offset;
 
