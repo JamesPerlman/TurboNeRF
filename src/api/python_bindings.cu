@@ -195,12 +195,6 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::init<const string&>(),
             py::arg("file_path")
         )
-        .def(
-            py::init<const BoundingBox&, const vector<Camera>&, const vector<TrainingImage>&>(),
-            py::arg("bounding_box"),
-            py::arg("cameras"),
-            py::arg("images")
-        )
         .def("copy", &Dataset::copy)
         .def("to_json", &Dataset::to_json)
         .def(
