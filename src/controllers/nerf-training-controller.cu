@@ -95,7 +95,7 @@ void NeRFTrainingController::prepare_for_training() {
 	// Initialize the network
 	ctx.network.prepare_for_training(ctx.stream, ctx.nerf->params);
 
-	_is_ready_to_train = true;
+	_is_training_memory_allocated = true;
 }
 
 void NeRFTrainingController::load_images(

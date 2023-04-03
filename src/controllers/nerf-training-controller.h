@@ -68,7 +68,7 @@ struct NeRFTrainingController {
 	}
 	
 	bool is_ready_to_train() const {
-		return _is_ready_to_train;
+		return _is_training_memory_allocated && _is_image_data_loaded;
 	}
 	
 	bool is_image_data_loaded() const {
@@ -83,7 +83,7 @@ private:
 
 	uint32_t _training_step;
 	bool _is_image_data_loaded;
-	bool _is_ready_to_train;
+	bool _is_training_memory_allocated;
 
 	void update_dataset_if_necessary();
     std::vector<size_t> get_cuda_memory_allocated() const;
