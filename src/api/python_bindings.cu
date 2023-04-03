@@ -499,7 +499,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def(
             "create",
             &NeRFManager::create,
-            py::arg("bbox"),
+            py::arg("dataset"),
             py::return_value_policy::reference
         )
     ;
