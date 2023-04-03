@@ -59,7 +59,7 @@ struct NetworkWorkspace : Workspace {
         ray_rgba = allocate<float>(stream, 4 * batch_size);
         loss_buf = allocate<float>(stream, 4 * batch_size);
        
-        grad_dL_dR = allocate<float>(stream, 4 * batch_size);
+        grad_dL_dR = allocate<float>(stream, 3 * batch_size);
         grad_dL_dweight = allocate<float>(stream, batch_size);
         grad_dL_dsigma = allocate<float>(stream, batch_size);
         grad_dL_dcolor = allocate<float>(stream, 3 * batch_size);
