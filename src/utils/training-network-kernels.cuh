@@ -188,10 +188,14 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 	const float rand_g = random_rgb[idx_offset_1];
 	const float rand_b = random_rgb[idx_offset_2];
 
+	const float ray_r = ray_rgba_buf[idx_offset_0];
+	const float ray_g = ray_rgba_buf[idx_offset_1];
+	const float ray_b = ray_rgba_buf[idx_offset_2];
 	const float ray_a = ray_rgba_buf[idx_offset_3];
-	const float ray_r = (ray_rgba_buf[idx_offset_0] - (1.0f - ray_a) * rand_r)  / ray_a;
-	const float ray_g = (ray_rgba_buf[idx_offset_1] - (1.0f - ray_a) * rand_g)  / ray_a;
-	const float ray_b = (ray_rgba_buf[idx_offset_2] - (1.0f - ray_a) * rand_b)  / ray_a;
+
+	const float dr = ray_r - rand_r;
+	const float dg = ray_g - rand_g;
+	const float db = ray_b - rand_b;
 
 	float cumsum_r = ray_r;
 	float cumsum_g = ray_g;
@@ -220,9 +224,9 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
         float dRb_dsigma = dt * (k * b - cumsum_b);
 		float dRa_dsigma = dt * (k * 1 - cumsum_a);
 
-		dRr_dsigma = dRr_dsigma * ray_a + (ray_r - rand_r) * dRa_dsigma;
-		dRg_dsigma = dRg_dsigma * ray_a + (ray_g - rand_g) * dRa_dsigma;
-		dRb_dsigma = dRb_dsigma * ray_a + (ray_b - rand_b) * dRa_dsigma;
+		dRr_dsigma = dRr_dsigma * ray_a + dr * dRa_dsigma;
+		dRg_dsigma = dRg_dsigma * ray_a + dg * dRa_dsigma;
+		dRb_dsigma = dRb_dsigma * ray_a + db * dRa_dsigma;
 
         s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma;
 
@@ -258,8 +262,8 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
 	const float* __restrict__ random_rgb,
-	float* __restrict__ ray_rgba,
-	float* __restrict__ target_rgba,
+	const float* __restrict__ ray_rgba,
+	const float* __restrict__ target_rgba,
 	float* __restrict__ sse_loss
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -293,22 +297,16 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 	const float rand_b = random_rgb[b_idx];
 
 	const float gt_a = target_rgba[a_idx];
-	const float gt_r = target_rgba[r_idx] * gt_a + rand_r * (1.0f - gt_a);
-	const float gt_g = target_rgba[g_idx] * gt_a + rand_g * (1.0f - gt_a);
-	const float gt_b = target_rgba[b_idx] * gt_a + rand_b * (1.0f - gt_a);
-
-	target_rgba[r_idx] = gt_r;
-	target_rgba[g_idx] = gt_g;
-	target_rgba[b_idx] = gt_b;
+	const float gt_a_comp = 1.0f - gt_a;
+	const float gt_r = target_rgba[r_idx] * gt_a + rand_r * gt_a_comp;
+	const float gt_g = target_rgba[g_idx] * gt_a + rand_g * gt_a_comp;
+	const float gt_b = target_rgba[b_idx] * gt_a + rand_b * gt_a_comp;
 
 	const float ray_a = ray_rgba[a_idx];
-	const float ray_r = ray_rgba[r_idx] * ray_a + rand_r * (1.0f - ray_a);
-	const float ray_g = ray_rgba[g_idx] * ray_a + rand_g * (1.0f - ray_a);
-	const float ray_b = ray_rgba[b_idx] * ray_a + rand_b * (1.0f - ray_a);
-
-	ray_rgba[r_idx] = ray_r;
-	ray_rgba[g_idx] = ray_g;
-	ray_rgba[b_idx] = ray_b;
+	const float ray_a_comp = 1.0f - ray_a;
+	const float ray_r = ray_rgba[r_idx] * ray_a + rand_r * ray_a_comp;
+	const float ray_g = ray_rgba[g_idx] * ray_a + rand_g * ray_a_comp;
+	const float ray_b = ray_rgba[b_idx] * ray_a + rand_b * ray_a_comp;
 
 	sse_loss[r_idx] = smooth_l1_loss_forward(ray_r - gt_r);
 	sse_loss[g_idx] = smooth_l1_loss_forward(ray_g - gt_g);
@@ -321,8 +319,9 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const uint32_t n_rays,
 	const uint32_t batch_size,
 	const float inv_3nrays,
+	const float* __restrict__ random_rgb,
 	const float* __restrict__ target_rgba,
-	float* __restrict__ ray_rgba,
+	const float* __restrict__ ray_rgba,
 	float* __restrict__ dL_dR
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -334,20 +333,25 @@ __global__ void ray_rgba_to_loss_backward_kernel(
 	const uint32_t b_idx = g_idx + batch_size;
 	const uint32_t a_idx = b_idx + batch_size;
 
+	const float rand_r = random_rgb[r_idx];
+	const float rand_g = random_rgb[g_idx];
+	const float rand_b = random_rgb[b_idx];
+
 	const float gt_a = target_rgba[a_idx];
-	const float gt_r = target_rgba[r_idx];
-	const float gt_g = target_rgba[g_idx];
-	const float gt_b = target_rgba[b_idx];
+	const float gt_a_comp = 1.0f - gt_a;
+	const float gt_r = target_rgba[r_idx] * gt_a + rand_r * gt_a_comp;
+	const float gt_g = target_rgba[g_idx] * gt_a + rand_g * gt_a_comp;
+	const float gt_b = target_rgba[b_idx] * gt_a + rand_b * gt_a_comp;
 
 	const float ray_a = ray_rgba[a_idx];
-	const float ray_r = ray_rgba[r_idx];
-	const float ray_g = ray_rgba[g_idx];
-	const float ray_b = ray_rgba[b_idx];
+	const float ray_a_comp = 1.0f - ray_a;
+	const float ray_r = ray_rgba[r_idx] * ray_a + rand_r * ray_a_comp;
+	const float ray_g = ray_rgba[g_idx] * ray_a + rand_g * ray_a_comp;
+	const float ray_b = ray_rgba[b_idx] * ray_a + rand_b * ray_a_comp;
 
 	dL_dR[r_idx] = inv_3nrays * smooth_l1_loss_backward(ray_r - gt_r);
 	dL_dR[g_idx] = inv_3nrays * smooth_l1_loss_backward(ray_g - gt_g);
 	dL_dR[b_idx] = inv_3nrays * smooth_l1_loss_backward(ray_b - gt_b);
-	// dL_dR[a_idx] = inv_4nrays * smooth_l1_loss_backward(ray_a - gt_a);
 }
 
 TURBO_NAMESPACE_END

@@ -517,6 +517,7 @@ void NerfNetwork::backward(
 		n_rays,
 		batch_size,
 		1.0f / (3.0f * (float)n_rays),
+		random_rgb,
 		target_rgba,
 		workspace.ray_rgba,
 		workspace.grad_dL_dR
