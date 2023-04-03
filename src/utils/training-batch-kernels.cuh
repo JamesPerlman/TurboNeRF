@@ -157,7 +157,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	
 	// assign ground-truth pixel
 	const size_t img_offset = (size_t)n_pixels_per_image * image_idx;
-	const size_t local_pixel_idx = min((size_t)local_pixel_idx_f, (size_t)n_pixels_per_image - 1);
+	const size_t local_pixel_idx = std::min((size_t)local_pixel_idx_f, (size_t)n_pixels_per_image - 1);
 	const stbi_uc* __restrict__ pixel = image_data + 4 * (img_offset + local_pixel_idx);
 
 	const float r = __srgb_to_linear((float)pixel[0] / 255.0f);
