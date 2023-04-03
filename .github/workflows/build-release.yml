@@ -21,11 +21,11 @@ jobs:
       matrix:
         # https://en.wikipedia.org/wiki/CUDA#GPUs_supported
         artifact: [
-          {
-            arch: "61",
-            name: "Pascal",
-            gpus: "GTX 1050 - 1080 & Ti, Quadro P400 - P6000"
-          },
+          # {
+          #   arch: "61",
+          #   name: "Pascal",
+          #   gpus: "GTX 1050 - 1080 & Ti, Quadro P400 - P6000"
+          # },
           {
             arch: "75",
             name: "Turing",
