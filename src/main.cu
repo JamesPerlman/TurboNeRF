@@ -96,6 +96,7 @@ int main(int argc, char* argv[])
 	// set up training controller
 	auto trainer = turbo::NeRFTrainingController(nerf, NeRFConstants::batch_size);
 	trainer.prepare_for_training();
+	trainer.load_images();
 
 	// set up rendering controller
 	auto renderer = turbo::NeRFRenderingController(RenderPattern::LinearChunks);

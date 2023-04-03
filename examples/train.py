@@ -50,7 +50,14 @@ render_cam = tn.Camera(
 )
 
 # this method loads all the images and other data the Trainer needs
+
+
 trainer.prepare_for_training()
+
+def img_load_status(i, n):
+    print(f"Loaded image {i} of {n}")
+
+trainer.load_images(on_image_loaded=img_load_status)
 
 for i in range(1024):
     print(f"Training step {i}...")

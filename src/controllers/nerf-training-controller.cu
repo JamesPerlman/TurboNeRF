@@ -90,19 +90,20 @@ void NeRFTrainingController::prepare_for_training() {
 		)
 	);
 
-	// Load all images into GPU memory!
-	load_images(ctx);
-
-	training_step = 0;
+	_training_step = 0;
 
 	// Initialize the network
 	ctx.network.prepare_for_training(ctx.stream, ctx.nerf->params);
+
+	_is_ready_to_train = true;
 }
 
 void NeRFTrainingController::load_images(
-	Trainer::Context& ctx,
-	const std::function<void(const int&)>& on_image_loaded
+	std::function<void(int, int)> on_image_loaded
 ) {
+	// we only load images for the first NeRF (for the first device) - the rest we will copy data to
+	auto& ctx = contexts[0];
+
 	// make sure images are all loaded into CPU and GPU
 	// TODO: can we read images from a stream and load them directly into GPU memory? Probably!
 	size_t n_image_elements = 4 * ctx.dataset->n_pixels_per_image;
@@ -112,8 +113,9 @@ void NeRFTrainingController::load_images(
 
 	ctx.dataset->load_images_in_parallel(
 		[this, &image_size, &n_image_elements, &ctx, &n_images_loaded, &on_image_loaded](
-			const size_t& image_index,
-			const TrainingImage& image
+			const TrainingImage& image,
+			int image_index,
+			int n_images_total
 		) {
 			CUDA_CHECK_THROW(cudaMemcpyAsync(
 				ctx.nerf->dataset_ws.image_data + image_index * n_image_elements,
@@ -124,7 +126,7 @@ void NeRFTrainingController::load_images(
 			));
 
 			if (on_image_loaded) {
-				on_image_loaded(n_images_loaded.fetch_add(1));
+				on_image_loaded(n_images_loaded.fetch_add(1), n_images_total);
 			}
 		}
 	);
@@ -134,7 +136,7 @@ void NeRFTrainingController::load_images(
 	// unload images from the CPU
 	ctx.dataset->unload_images();
 
-	printf("All images loaded to GPU.\n");
+	_is_image_data_loaded = true;
 }
 
 NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
@@ -145,12 +147,12 @@ NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
 	nerf_proxy->update_dataset_if_necessary(ctx.stream);
 	
 	float loss = trainer.train_step(ctx);
-	++training_step;
+	++_training_step;
 
 	NeRFTrainingController::TrainingMetrics info;
 	
 	info.loss = loss;
-	info.step = training_step;
+	info.step = _training_step;
 	info.n_rays = ctx.n_rays_in_batch;
 	info.n_samples = ctx.n_samples_in_batch;
 

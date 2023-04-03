@@ -131,18 +131,18 @@ Dataset::Dataset(
 
 // this method was written (mostly) by ChatGPT!
 void Dataset::load_images_in_parallel(const Dataset::ImageLoadCallback& post_load_image) {
-    const size_t num_threads = std::thread::hardware_concurrency(); // get the number of available hardware threads
-
+    const int num_threads = std::thread::hardware_concurrency(); // get the number of available hardware threads
+    const int n_images_total = images.size();
     std::vector<std::thread> threads;
-    std::atomic<std::size_t> index{ 0 }; // atomic variable to track the next image to be loaded
-    for (size_t i = 0; i < num_threads; ++i) {
+    std::atomic<int> index{ 0 }; // atomic variable to track the next image to be loaded
+    for (int i = 0; i < num_threads; ++i) {
         // create a new thread to load images
         threads.emplace_back([&] {
-            std::size_t local_index;
-            while ((local_index = index.fetch_add(1)) < images.size()) {
+            int local_index;
+            while ((local_index = index.fetch_add(1)) < n_images_total) {
                 images[local_index].load_cpu();
                 if (post_load_image) {
-                    post_load_image(local_index, images[local_index]);
+                    post_load_image(images[local_index], local_index, n_images_total);
                 }
             }
         });

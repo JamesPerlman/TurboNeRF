@@ -371,12 +371,36 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             "Call this once before starting training."
         )
         .def(
+            "load_images",
+            [](NeRFTrainingController& tc, py::object on_image_loaded) {
+                // coded with a generous amount of help from GPT-4
+                if (py::isinstance<py::function>(on_image_loaded)) {
+                    // Capture a reference to the on_image_loaded function
+                    auto on_image_loaded_func = std::make_shared<py::function>(on_image_loaded.cast<py::function>());
+
+                    // Release the GIL before calling the C++ function
+                    py::gil_scoped_release release;
+
+                    tc.load_images([on_image_loaded_func](int n_loaded, int n_total) {
+                        // Re-acquire the GIL when calling the Python function
+                        py::gil_scoped_acquire acquire;
+                        (*on_image_loaded_func)(n_loaded, n_total);
+                    });
+                } else {
+                    tc.load_images();
+                }
+            },
+            py::arg("on_image_loaded") = py::none()
+        )
+        .def(
             "update_occupancy_grid",
             &NeRFTrainingController::update_occupancy_grid,
             py::arg("training_step")
         )
         .def("get_training_step", &NeRFTrainingController::get_training_step)
         .def("train_step", &NeRFTrainingController::train_step)
+        .def("is_ready_to_train", &NeRFTrainingController::is_ready_to_train)
+        .def("is_image_data_loaded", &NeRFTrainingController::is_image_data_loaded)
     ;
 
     /**

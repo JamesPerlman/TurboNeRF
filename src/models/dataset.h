@@ -17,7 +17,7 @@
 TURBO_NAMESPACE_BEGIN
 
 struct Dataset {
-	using ImageLoadCallback = std::function<void(const int&, const TrainingImage&)>;
+	using ImageLoadCallback = std::function<void(const TrainingImage&, int, int)>;
 
 	std::vector<Camera> cameras;
 	std::vector<TrainingImage> images;

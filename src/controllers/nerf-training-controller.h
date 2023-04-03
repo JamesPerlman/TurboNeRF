@@ -57,32 +57,35 @@ struct NeRFTrainingController {
 	// public methods
 	void prepare_for_training();
 	
+	void load_images(std::function<void(int, int)> on_image_loaded = {});
+	
 	TrainingMetrics train_step();
 
 	OccupancyGridMetrics update_occupancy_grid(const uint32_t& training_step);
 
 	uint32_t get_training_step() const {
-		return training_step;
+		return _training_step;
+	}
+	
+	bool is_ready_to_train() const {
+		return _is_ready_to_train;
+	}
+	
+	bool is_image_data_loaded() const {
+		return _is_image_data_loaded;
 	}
 
 private:
 	// private properties
 	std::vector<Trainer::Context> contexts;
-
 	Trainer trainer;
-
-	uint32_t training_step;
-
 	NeRFProxy* nerf_proxy;
-	
-	// private methods
-	void load_images(
-		Trainer::Context& ctx,
-		const std::function<void(const int&)>& on_image_loaded = {}
-	);
+
+	uint32_t _training_step;
+	bool _is_image_data_loaded;
+	bool _is_ready_to_train;
 
 	void update_dataset_if_necessary();
-	
     std::vector<size_t> get_cuda_memory_allocated() const;
 };
 
