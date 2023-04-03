@@ -52,8 +52,6 @@ Dataset::Dataset(const string& file_path)
 
     bounding_box = BoundingBox((float)aabb_size);
 
-    float2 global_focal_length{global_fl_x, global_fl_y};
-
     float global_near = json_data.value("near", 0.05f);
     float global_far = json_data.value("far", 128.0f);
 
@@ -68,6 +66,17 @@ Dataset::Dataset(const string& file_path)
     path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
 
     for (json frame : json_data["frames"]) {
+        
+        // images
+        string file_path = frame["file_path"];
+        path absolute_path = base_dir / file_path; // construct the absolute path using base_dir
+
+        if (!exists(absolute_path)) {
+            continue;
+        }
+            
+        images.emplace_back(absolute_path.string(), image_dimensions);
+        
         float near = scene_scale * frame.value("near", global_near);
         float far = scene_scale * frame.value("far", global_far);
 
@@ -79,7 +88,7 @@ Dataset::Dataset(const string& file_path)
         const float cy = frame.value("cy", global_cy);
 
         const float fl_x = frame.value("fl_x", global_fl_x);
-        const float fl_y = frame.value("fl_y", fl_x);
+        const float fl_y = frame.value("fl_y", fl_x); // potential bug, global_fl_y is not used
 
         DistortionParams dist_params(
             frame.value("k1", global_dist_params.k1),
@@ -101,18 +110,11 @@ Dataset::Dataset(const string& file_path)
             dist_params
         );
 
-        // images
-        string file_path = frame["file_path"];
-        path absolute_path = base_dir / file_path; // construct the absolute path using base_dir
-
-        // only add the image if it exists
-        if (exists(absolute_path)) {
-            images.emplace_back(absolute_path.string(), image_dimensions);
-        }
     }
 
     // remove excess allocated images
     images.shrink_to_fit();
+    cameras.shrink_to_fit();
 }
 
 Dataset::Dataset(
@@ -128,7 +130,7 @@ Dataset::Dataset(
 }
 
 // this method was written (mostly) by ChatGPT!
-void Dataset::load_images_in_parallel(std::function<void(const size_t, const TrainingImage&)> post_load_image) {
+void Dataset::load_images_in_parallel(const Dataset::ImageLoadCallback& post_load_image) {
     const size_t num_threads = std::thread::hardware_concurrency(); // get the number of available hardware threads
 
     std::vector<std::thread> threads;
@@ -149,6 +151,12 @@ void Dataset::load_images_in_parallel(std::function<void(const size_t, const Tra
     // wait for all threads to complete
     for (auto& thread : threads) {
         thread.join();
+    }
+}
+
+void Dataset::unload_images() {
+    for (auto& image : images) {
+        image.unload_cpu();
     }
 }
 

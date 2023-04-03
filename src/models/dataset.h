@@ -17,6 +17,8 @@
 TURBO_NAMESPACE_BEGIN
 
 struct Dataset {
+	using ImageLoadCallback = std::function<void(const int&, const TrainingImage&)>;
+
 	std::vector<Camera> cameras;
 	std::vector<TrainingImage> images;
 	uint32_t n_pixels_per_image;
@@ -27,7 +29,12 @@ struct Dataset {
 	Dataset(const std::string& file_path);
 	Dataset(const BoundingBox& bounding_box, const std::vector<Camera>& cameras, const std::vector<TrainingImage>& images);
 	Dataset() = default;
-	void load_images_in_parallel(std::function<void(const size_t, const TrainingImage&)> post_load_image = {});
+
+	void load_images_in_parallel(const ImageLoadCallback& post_load_image = {});
+	void unload_images();
+	
+	bool is_loaded() const;
+
 	nlohmann::json to_json() const;
 	Dataset copy() const;
 };

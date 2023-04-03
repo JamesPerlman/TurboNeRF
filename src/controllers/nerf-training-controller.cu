@@ -99,14 +99,22 @@ void NeRFTrainingController::prepare_for_training() {
 	ctx.network.prepare_for_training(ctx.stream, ctx.nerf->params);
 }
 
-void NeRFTrainingController::load_images(Trainer::Context& ctx) {
+void NeRFTrainingController::load_images(
+	Trainer::Context& ctx,
+	const std::function<void(const int&)>& on_image_loaded
+) {
 	// make sure images are all loaded into CPU and GPU
 	// TODO: can we read images from a stream and load them directly into GPU memory? Probably!
 	size_t n_image_elements = 4 * ctx.dataset->n_pixels_per_image;
 	size_t image_size = n_image_elements * sizeof(stbi_uc);
 
+	std::atomic<int> n_images_loaded = 0;
+
 	ctx.dataset->load_images_in_parallel(
-		[this, &image_size, &n_image_elements, &ctx](const size_t& image_index, const TrainingImage& image) {
+		[this, &image_size, &n_image_elements, &ctx, &n_images_loaded, &on_image_loaded](
+			const size_t& image_index,
+			const TrainingImage& image
+		) {
 			CUDA_CHECK_THROW(cudaMemcpyAsync(
 				ctx.nerf->dataset_ws.image_data + image_index * n_image_elements,
 				image.data_cpu.get(),
@@ -114,8 +122,17 @@ void NeRFTrainingController::load_images(Trainer::Context& ctx) {
 				cudaMemcpyHostToDevice,
 				ctx.stream
 			));
+
+			if (on_image_loaded) {
+				on_image_loaded(n_images_loaded.fetch_add(1));
+			}
 		}
 	);
+
+	CUDA_CHECK_THROW(cudaStreamSynchronize(ctx.stream));
+	
+	// unload images from the CPU
+	ctx.dataset->unload_images();
 
 	printf("All images loaded to GPU.\n");
 }

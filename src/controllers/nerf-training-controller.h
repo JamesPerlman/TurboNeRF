@@ -76,7 +76,10 @@ private:
 	NeRFProxy* nerf_proxy;
 	
 	// private methods
-	void load_images(Trainer::Context& ctx);
+	void load_images(
+		Trainer::Context& ctx,
+		const std::function<void(const int&)>& on_image_loaded = {}
+	);
 
 	void update_dataset_if_necessary();
 	
