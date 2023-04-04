@@ -81,9 +81,9 @@ private:
 	Trainer trainer;
 	NeRFProxy* nerf_proxy;
 
-	uint32_t _training_step;
-	bool _is_image_data_loaded;
-	bool _is_training_memory_allocated;
+	uint32_t _training_step = 0;
+	bool _is_image_data_loaded = false;
+	bool _is_training_memory_allocated = false;
 
 	void update_dataset_if_necessary();
     std::vector<size_t> get_cuda_memory_allocated() const;

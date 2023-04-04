@@ -111,7 +111,7 @@ void NeRFTrainingController::load_images(
 
 	std::atomic<int> n_images_loaded = 0;
 
-	ctx.dataset->load_images_in_parallel(
+	ctx.dataset->load_images(
 		[this, &image_size, &n_image_elements, &ctx, &n_images_loaded, &on_image_loaded](
 			const TrainingImage& image,
 			int image_index,
@@ -126,7 +126,8 @@ void NeRFTrainingController::load_images(
 			));
 
 			if (on_image_loaded) {
-				on_image_loaded(n_images_loaded.fetch_add(1), n_images_total);
+				n_images_loaded.fetch_add(1);
+				on_image_loaded(n_images_loaded, n_images_total);
 			}
 		}
 	);

@@ -428,12 +428,17 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .value("OnRenderComplete", BlenderBridge::ObservableEvent::OnRenderComplete)
         .value("OnRenderCancel", BlenderBridge::ObservableEvent::OnRenderCancel)
         .value("OnRequestRedraw", BlenderBridge::ObservableEvent::OnRequestRedraw)
+        .value("OnTrainingImageLoaded", BlenderBridge::ObservableEvent::OnTrainingImageLoaded)
+        .value("OnTrainingImagesLoadComplete", BlenderBridge::ObservableEvent::OnTrainingImagesLoadComplete)
+        .value("OnTrainingImagesLoadStart", BlenderBridge::ObservableEvent::OnTrainingImagesLoadStart)
     ;
 
     py::class_<BlenderBridge>(m, "BlenderBridge")
         .def(py::init<>())
         // training
-        .def("can_train", &BlenderBridge::can_train)
+        .def("can_load_images", &BlenderBridge::can_load_images)
+        .def("is_image_data_loaded", &BlenderBridge::is_image_data_loaded)
+        .def("is_ready_to_train", &BlenderBridge::is_ready_to_train)
         .def("is_training", &BlenderBridge::is_training)
         .def(
             "prepare_for_training",

@@ -30,7 +30,7 @@ struct Dataset {
 	Dataset(const BoundingBox& bounding_box, const std::vector<Camera>& cameras, const std::vector<TrainingImage>& images);
 	Dataset() = default;
 
-	void load_images_in_parallel(const ImageLoadCallback& post_load_image = {});
+	void load_images(ImageLoadCallback post_load_image = {});
 	void unload_images();
 	
 	bool is_loaded() const;

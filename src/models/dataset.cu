@@ -130,7 +130,7 @@ Dataset::Dataset(
 }
 
 // this method was written (mostly) by ChatGPT!
-void Dataset::load_images_in_parallel(const Dataset::ImageLoadCallback& post_load_image) {
+void Dataset::load_images(Dataset::ImageLoadCallback post_load_image) {
     const int num_threads = std::thread::hardware_concurrency(); // get the number of available hardware threads
     const int n_images_total = images.size();
     std::vector<std::thread> threads;

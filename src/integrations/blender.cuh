@@ -38,7 +38,10 @@ class BlenderBridge
         OnRenderProgress,
         OnRenderComplete,
         OnRenderCancel,
-        OnRequestRedraw
+        OnRequestRedraw,
+        OnTrainingImageLoaded,
+        OnTrainingImagesLoadComplete,
+        OnTrainingImagesLoadStart
     };
 
     using EventCallbackParam = std::map<std::string, std::any>;
@@ -73,6 +76,8 @@ class BlenderBridge
     DebounceQueue _draw_queue;
 
     std::future<void> _runloop_future;
+    std::future<void> _img_load_future;
+
     bool _keep_runloop_alive = false;
     bool _is_training = false;
     bool _is_rendering = false;
@@ -213,8 +218,16 @@ class BlenderBridge
         return 0;
     }
 
-    bool can_train() const {
-        return _trainer.has_value();
+    bool can_load_images() const {
+        return _trainer.has_value() && !_trainer->is_image_data_loaded();
+    }
+
+    bool is_image_data_loaded() const {
+        return _trainer.has_value() && _trainer->is_image_data_loaded();
+    }
+
+    bool is_ready_to_train() const {
+        return _trainer.has_value() && _trainer->is_ready_to_train();
     }
 
     bool is_training() const {
@@ -224,7 +237,29 @@ class BlenderBridge
     void prepare_for_training(NeRFProxy* proxy, const uint32_t& batch_size = NeRFConstants::batch_size) {
         if (!_trainer.has_value()) {
             _trainer = NeRFTrainingController(proxy, batch_size);
-            _trainer->prepare_for_training();
+
+            _img_load_future = std::async(
+                std::launch::async,
+                [this, proxy]() {
+                    this->dispatch(
+                        ObservableEvent::OnTrainingImagesLoadStart,
+                        {{ "n_total", proxy->dataset.images.size() }}
+                    );
+                    printf("wat\n");
+                    _trainer->prepare_for_training();
+                    _trainer->load_images(
+                        [this](int n_loaded, int n_total) {
+                            std::map<std::string, std::any> data{
+                                {"n_loaded", n_loaded},
+                                {"n_total", n_total}
+                            };
+                            this->dispatch(ObservableEvent::OnTrainingImageLoaded, data);
+                        }
+                    );
+                    this->dispatch(ObservableEvent::OnTrainingImagesLoadComplete);
+                }
+            );
+            
         }
     }
 
