@@ -413,7 +413,10 @@ __global__ void march_and_generate_network_positions_kernel(
 				dt, inv_aabb_size,
 				out_pos_xyz, out_dir_xyz, out_dt
 			);
-			break;
+
+			++n_steps_taken;
+			
+			continue;
 		}
 
 		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
