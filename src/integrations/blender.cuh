@@ -26,9 +26,6 @@ class BlenderBridge
     // TODO: This could be abstracted to a base class
 
     enum class ObservableEvent {
-        OnTrainingStart,
-        OnTrainingStop,
-        OnTrainingStep,
         OnUpdateOccupancyGrid,
         OnPreviewStart,
         OnPreviewProgress,
@@ -41,7 +38,11 @@ class BlenderBridge
         OnRequestRedraw,
         OnTrainingImageLoaded,
         OnTrainingImagesLoadComplete,
-        OnTrainingImagesLoadStart
+        OnTrainingImagesLoadStart,
+        OnTrainingReset,
+        OnTrainingStart,
+        OnTrainingStop,
+        OnTrainingStep
     };
 
     using EventCallbackParam = std::map<std::string, std::any>;
@@ -82,6 +83,7 @@ class BlenderBridge
     bool _is_training = false;
     bool _is_rendering = false;
     bool _is_previewing = false;
+    bool _needs_reset_training = false;
 
     float _preview_progress = 0.0f;
     float _render_progress = 0.0f;
@@ -167,9 +169,11 @@ class BlenderBridge
         
         // potential TODO here - the dispatch() calls will slow down the run loop depending on how many observers there are, and what the callbacks do
         // so we may want to add them to a queue and dispatch them in another thread.  Although this can become problematic too.
+        // in general this loop is horrible.  it is robust to poor thread management but there must be a more beautiful architecture.
 
         do {
-            if (_is_training && _trainer.has_value()) {
+            // check if we need to train a step
+            if (_trainer.has_value() && _is_training) {
                 // train a single step
                 auto metrics = _trainer->train_step();
                 auto training_step = _trainer->get_training_step();
@@ -179,11 +183,22 @@ class BlenderBridge
                 }
                 dispatch(ObservableEvent::OnTrainingStep, metrics.as_map());
             }
+            
+            // check if we need to reset training
+            if (_needs_reset_training) {
+                _needs_reset_training = false;
+                if (_trainer.has_value()) {
+                    _trainer->reset_training_state();
+                    _trainer->prepare_for_training();
+                    dispatch(ObservableEvent::OnTrainingReset);
+                }
+            }
+
             // check if we need to render
             _render_queue.work();
             _render_queue.wait();
-
-        } while (_keep_runloop_alive);
+            
+        } while (_keep_runloop_alive || _needs_reset_training);
     }
 
     void start_runloop(bool keep_alive) {
@@ -282,6 +297,16 @@ class BlenderBridge
         _is_training = false;
         stop_runloop();
         dispatch(ObservableEvent::OnTrainingStop);
+    }
+
+    void reset_training() {
+        if (!_trainer.has_value()) {
+            return;
+        }
+        _needs_reset_training = true;
+
+        cancel_preview();
+        start_runloop(false);
     }
 
     void wait_for_runloop_to_stop() {

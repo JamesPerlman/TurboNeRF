@@ -75,6 +75,8 @@ struct NeRFTrainingController {
 		return _is_image_data_loaded;
 	}
 
+	void reset_training_state();
+
 private:
 	// private properties
 	std::vector<Trainer::Context> contexts;

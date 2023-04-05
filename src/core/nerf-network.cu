@@ -508,9 +508,9 @@ void NerfNetwork::backward(
 	float* target_rgba
 ) {
 	// zero out previous gradients
-	cudaMemsetAsync(workspace.grad_dL_dR, 0, 3 * batch_size * sizeof(float), stream);
-	cudaMemsetAsync(workspace.grad_dL_dcolor, 0, 3 * batch_size * sizeof(float), stream);
-	cudaMemsetAsync(workspace.grad_dL_dsigma, 0, batch_size * sizeof(float), stream);
+	CUDA_CHECK_THROW(cudaMemsetAsync(workspace.grad_dL_dR, 0, 3 * batch_size * sizeof(float), stream));
+	CUDA_CHECK_THROW(cudaMemsetAsync(workspace.grad_dL_dcolor, 0, 3 * batch_size * sizeof(float), stream));
+	CUDA_CHECK_THROW(cudaMemsetAsync(workspace.grad_dL_dsigma, 0, batch_size * sizeof(float), stream));
 
 	// Backpropagate loss
 	ray_rgba_to_loss_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
@@ -522,7 +522,6 @@ void NerfNetwork::backward(
 		workspace.ray_rgba,
 		workspace.grad_dL_dR
 	);
-
 
 	sigma_to_ray_rgba_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,

@@ -415,9 +415,6 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     // TODO: This is a large module.  Consider defining it in a separate file.
 
     py::enum_<BlenderBridge::ObservableEvent>(m, "BlenderBridgeEvent")
-        .value("OnTrainingStart", BlenderBridge::ObservableEvent::OnTrainingStart)
-        .value("OnTrainingStop", BlenderBridge::ObservableEvent::OnTrainingStop)
-        .value("OnTrainingStep", BlenderBridge::ObservableEvent::OnTrainingStep)
         .value("OnUpdateOccupancyGrid", BlenderBridge::ObservableEvent::OnUpdateOccupancyGrid)
         .value("OnPreviewStart", BlenderBridge::ObservableEvent::OnPreviewStart)
         .value("OnPreviewProgress", BlenderBridge::ObservableEvent::OnPreviewProgress)
@@ -431,6 +428,10 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .value("OnTrainingImageLoaded", BlenderBridge::ObservableEvent::OnTrainingImageLoaded)
         .value("OnTrainingImagesLoadComplete", BlenderBridge::ObservableEvent::OnTrainingImagesLoadComplete)
         .value("OnTrainingImagesLoadStart", BlenderBridge::ObservableEvent::OnTrainingImagesLoadStart)
+        .value("OnTrainingReset", BlenderBridge::ObservableEvent::OnTrainingReset)
+        .value("OnTrainingStart", BlenderBridge::ObservableEvent::OnTrainingStart)
+        .value("OnTrainingStop", BlenderBridge::ObservableEvent::OnTrainingStop)
+        .value("OnTrainingStep", BlenderBridge::ObservableEvent::OnTrainingStep)
     ;
 
     py::class_<BlenderBridge>(m, "BlenderBridge")
@@ -440,6 +441,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("is_image_data_loaded", &BlenderBridge::is_image_data_loaded)
         .def("is_ready_to_train", &BlenderBridge::is_ready_to_train)
         .def("is_training", &BlenderBridge::is_training)
+        .def("get_training_step", &BlenderBridge::get_training_step)
         .def(
             "prepare_for_training",
             &BlenderBridge::prepare_for_training,
@@ -448,6 +450,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         )
         .def("start_training", &BlenderBridge::start_training)
         .def("stop_training", &BlenderBridge::stop_training)
+        .def("reset_training", &BlenderBridge::reset_training)
         .def("wait_for_runloop_to_stop", &BlenderBridge::wait_for_runloop_to_stop)
         // rendering (final)
         .def("is_rendering", &BlenderBridge::is_rendering)

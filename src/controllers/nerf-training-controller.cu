@@ -72,6 +72,36 @@ void NeRFTrainingController::prepare_for_training() {
 		)
 	);
 
+	_training_step = 0;
+
+	// Initialize the network
+	ctx.network.prepare_for_training(ctx.stream, ctx.nerf->params);
+
+	_is_training_memory_allocated = true;
+}
+
+void NeRFTrainingController::reset_training_state() {
+	// this should possibly be a method of the context.
+	// there are some quirky things that need to be done to reset the state
+
+	// TODO: for all contexts
+	auto& ctx = contexts[0];
+	ctx.workspace.free_allocations();
+	ctx.nerf->params.free_allocations();
+	ctx.nerf->occupancy_grid.workspace.free_allocations();
+
+	ctx.n_rays_in_batch = ctx.batch_size;
+	ctx.n_samples_in_batch = 0;
+
+	_is_training_memory_allocated = false;
+}
+
+void NeRFTrainingController::load_images(
+	std::function<void(int, int)> on_image_loaded
+) {
+	// we only load images for the first NeRF (for the first device) - the rest we will copy data to
+	auto& ctx = contexts[0];
+	
 	// make sure dataset workspace is allocated
 	ctx.nerf->dataset_ws.enlarge(
 		ctx.stream,
@@ -89,20 +119,6 @@ void NeRFTrainingController::prepare_for_training() {
 			ctx.stream
 		)
 	);
-
-	_training_step = 0;
-
-	// Initialize the network
-	ctx.network.prepare_for_training(ctx.stream, ctx.nerf->params);
-
-	_is_training_memory_allocated = true;
-}
-
-void NeRFTrainingController::load_images(
-	std::function<void(int, int)> on_image_loaded
-) {
-	// we only load images for the first NeRF (for the first device) - the rest we will copy data to
-	auto& ctx = contexts[0];
 
 	// make sure images are all loaded into CPU and GPU
 	// TODO: can we read images from a stream and load them directly into GPU memory? Probably!
