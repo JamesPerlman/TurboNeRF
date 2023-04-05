@@ -46,7 +46,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
      */
 
     m.doc() = "TurboNeRF Python Bindings";
-    m.attr("__version__") = "0.0.6-5";
+    m.attr("__version__") = "0.0.7";
 
     /**
      * Global functions
