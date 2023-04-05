@@ -338,7 +338,6 @@ __global__ void march_and_generate_network_positions_kernel(
 	const float cone_angle,
 	
 	// input buffers
-	const float* __restrict__ random_float,
 	const float* __restrict__ in_ori_xyz,
 	const float* __restrict__ in_dir_xyz,
 	const float* __restrict__ in_idir_xyz,
@@ -385,25 +384,20 @@ __global__ void march_and_generate_network_positions_kernel(
 	const float id_x = in_idir_xyz[i_offset_0];
 	const float id_y = in_idir_xyz[i_offset_1];
 	const float id_z = in_idir_xyz[i_offset_2];
-
-	const float* s_rand = random_float + sample_offset;
-
+	
 	// Perform raymarching
 
-	float t0 = in_ray_t[i];
-	float t1 = t0;
+	float t = in_ray_t[i];
 
 	uint32_t n_steps_taken = 0;
 
 	while (n_steps_taken < n_steps) {
-		
-		const float tr = t0 + (t1 - t0) * s_rand[n_steps_taken];
 
-		const float x = o_x + tr * d_x;
-		const float y = o_y + tr * d_y;
-		const float z = o_z + tr * d_z;
+		const float x = o_x + t * d_x;
+		const float y = o_y + t * d_y;
+		const float z = o_z + t * d_z;
 
-		const float dt = grid->get_dt(tr, cone_angle, dt_min, dt_max);
+		const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
 
 		if (!bbox->contains(x, y, z)) {
 			assign_normalized_ray_sample(
@@ -421,11 +415,9 @@ __global__ void march_and_generate_network_positions_kernel(
 
 		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
 
-		t0 = t1;
-
 		if (grid->is_occupied_at(grid_level, x, y, z)) {
 
-			t1 += dt;
+			t += dt;
 
 			assign_normalized_ray_sample(
 				batch_size, sample_offset, n_steps_taken,
@@ -440,7 +432,7 @@ __global__ void march_and_generate_network_positions_kernel(
 		} else {
 
 			// otherwise we need to find the next occupied cell
-			t1 += grid->get_dt_to_next_voxel(
+			t += grid->get_dt_to_next_voxel(
 				x, y, z,
 				d_x, d_y, d_z,
 				id_x, id_y, id_z,

@@ -181,7 +181,6 @@ void Trainer::generate_next_training_batch(
 		cone_angle,
 
 		// input buffers
-		ctx.workspace.random_float,
 		ctx.workspace.ray_origin,
 		ctx.workspace.ray_dir,
 		ctx.workspace.ray_inv_dir,
