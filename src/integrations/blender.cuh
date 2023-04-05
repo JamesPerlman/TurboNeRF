@@ -245,7 +245,7 @@ class BlenderBridge
                         ObservableEvent::OnTrainingImagesLoadStart,
                         {{ "n_total", proxy->dataset.images.size() }}
                     );
-                    printf("wat\n");
+
                     _trainer->prepare_for_training();
                     _trainer->load_images(
                         [this](int n_loaded, int n_total) {
