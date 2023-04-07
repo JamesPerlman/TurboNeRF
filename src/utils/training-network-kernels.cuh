@@ -288,11 +288,6 @@ __global__ void ray_rgba_to_loss_forward_kernel(
 	// mixing random colors with predicted and ground truth colors encourages the network to learn empty space
 	// THANK YOU CHEIND
 
-	// TODO: Clean this up.  Here is a suboptimal place to change this buffer data.
-	// Ideally ground truth colors should be mixed during batch generation.
-	// Predicted colors should be mixed during ray accumulation.
-	// "Sir, this is a loss function."
-
 	const float rand_r = random_rgb[r_idx];
 	const float rand_g = random_rgb[g_idx];
 	const float rand_b = random_rgb[b_idx];
