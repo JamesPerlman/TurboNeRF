@@ -95,6 +95,8 @@ struct Camera {
 		float x,
 		float y
 	) const {
+		// todo: depth of field
+		// http://marc-b-reynolds.github.io/math/2017/01/08/SquareDisc.html
 		if (dist_params.is_any_nonzero()) {
 			const float xd = (x - principal_point.x) / focal_length.x;
 			const float yd = (y - principal_point.y) / focal_length.y;
