@@ -229,9 +229,11 @@ __global__ void sigma_to_ray_rgba_backward_kernel(
 
         s_dL_dsigma[i] = dL_dR_r * dRr_dsigma + dL_dR_g * dRg_dsigma + dL_dR_b * dRb_dsigma;
 
-		s_dL_dcolor_r[i] = dL_dR_r * weight;
-		s_dL_dcolor_g[i] = dL_dR_g * weight;
-		s_dL_dcolor_b[i] = dL_dR_b * weight;
+		const float dR_dcolor = weight * ray_a;
+		
+		s_dL_dcolor_r[i] = dL_dR_r * dR_dcolor;
+		s_dL_dcolor_g[i] = dL_dR_g * dR_dcolor;
+		s_dL_dcolor_b[i] = dL_dR_b * dR_dcolor;
 		
 		trans *= 1.0f - alpha;
 
