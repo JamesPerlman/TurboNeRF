@@ -231,11 +231,11 @@ public:
 		const float& ray_pos_x, const float& ray_pos_y, const float& ray_pos_z,
 		const float& ray_dir_x, const float& ray_dir_y, const float& ray_dir_z,
 		const float& inv_dir_x, const float& inv_dir_y, const float& inv_dir_z,
-		const float& dt,
+		const float& dt_min,
 		const int& grid_level
 	) const {
 		const float level_size = get_level_size(grid_level);
-		const float i_level_size = __fdividef(1.0f, level_size);
+		const float i_level_size = 1.0f / level_size;
 
 		// normalize xyz to [0, resolution] for the current level
 		const float x = (ray_pos_x * i_level_size + 0.5f) * resolution_f;
@@ -248,9 +248,8 @@ public:
 		const float ty = k * ((floorf(0.5f * copysignf(1.0f, ray_dir_y) + y + 0.5f) - y) * inv_dir_y);
 		const float tz = k * ((floorf(0.5f * copysignf(1.0f, ray_dir_z) + z + 0.5f) - z) * inv_dir_z);
 
-		const float t_target = fmaxf(dt, k * fminf(fminf(tx, ty), tz));
-	
-		return __fdiv_ru(t_target, dt) * dt;
+		const float t_target = fmaxf(dt_min, fminf(fminf(tx, ty), tz));
+		return __fdiv_ru(t_target, dt_min) * dt_min;
 	}
 
 	inline NRC_HOST_DEVICE float get_dt(
