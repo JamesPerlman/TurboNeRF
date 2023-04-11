@@ -290,7 +290,8 @@ uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& t
 }
 
 float Trainer::train_step(
-	Trainer::Context& ctx
+	Trainer::Context& ctx,
+	const uint32_t& training_step
 ) {
 	// Generate training batch
 	generate_next_training_batch(ctx);
@@ -298,6 +299,7 @@ float Trainer::train_step(
 	const float loss = ctx.network.train(
 		ctx.stream,
 		ctx.nerf->params,
+		training_step,
 		ctx.workspace.batch_size,
 		ctx.n_rays_in_batch,
 		ctx.n_samples_in_batch,

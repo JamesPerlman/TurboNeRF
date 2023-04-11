@@ -62,7 +62,7 @@ public:
 	};
 
 	// public methods
-	float train_step(Context& ctx);
+	float train_step(Context& ctx, const uint32_t& training_step);
 	uint32_t update_occupancy_grid(Context& ctx, const uint32_t& training_step);
 	void generate_next_training_batch(Context& ctx);
 };

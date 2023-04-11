@@ -185,6 +185,7 @@ void NerfNetwork::set_params(NetworkParamsWorkspace& params_ws) {
 float NerfNetwork::train(
 	const cudaStream_t& stream,
 	NetworkParamsWorkspace& params_ws,
+	const uint32_t& step,
 	const uint32_t& batch_size,
 	const uint32_t& n_rays,
 	const uint32_t& n_samples,
@@ -199,6 +200,8 @@ float NerfNetwork::train(
 	network_precision_t* concat_buffer,
 	network_precision_t* output_buffer
 ) {
+
+	optimizer->set_learning_rate(1e-2f / (1.0f + NeRFConstants::learning_rate_decay * (float)step));
 
 	update_aabb_scale_if_needed(aabb_scale);
 

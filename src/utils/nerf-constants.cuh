@@ -20,4 +20,6 @@ namespace NeRFConstants {
     constexpr float occupancy_threshold = 0.01f;// * NeRFConstants::min_step_size;
 
     constexpr uint32_t n_steps_per_render_compaction = 64;
+
+    constexpr float learning_rate_decay = 3.3e-5f;
 }

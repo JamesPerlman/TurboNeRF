@@ -163,7 +163,7 @@ NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
 
 	nerf_proxy->update_dataset_if_necessary(ctx.stream);
 	
-	float loss = trainer.train_step(ctx);
+	float loss = trainer.train_step(ctx, _training_step);
 	++_training_step;
 
 	NeRFTrainingController::TrainingMetrics info;

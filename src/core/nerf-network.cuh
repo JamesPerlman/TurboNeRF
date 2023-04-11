@@ -32,6 +32,7 @@ struct NerfNetwork {
 	float train(
 		const cudaStream_t& stream,
 		NetworkParamsWorkspace& params_ws,
+		const uint32_t& step,
 		const uint32_t& batch_size,
 		const uint32_t& n_rays,
 		const uint32_t& n_samples,
