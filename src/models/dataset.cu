@@ -13,10 +13,18 @@ using namespace filesystem;
 using json = nlohmann::json;
 using namespace turbo;
 
-Dataset::Dataset(const string& file_path)
-    : file_path(file_path)
-{
-    ifstream input_file(file_path);
+void Dataset::load_transforms() {
+
+    if (!file_path.has_value()) {
+        throw runtime_error("No file path specified");
+    }
+
+    ifstream input_file(file_path.value());
+
+    if (!input_file) {
+        throw runtime_error("Could not open file: " + file_path->string());
+    }
+
     json json_data;
     input_file >> json_data;
 
@@ -63,13 +71,13 @@ Dataset::Dataset(const string& file_path)
         json_data.value("p2", 0.0f)
     );
 
-    path base_dir = path(file_path).parent_path(); // get the parent directory of file_path
+    path base_dir = file_path->parent_path(); // get the parent directory of file_path
 
     for (json frame : json_data["frames"]) {
         
         // images
-        string file_path = frame["file_path"];
-        path absolute_path = base_dir / file_path; // construct the absolute path using base_dir
+        string img_path = frame["file_path"];
+        path absolute_path = base_dir / img_path; // construct the absolute path using base_dir
 
         if (!exists(absolute_path)) {
             continue;

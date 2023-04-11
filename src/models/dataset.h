@@ -26,14 +26,14 @@ struct Dataset {
 	BoundingBox bounding_box;
 	std::optional<filesystem::path> file_path;
 
-	Dataset(const std::string& file_path);
+	Dataset(const std::string& file_path) : file_path(file_path) {};
 	Dataset(const BoundingBox& bounding_box, const std::vector<Camera>& cameras, const std::vector<TrainingImage>& images);
 	Dataset() = default;
 
+	void load_transforms();
+
 	void load_images(ImageLoadCallback post_load_image = {});
 	void unload_images();
-	
-	bool is_loaded() const;
 
 	nlohmann::json to_json() const;
 	Dataset copy() const;

@@ -17,12 +17,12 @@ TURBO_NAMESPACE_BEGIN
 
 struct NeRFProxy {
     std::vector<NeRF> nerfs;
-    Dataset dataset;
+    std::optional<Dataset> dataset;
     
     bool is_visible = true;
     bool is_dataset_dirty = true;
 
-    NeRFProxy(const Dataset& dataset) : dataset(dataset) {};
+    NeRFProxy() = default;
     
     // TODO:
     // transform
@@ -31,7 +31,11 @@ struct NeRFProxy {
     // distortions
 
     BoundingBox get_bounding_box() const {
-        return dataset.bounding_box;
+        if (dataset.has_value()) {
+            return dataset->bounding_box;
+        }
+
+        return nerfs[0].bounding_box;
     }
 
     std::vector<NeRF*> get_nerf_ptrs() {
@@ -56,8 +60,8 @@ struct NeRFProxy {
         CUDA_CHECK_THROW(
             cudaMemcpyAsync(
                 nerf.dataset_ws.cameras,
-                dataset.cameras.data(),
-                dataset.cameras.size() * sizeof(Camera),
+                dataset->cameras.data(),
+                dataset->cameras.size() * sizeof(Camera),
                 cudaMemcpyHostToDevice,
                 stream
             )

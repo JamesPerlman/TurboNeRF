@@ -135,6 +135,7 @@ set(HEADERS
 	# services
 	src/services/device-manager.cuh
 	src/services/nerf-manager.cuh
+	src/services/file-manager.cuh
 
 	# workspaces
 	src/workspaces/dataset-workspace.cuh

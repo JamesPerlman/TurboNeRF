@@ -258,7 +258,7 @@ class BlenderBridge
                 [this, proxy]() {
                     this->dispatch(
                         ObservableEvent::OnTrainingImagesLoadStart,
-                        {{ "n_total", proxy->dataset.images.size() }}
+                        {{ "n_total", proxy->dataset->images.size() }}
                     );
 
                     _trainer->prepare_for_training();

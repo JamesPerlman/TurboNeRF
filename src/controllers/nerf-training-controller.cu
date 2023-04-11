@@ -28,7 +28,7 @@ NeRFTrainingController::NeRFTrainingController(NeRFProxy* nerf_proxy, const uint
 			contexts.emplace_back(
 				stream,
 				TrainingWorkspace(device_id),
-				&nerf_proxy->dataset,
+				&nerf_proxy->dataset.value(),
 				nerf,
 				NerfNetwork(device_id, nerf->aabb_scale()),
 				batch_size

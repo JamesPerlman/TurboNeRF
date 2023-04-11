@@ -241,6 +241,11 @@ void Renderer::perform_task(
             workspace.network_output
         );
 
+        GPUMemory<float> net_con_f(network_batch);
+        copy_and_cast<float, tcnn::network_precision_t>(stream, network_batch, net_con_f.data(), workspace.network_concat);
+
+        CHECK_DATA(net_con_cpu, float, net_con_f.data(), network_batch, stream);
+
         // save alpha in a buffer
         sigma_to_alpha_forward_kernel<<<n_blocks_linear(network_batch), n_threads_linear, 0, stream>>>(
             network_batch,
@@ -248,6 +253,8 @@ void Renderer::perform_task(
             workspace.network_dt,
             workspace.sample_alpha
         );
+
+        CHECK_DATA(alpha_cpu, float, workspace.sample_alpha, network_batch, stream);
 
         /**
          * It is best to clear RGBA right before we composite the first sample.
@@ -350,7 +357,7 @@ void Renderer::perform_task(
             n_rays_alive = n_rays_to_keep;
 
             n_steps = 0;
-        }                                                                                                                                                                                                                                                                                                              
+        }
     }
 
     if (show_training_cameras) {

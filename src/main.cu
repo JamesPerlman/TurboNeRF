@@ -88,18 +88,12 @@ int main(int argc, char* argv[])
 	CUDA_CHECK_THROW(cudaStreamCreate(&stream));
 
 	turbo::Dataset dataset = turbo::Dataset(DATASET_PATH);
-
+	dataset.load_transforms();
+	
 	auto nerf_manager = turbo::NeRFManager();
 
-	auto nerf = nerf_manager.create(dataset);
 
-	// set up training controller
-	auto trainer = turbo::NeRFTrainingController(nerf, NeRFConstants::batch_size);
-	trainer.prepare_for_training();
-	trainer.load_images([](int a, int b) {
-		printf("Loading images: %d / %d\n", a, b);
-	});
-
+	
 	// set up rendering controller
 	auto renderer = turbo::NeRFRenderingController(RenderPattern::LinearChunks);
 	int IMG_SIZE = dataset.cameras[0].resolution.x;
@@ -110,10 +104,42 @@ int main(int argc, char* argv[])
 	auto cam6 = dataset.cameras[6];
 	auto cam0 = dataset.cameras[6];
 
+	// auto loaded_id = nerf_manager.load("H:\\dozer.turbo");
+	// std::vector<NeRFProxy*> nerfs(1);
+	// nerfs[0] = nerf_manager.get_proxy_ptr(loaded_id);
+	// auto render_request = std::make_shared<RenderRequest>(
+	// 	cam6,
+	// 	nerfs,
+	// 	&render_buffer,
+	// 	RenderModifiers(),
+	// 	RenderFlags::Final,
+	// 	// on_complete
+	// 	[]() {},
+	// 	// on_progress, save image
+	// 	[&](float progress) {
+	// 		// render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}-{}.png", progress, i), stream);
+	// 	}
+	// );
+
+	// renderer.submit(render_request);
+	// render_buffer.save_image("H:\\saved_render.png", stream);
+
+	// return 0;
+
+	auto nerf_id = nerf_manager.create(dataset);
+	auto nerf = nerf_manager.get_proxy_ptr(nerf_id);
+
+	// set up training controller
+	auto trainer = turbo::NeRFTrainingController(nerf, NeRFConstants::batch_size);
+	trainer.prepare_for_training();
+	trainer.load_images([](int a, int b) {
+		printf("Loading images: %d / %d\n", a, b);
+	});
+
 	// fetch nerfs as pointers
 	auto proxy_ptrs = nerf_manager.get_proxies();
 
-	for (int i = 0; i < 1024 * 10; ++i) {
+	for (int i = 0; i < 128; ++i) {
 		trainer.train_step();
 		// every 16 training steps, update the occupancy grid
 
@@ -152,10 +178,11 @@ int main(int argc, char* argv[])
 			);
 
 			renderer.submit(render_request);
-			printf("Done!\n");
 			render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);
 		}
 	}
+
+	nerf_manager.save(nerf_id, "H:\\dozer.turbo");
 
 	// Wait for the kernel to finish executing
 	cudaDeviceSynchronize();

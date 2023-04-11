@@ -195,6 +195,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::init<const string&>(),
             py::arg("file_path")
         )
+        .def("load_transforms", &Dataset::load_transforms)
         .def("copy", &Dataset::copy)
         .def("to_json", &Dataset::to_json)
         .def(
@@ -531,8 +532,22 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def(
             "create",
             &NeRFManager::create,
-            py::arg("dataset"),
-            py::return_value_policy::reference
+            py::arg("dataset")
         )
+        .def(
+            "save",
+            &NeRFManager::save,
+            py::arg("nerf"),
+            py::arg("path")
+        )
+        .def(
+            "load",
+            [](NeRFManager& mgr, const std::string& path) -> proxy_id_t {
+                return mgr.load(path);
+            },
+            py::arg("path")
+        )
+        .def("get_proxy", &NeRFManager::get_proxy, py::arg("id"), py::return_value_policy::reference)
+        .def("get_proxy_ptr", &NeRFManager::get_proxy_ptr, py::arg("id"), py::return_value_policy::reference)
     ;
 }

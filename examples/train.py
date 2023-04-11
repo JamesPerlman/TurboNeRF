@@ -20,8 +20,10 @@ print("TurboNeRF loaded:", tn is not None)
 manager = tn.Manager()
 
 dataset = tn.Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json")
+dataset.load_transforms()
 
-nerf = manager.create(dataset)
+nerf_id = manager.create(dataset)
+nerf = manager.get_proxy_ptr(nerf_id)
 
 trainer = tn.Trainer(nerf, batch_size=2<<21)
 
@@ -49,6 +51,25 @@ render_cam = tn.Camera(
     cam6.dist_params
 )
 
+# nerf2 = manager.load("H:\\dozer.turbo")
+# request = tn.RenderRequest(
+#     render_cam,
+#     [nerf2],
+#     render_buf,
+#     tn.RenderModifiers(),
+#     tn.RenderFlags.Final
+# )
+
+# renderer.submit(request)
+
+# # save
+# rgba = np.array(render_buf.get_rgba())
+# rgba_uint8 = (rgba * 255).astype(np.uint8)
+# img = Image.fromarray(rgba_uint8, mode="RGBA")
+# img.save(f"H:\\render_loaded.png")
+
+# exit()
+
 # this method loads all the images and other data the Trainer needs
 
 
@@ -59,14 +80,14 @@ def img_load_status(i, n):
 
 trainer.load_images(on_image_loaded=img_load_status)
 
-for i in range(1024):
+for i in range(128):
     print(f"Training step {i}...")
     trainer.train_step()
 
     if i % 16 == 0 and i > 0:
         trainer.update_occupancy_grid(i)
 
-    if i % 16 == 0 and i > 0:
+    if i % 64 == 0 and i > 0:
 
         request = tn.RenderRequest(
             render_cam,
@@ -89,6 +110,8 @@ for i in range(1024):
         # render_buf.save_image(f"H:\\render_{i:05d}.png")
 
         print(f"Saved render_{i:05d}.png!")
+
+manager.save(nerf, "H:\\dozer.turbo")
 
 # it is recommended to call these methods at the end of your program
 render_buf.free()
