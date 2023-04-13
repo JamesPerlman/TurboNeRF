@@ -22,4 +22,7 @@ namespace NeRFConstants {
     constexpr uint32_t n_steps_per_render_compaction = 64;
 
     constexpr float learning_rate_decay = 3.3e-5f;
+
+    // the maximum number of nerfs that can be rendered simultaneously
+    constexpr uint32_t n_max_nerfs = 2<<10;
 }
