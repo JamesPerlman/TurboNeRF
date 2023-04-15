@@ -24,7 +24,6 @@ struct SceneWorkspace: Workspace {
     Transform4f* nerf_transforms;
 
     float* ray_t[2];
-    float* ray_tmin[2];
     float* ray_tmax[2];
     bool* ray_active[2];
     uint32_t* intersect_nerfs;
@@ -46,9 +45,6 @@ struct SceneWorkspace: Workspace {
 
         ray_t[0]        = allocate<float>(stream, n_elems);
         ray_t[1]        = allocate<float>(stream, n_elems);
-
-        ray_tmin[0]     = allocate<float>(stream, n_elems);
-        ray_tmin[1]     = allocate<float>(stream, n_elems);
 
         ray_tmax[0]     = allocate<float>(stream, n_elems);
         ray_tmax[1]     = allocate<float>(stream, n_elems);
