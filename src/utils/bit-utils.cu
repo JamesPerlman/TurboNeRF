@@ -1,4 +1,8 @@
-#pragma once
+//#pragma once
+// error: #pragma once in main file
+#ifndef TURBONERF_BIT_UTILS_CU
+#define TURBONERF_BIT_UTILS_CU
+
 #include "bit-utils.cuh"
 
 TURBO_NAMESPACE_BEGIN
@@ -20,3 +24,5 @@ __global__ void get_1s_per_uint32(
 }
 
 TURBO_NAMESPACE_END
+
+#endif
