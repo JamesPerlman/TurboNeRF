@@ -56,6 +56,8 @@ struct BoundingBox {
         return tmax >= tmin;
     }
 
+    // get if the point is inside the bounding box
+
     inline NRC_HOST_DEVICE bool contains(const float& x, const float& y, const float& z) const {
         return x >= min_x && x <= max_x
             && y >= min_y && y <= max_y
