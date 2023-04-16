@@ -74,7 +74,17 @@ include_directories(includes/glad/include)
 # tiny-cuda-nn
 set(TCNN_BUILD_EXAMPLES OFF)
 set(TCNN_BUILD_BENCHMARK OFF)
+if(UNIX)
+    # Enable generation of PIC code on Linux, otherwise
+    # the tiny-cuda-nn library won't be able to link with
+    # the Python module code
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 add_subdirectory(includes/tiny-cuda-nn)
+if(UNIX)
+    # And disable again
+    set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
+endif()
 
 # project includes
 set(HEADERS
