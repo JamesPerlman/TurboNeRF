@@ -249,7 +249,10 @@ class BlenderBridge
         return _is_training;
     }
 
-    void prepare_for_training(NeRFProxy* proxy, const uint32_t& batch_size = NeRFConstants::batch_size) {
+    void prepare_for_training(
+        NeRFProxy* proxy,
+        const uint32_t& batch_size = NeRFConstants::batch_size
+    ) {
         if (!_trainer.has_value()) {
             _trainer = NeRFTrainingController(proxy, batch_size);
 
@@ -274,7 +277,6 @@ class BlenderBridge
                     this->dispatch(ObservableEvent::OnTrainingImagesLoadComplete);
                 }
             );
-            
         }
     }
 
