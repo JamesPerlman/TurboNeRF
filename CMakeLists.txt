@@ -221,6 +221,11 @@ if(TN_BUILD_EXE)
 		PRIVATE
 		${TurboNeRF_LIBRARIES}
 	)
+
+    # Set stricter compile flag (for Linux)
+    if(NOT MSVC)
+        target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler -Werror)
+    endif()
 else()
 	message(STATUS "${PROJECT_NAME} Executable will NOT be built!")
 endif()
@@ -252,11 +257,6 @@ if (TN_BUILD_PYD)
 	)
 else()
 	message(STATUS "${PYLIB_NAME} Python Library will NOT be built!")
-endif()
-
-# Set stricter compile flag (for Linux)
-if(NOT MSVC)
-	target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler -Werror)
 endif()
 
 
