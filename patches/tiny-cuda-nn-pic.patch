@@ -1,0 +1,14 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 600bc41..a13a404 100644
+--- includes/tiny-cuda-nn/CMakeLists.txt
++++ includes/tiny-cuda-nn/CMakeLists.txt
+@@ -187,6 +187,8 @@ find_library(
+ )
+ 
+ set(BUILD_SHARED_LIBS OFF)
++# Linux, Python module, needs -fPIC and friends to link
++set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+ add_subdirectory("dependencies/fmt")
+ 
+ ###############################################################################
+
