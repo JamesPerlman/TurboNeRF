@@ -48,7 +48,19 @@ endif()
 
 set(TCNN_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
 
-find_package(CUDA 12.0 REQUIRED)
+# Prefer CUDA 12, but use 11 if 12 not available
+find_package(CUDA 12 QUIET)
+if(NOT CUDA_FOUND)
+    find_package(CUDA 11 QUIET)
+    if(NOT CUDA_FOUND)
+        message(FATAL_ERROR "CUDA 12 (or 11) not found!")
+    else()
+        message(STATUS "Using CUDA 11 from ${CUDA_TOOLKIT_ROOT_DIR}")
+    endif()    
+else()
+    message(STATUS "Using CUDA 12 from ${CUDA_TOOLKIT_ROOT_DIR}")
+endif()
+
 include_directories(${CUDA_INCLUDE_DIRS})
 
 # OpenGL
