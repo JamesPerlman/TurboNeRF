@@ -16,11 +16,8 @@ __global__ void generate_rectangular_grid_of_rays_kernel(
     const int2 grid_size, // size in camera-space pixels of the grid's extent
     const int2 grid_resolution, // resolution (number of samples) across the grid
     const Camera* __restrict__ camera,
-    const BoundingBox* __restrict__ bbox,
     float* __restrict__ pos,
     float* __restrict__ dir,
-    float* __restrict__ idir,
-    float* __restrict__ t,
     float* __restrict__ t_max,
     int* __restrict__ index,
     bool* __restrict__ alive
@@ -42,12 +39,11 @@ __global__ void generate_rectangular_grid_of_rays_kernel(
     int ix = gx + grid_offset.x;
     int iy = gy + grid_offset.y;
 
-    fill_ray_buffers(i, stride, camera, bbox, ix, iy, pos, dir, idir, t, t_max, index, alive);
+    fill_ray_buffers(i, stride, camera, ix, iy, pos, dir, t_max, index, alive);
 }
 
 void RectangularGridRayBatchCoordinator::generate_rays(
     const Camera* camera,
-    const BoundingBox* bbox,
     RayBatch& ray_batch,
     const cudaStream_t& stream
 ) {
@@ -58,11 +54,8 @@ void RectangularGridRayBatchCoordinator::generate_rays(
         grid_size,
         grid_resolution,
         camera,
-        bbox,
         ray_batch.pos,
         ray_batch.dir,
-        ray_batch.idir,
-        ray_batch.t,
         ray_batch.t_max,
         ray_batch.index,
         ray_batch.alive

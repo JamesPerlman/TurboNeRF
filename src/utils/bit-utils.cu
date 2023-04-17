@@ -1,4 +1,3 @@
-#pragma once
 #include "bit-utils.cuh"
 
 TURBO_NAMESPACE_BEGIN

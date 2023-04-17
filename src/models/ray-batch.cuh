@@ -9,12 +9,9 @@ struct RayBatch {
     int stride; // stride between xyz components
     float* pos;
     float* dir;
-    float* idir;
-    float* t;
     float* t_max;
     float* transmittance;
     int* index;
-    bool* active;
     bool* alive;
 };
 

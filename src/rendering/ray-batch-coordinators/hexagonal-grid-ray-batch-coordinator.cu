@@ -20,11 +20,8 @@ __global__ void generate_hexagonal_grid_of_rays_kernel(
     const int H,
     const int cw,
     const Camera* __restrict__ camera,
-    const BoundingBox* __restrict__ bbox,
     float* __restrict__ pos,
     float* __restrict__ dir,
-    float* __restrict__ idir,
-    float* __restrict__ t,
     float* __restrict__ t_max,
     int* __restrict__ index,
     bool* __restrict__ alive
@@ -45,12 +42,11 @@ __global__ void generate_hexagonal_grid_of_rays_kernel(
     ix = ix - grid_offset.x + W / 2;
     iy = iy - grid_offset.y + H / 2;
 
-    fill_ray_buffers(i, stride, camera, bbox, ix, iy, pos, dir, idir, t, t_max, index, alive);
+    fill_ray_buffers(i, stride, camera, ix, iy, pos, dir, t_max, index, alive);
 }
 
 void HexagonalGridRayBatchCoordinator::generate_rays(
     const Camera* camera,
-    const BoundingBox* bbox,
     RayBatch& ray_batch,
     const cudaStream_t& stream
 ) {
@@ -64,11 +60,8 @@ void HexagonalGridRayBatchCoordinator::generate_rays(
         H,
         cw,
         camera,
-        bbox,
         ray_batch.pos,
         ray_batch.dir,
-        ray_batch.idir,
-        ray_batch.t,
         ray_batch.t_max,
         ray_batch.index,
         ray_batch.alive

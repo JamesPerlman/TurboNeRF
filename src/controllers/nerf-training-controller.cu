@@ -7,6 +7,7 @@
 #include <thrust/device_vector.h>
 #include <tiny-cuda-nn/common.h>
 
+#include "../core/occupancy-grid.cuh"
 #include "../services/device-manager.cuh"
 #include "../utils/nerf-constants.cuh"
 #include "../common.h"
@@ -17,20 +18,21 @@ using namespace nlohmann;
 
 TURBO_NAMESPACE_BEGIN
 
-NeRFTrainingController::NeRFTrainingController(NeRFProxy* nerf_proxy, const uint32_t batch_size)
+NeRFTrainingController::NeRFTrainingController(
+	NeRFProxy* nerf_proxy,
+	const uint32_t batch_size
+)
 	: nerf_proxy(nerf_proxy)
 {
 	contexts.reserve(DeviceManager::get_device_count());
-	
 	DeviceManager::foreach_device(
 		[this, nerf_proxy, batch_size](const int& device_id, const cudaStream_t& stream) {
-			NeRF* nerf = &nerf_proxy->nerfs[device_id];
 			contexts.emplace_back(
 				stream,
 				TrainingWorkspace(device_id),
 				&nerf_proxy->dataset.value(),
-				nerf,
-				NerfNetwork(device_id, nerf->aabb_scale()),
+				&nerf_proxy->nerfs[device_id],
+				NerfNetwork(device_id, nerf_proxy->bounding_box.size()),
 				batch_size
 			);
 		}
@@ -72,7 +74,7 @@ void NeRFTrainingController::prepare_for_training() {
 		)
 	);
 
-	_training_step = 0;
+	nerf_proxy->training_step = 0;
 
 	// Initialize the network
 	ctx.network.prepare_for_training(ctx.stream, ctx.nerf->params);
@@ -163,13 +165,13 @@ NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
 
 	nerf_proxy->update_dataset_if_necessary(ctx.stream);
 	
-	float loss = trainer.train_step(ctx, _training_step);
-	++_training_step;
+	float loss = trainer.train_step(ctx, nerf_proxy->training_step);
+	nerf_proxy->training_step++;
 
 	NeRFTrainingController::TrainingMetrics info;
 	
 	info.loss = loss;
-	info.step = _training_step;
+	info.step = nerf_proxy->training_step;
 	info.n_rays = ctx.n_rays_in_batch;
 	info.n_samples = ctx.n_samples_in_batch;
 

@@ -157,6 +157,7 @@
         "version": "cpp",
         "glad.h": "c",
         "coroutine": "cpp",
-        "resumable": "cpp"
+        "resumable": "cpp",
+        "codecvt": "cpp"
     }
 }

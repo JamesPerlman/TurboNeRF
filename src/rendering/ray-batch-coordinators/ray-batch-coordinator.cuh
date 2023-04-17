@@ -21,7 +21,6 @@ class RayBatchCoordinator {
 public:
     virtual void generate_rays(
         const Camera* camera,
-        const BoundingBox* bbox,
         RayBatch& ray_batch,
         const cudaStream_t& stream = 0
     ) = 0;
@@ -41,7 +40,6 @@ public:
 /**
  * Each subclass of RayBatchCoordinator will be responsible for generating rays, and must call a kernel.
  * This device function abstracts some common functionality:
- * + invert ray directions
  * + set default ray properties
  * + write to ray buffers
  */
@@ -49,13 +47,10 @@ inline __device__ void fill_ray_buffers(
     const int& i,
     const int& stride,
     const Camera* __restrict__ cam,
-    const BoundingBox* __restrict__ bbox,
     const int& pix_idx_x,
     const int& pix_idx_y,
     float* __restrict__ pos,
     float* __restrict__ dir,
-    float* __restrict__ idir,
-    float* __restrict__ t,
     float* __restrict__ t_max,
     int* __restrict__ index,
     bool* __restrict__ alive
@@ -73,10 +68,6 @@ inline __device__ void fill_ray_buffers(
 	const float dir_y = global_dir.y;
 	const float dir_z = global_dir.z;
 	
-	const float idir_x = 1.0f / dir_x;
-	const float idir_y = 1.0f / dir_y;
-	const float idir_z = 1.0f / dir_z;
-	
     // assign ray properties
 
 	pos[i_offset_0] = global_ori.x;
@@ -87,12 +78,6 @@ inline __device__ void fill_ray_buffers(
 	dir[i_offset_1] = dir_y;
 	dir[i_offset_2] = dir_z;
 
-	idir[i_offset_0] = idir_x;
-	idir[i_offset_1] = idir_y;
-	idir[i_offset_2] = idir_z;
-
-    // set t-value to a position just barely within the bbox
-	t[i] = 0.0f;
     t_max[i] = cam->far - cam->near;
     index[i] = i;
 	alive[i] = true;

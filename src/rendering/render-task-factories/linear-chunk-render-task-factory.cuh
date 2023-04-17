@@ -25,6 +25,9 @@ public:
         std::vector<RenderTask> tasks;
         tasks.reserve(n_tasks);
 
+        // only one device for now
+        const int device_id = 0;
+
         // next we create a task for each hexagonal tile to fill it in with higher detail.
         for (int i = 0; i < n_tasks; ++i) {
             const int start_idx = i * n_rays_per_task;
@@ -32,7 +35,7 @@ public:
             tasks.emplace_back(
                 n_rays,
                 request->camera,
-                request->proxies[0]->get_nerf_ptrs(),
+                request->get_nerfs(device_id),
                 request->modifiers,
                 std::unique_ptr<RayBatchCoordinator>(
                     new LinearBufferRayBatchCoordinator(

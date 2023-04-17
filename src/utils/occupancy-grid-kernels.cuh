@@ -30,7 +30,7 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t level,
     const bool sample_all_cells,
     const float* __restrict__ random_float,
-    const tcnn::network_precision_t* __restrict__ network_sigma,
+    const tcnn::network_precision_t* __restrict__ network_density,
     OccupancyGrid* grid
 );
 

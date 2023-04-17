@@ -22,7 +22,11 @@ struct alignas(float) Transform4f
 
     /** Constructors **/
 
-    Transform4f() = default;
+    NRC_HOST_DEVICE Transform4f()
+        : m00(1), m01(0), m02(0), m03(0)
+        , m10(0), m11(1), m12(0), m13(0)
+        , m20(0), m21(0), m22(1), m23(0)
+    {};
 
     NRC_HOST_DEVICE Transform4f(Matrix4f m)
         : m00(m.m00), m01(m.m01), m02(m.m02), m03(m.m03)

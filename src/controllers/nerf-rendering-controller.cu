@@ -31,6 +31,7 @@ NeRFRenderingController::NeRFRenderingController(
             contexts.emplace_back(
                 stream,
                 RenderingWorkspace(device_id),
+                SceneWorkspace(device_id),
                 NerfNetwork(device_id, 16),
                 this->batch_size
             );
@@ -51,7 +52,8 @@ void NeRFRenderingController::submit(
     std::shared_ptr<RenderRequest> request
 ) {
     // TODO: batching/chunking/distributing requests across multiple GPUs
-    auto& ctx = contexts[0];
+    const int device_id = 0;
+    auto& ctx = contexts[device_id];
     
     this->request = request;
 
@@ -77,8 +79,13 @@ void NeRFRenderingController::submit(
     }
 
     // prepare for rendering and dispatch tasks
-	request->proxies[0]->update_dataset_if_necessary(ctx.stream);
-    renderer.prepare_for_rendering(ctx, request->camera, request->proxies[0]->nerfs[0], n_rays_max);
+    for (auto& proxy : request->proxies) {
+        proxy->update_dataset_if_necessary(ctx.stream);
+    }
+
+    const auto& nerfs = request->get_nerfs(device_id);
+
+    renderer.prepare_for_rendering(ctx, request->camera, nerfs, n_rays_max);
 
     // preview task cannot be canceled
     bool requested_preview = (request->flags & RenderFlags::Preview) == RenderFlags::Preview;
@@ -120,7 +127,8 @@ std::vector<size_t> NeRFRenderingController::get_cuda_memory_allocated() const {
     for (const auto& ctx : contexts) {
         size_t total = 0;
         
-        total += ctx.workspace.get_bytes_allocated();
+        total += ctx.render_ws.get_bytes_allocated();
+        total += ctx.scene_ws.get_bytes_allocated();
         total += ctx.network.workspace.get_bytes_allocated();
 
         sizes[i++] = total;

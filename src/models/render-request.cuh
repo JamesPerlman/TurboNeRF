@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "../render-targets/render-target.cuh"
+#include "../services/nerf-manager.cuh"
 #include "../utils/render-flags.cuh"
 #include "../common.h"
 #include "camera.cuh"
@@ -73,6 +74,15 @@ public:
         if (_on_cancel) {
             _on_cancel();
         }
+    }
+
+    std::vector<NeRF*> get_nerfs(const int& device_id) const {
+        std::vector<NeRF*> nerfs;
+        nerfs.reserve(proxies.size());
+        for (auto proxy : proxies) {
+            nerfs.push_back(&proxy->nerfs[device_id]);
+        }
+        return nerfs;
     }
 };
 

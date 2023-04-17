@@ -341,13 +341,6 @@ void NerfNetwork::inference(
 			color_network_output_matrix
 		);
 	}
-
-	// for inference we just overwrite the color network's alpha channel with activated sigma data
-	density_to_sigma_forward_kernel<<<n_blocks_linear(batch_size), tcnn::n_threads_linear, 0, stream>>>(
-		batch_size,
-		concat_buffer,
-		output_buffer + 3 * batch_size
-	);
 }
 
 std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(

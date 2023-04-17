@@ -5,12 +5,23 @@
 #include <stdint.h>
 
 template <typename T>
+inline __device__ float density_to_sigma(const T& density) {
+	return __expf((float)density - 1.0f);
+}
+
 inline __device__ float sigma_to_alpha(
-    const T* __restrict__ sigma,
-    const float* __restrict__ dt,
-    const int& i
+	const float& sigma,
+	const float& dt
 ) {
-    return 1.0f - __expf(-(float)sigma[i] * dt[i]);
+	return 1.0f - __expf(-(float)sigma * dt);
+}
+
+template <typename T>
+inline __device__ float density_to_alpha(
+	const T& density,
+	const float& dt
+) {
+	return sigma_to_alpha(density_to_sigma(density), dt);
 }
 
 template <typename T>
@@ -24,7 +35,7 @@ __global__ void sigma_to_alpha_forward_kernel(
 
 	if (i >= n_samples) return;
 
-	alpha[i] = sigma_to_alpha(sigma, dt, i);
+	alpha[i] = sigma_to_alpha(sigma[i], dt[i]);
 }
 
 

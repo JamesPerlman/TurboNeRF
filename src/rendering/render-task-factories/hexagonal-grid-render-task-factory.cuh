@@ -17,6 +17,9 @@ public:
 
     // TODO: this needs some revision/optimization.  It could be better at optimizing hexagon tiling.
     std::vector<RenderTask> create_tasks(const RenderRequest* request) override {
+        // TODO: multi-gpu
+        const int device_id = 0;
+
         // aspect ratio of hexagon is constant and this is a good value for an aesthetic shape
         float a = 1.1f;
 
@@ -140,11 +143,13 @@ public:
         std::vector<RenderTask> tasks;
         tasks.reserve(n_hex + 1);
 
+        const auto& nerfs = request->get_nerfs(device_id);
+
         // the fist task is a hexagonal grid for a low-resolution preview.
         tasks.emplace_back(
             pn_w * pn_h,
             request->camera,
-            request->proxies[0]->get_nerf_ptrs(),
+            nerfs,
             request->modifiers,
             std::unique_ptr<RayBatchCoordinator>(
                 new HexagonalGridRayBatchCoordinator(
@@ -162,7 +167,7 @@ public:
             tasks.emplace_back(
                 n_rays,
                 request->camera,
-                request->proxies[0]->get_nerf_ptrs(),
+                nerfs,
                 request->modifiers,
                 std::unique_ptr<RayBatchCoordinator>(
                     new HexagonalTileRayBatchCoordinator(

@@ -43,9 +43,6 @@ struct TrainingWorkspace: Workspace {
 	// ray direction components
 	float* ray_dir;
 
-	// ray inverse direction components
-	float* ray_inv_dir;
-
 	// ray t components
 	float* ray_t;
 	float* ray_t_max;
@@ -99,7 +96,6 @@ struct TrainingWorkspace: Workspace {
 		ray_offset		= allocate<uint32_t>(stream, batch_size);
 		ray_origin 		= allocate<float>(stream, 3 * batch_size);
 		ray_dir			= allocate<float>(stream, 3 * batch_size);
-		ray_inv_dir 	= allocate<float>(stream, 3 * batch_size);
 		ray_t 			= allocate<float>(stream, batch_size);
 		ray_t_max		= allocate<float>(stream, batch_size);
 		ray_alive 		= allocate<bool>(stream, batch_size);

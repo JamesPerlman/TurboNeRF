@@ -33,11 +33,6 @@ __global__ void copy_gradients_kernel(
 	}
 }
 
-template <typename T>
-inline __device__ float density_to_sigma(const T& density) {
-	return __expf((float)density - 1.0f);
-}
-
 /**
  * Apply exponential scaling to density network output
  * (log-space density!)

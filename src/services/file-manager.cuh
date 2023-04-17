@@ -26,7 +26,7 @@ struct FileManager {
     };
     
     static void save(
-        const NeRFProxy& proxy,
+        const NeRFProxy* proxy,
         const std::filesystem::path& file_path,
         const cudaStream_t& stream = 0
     ) {
@@ -36,7 +36,7 @@ struct FileManager {
             throw std::runtime_error("Could not open file for writing");
         }
 
-        const NeRF& nerf = proxy.nerfs[0];
+        const NeRF& nerf = proxy->nerfs[0];
 
         // prepare data
         NeRFFileData data;
@@ -44,7 +44,7 @@ struct FileManager {
         
         data.version = TURBO_NERF_FILE_VERSION;
 
-        std::string dataset_path = proxy.dataset->file_path->string();
+        std::string dataset_path = proxy->dataset->file_path->string();
         size_t copy_len = std::min(dataset_path.size(), sizeof(data.dataset_path) - 1);
         strncpy(data.dataset_path, dataset_path.c_str(), copy_len);
         data.dataset_path[copy_len] = '\0';
@@ -52,8 +52,7 @@ struct FileManager {
         data.n_color_params = nerf.params.n_color_params;
         data.n_density_params = nerf.params.n_density_params;
         data.n_occ_grid_bits = nerf.occupancy_grid.workspace.n_bitfield_elements;
-        data.aabb_scale = static_cast<uint32_t>(nerf.aabb_scale());
-
+        data.aabb_scale = static_cast<uint32_t>(proxy->bounding_box.size());
 
         // copy nerf params data to CPU
         size_t n_params = data.n_color_params + data.n_density_params;
@@ -61,12 +60,11 @@ struct FileManager {
         CUDA_CHECK_THROW(
             cudaMemcpy(
                 params.data(),
-                proxy.nerfs[0].params.params_fp,
+                proxy->nerfs[0].params.params_fp,
                 n_params * sizeof(float),
                 cudaMemcpyDeviceToHost
             )
         );
-
 
         // copy occupancy grid bitfield to CPU
         std::vector<uint8_t> occ_grid_bits(data.n_occ_grid_bits);
@@ -74,7 +72,7 @@ struct FileManager {
         CUDA_CHECK_THROW(
             cudaMemcpy(
                 occ_grid_bits.data(),
-                proxy.nerfs[0].occupancy_grid.get_bitfield(),
+                proxy->nerfs[0].occupancy_grid.get_bitfield(),
                 data.n_occ_grid_bits * sizeof(uint8_t),
                 cudaMemcpyDeviceToHost
             )
@@ -91,7 +89,7 @@ struct FileManager {
     }
 
     static void load(
-        NeRFProxy& proxy,
+        NeRFProxy* proxy,
         const std::filesystem::path& file_path,
         const cudaStream_t& stream = 0
     ) {
@@ -117,7 +115,7 @@ struct FileManager {
 
         // load dataset
         std::string dataset_path_str(data.dataset_path);
-        proxy.dataset = Dataset(dataset_path_str);
+        proxy->dataset = Dataset(dataset_path_str);
         
         // load nerf params
         size_t n_params = data.n_color_params + data.n_density_params;
@@ -127,13 +125,17 @@ struct FileManager {
 
         // need AABB to create the NeRFs, but this code should probably go somewhere else
         const BoundingBox bbox(static_cast<float>(data.aabb_scale));
-        proxy.nerfs.reserve(DeviceManager::get_device_count());
+        
+        proxy->bounding_box = bbox;
+
+        proxy->nerfs.reserve(DeviceManager::get_device_count());
+
         DeviceManager::foreach_device([&](const int device_id, const cudaStream_t& stream) {
-            proxy.nerfs.emplace_back(device_id, bbox);
+            proxy->nerfs.emplace_back(device_id, proxy);
         });
 
         // prep NeRF params
-        auto& nerf = proxy.nerfs[0];
+        auto& nerf = proxy->nerfs[0];
         nerf.params.enlarge(stream, data.n_density_params, data.n_color_params);
         
         // copy to GPU

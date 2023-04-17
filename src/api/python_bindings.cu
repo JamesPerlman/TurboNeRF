@@ -216,14 +216,14 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::init<float>(),
             py::arg("size")
         )
-        .def("get_size", [](BoundingBox& bb) { return bb.size_x; })
+        .def("size", &BoundingBox::size)
     ;
 
     py::class_<NeRFProxy>(m, "NeRF")
-        .def("get_bounding_box", &NeRFProxy::get_bounding_box)
         .def_readwrite("is_visible", &NeRFProxy::is_visible)
         .def_readwrite("is_dataset_dirty", &NeRFProxy::is_dataset_dirty)
         .def_readonly("dataset", &NeRFProxy::dataset)
+        .def_readonly("bounding_box", &NeRFProxy::bounding_box)
     ;
 
     py::enum_<RenderPattern>(m, "RenderPattern")
@@ -542,12 +542,10 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         )
         .def(
             "load",
-            [](NeRFManager& mgr, const std::string& path) -> proxy_id_t {
+            [](NeRFManager& mgr, const std::string& path) -> NeRFProxy* {
                 return mgr.load(path);
             },
             py::arg("path")
         )
-        .def("get_proxy", &NeRFManager::get_proxy, py::arg("id"), py::return_value_policy::reference)
-        .def("get_proxy_ptr", &NeRFManager::get_proxy_ptr, py::arg("id"), py::return_value_policy::reference)
     ;
 }

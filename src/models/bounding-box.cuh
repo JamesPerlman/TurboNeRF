@@ -18,7 +18,7 @@ struct BoundingBox {
     float size_x;
 	float size_y;
 	float size_z;
-    
+
 	BoundingBox() = default;
 
     BoundingBox(float size)
@@ -27,11 +27,13 @@ struct BoundingBox {
 		, size_x(size), size_y(size), size_z(size)
     {};
 
-    inline __device__ bool get_ray_t_intersection(
+    // get nearest intersection point of the ray with the bounding box
+
+    inline __device__ bool get_ray_t_intersections(
         const float& ori_x, const float& ori_y, const float& ori_z,
         const float& dir_x, const float& dir_y, const float& dir_z,
         const float& idir_x, const float& idir_y, const float& idir_z,
-        float& t
+        float& tmin, float& tmax
     ) const {
         // Compute the minimum and maximum intersection points for each axis
         float t1_x = (min_x - ori_x) * idir_x;
@@ -45,12 +47,9 @@ struct BoundingBox {
         if (t1_y > t2_y) thrust::swap(t1_y, t2_y);
         if (t1_z > t2_z) thrust::swap(t1_z, t2_z);
 
-        // Update tmin and tmax using the intersection points
-        float tmin = fmaxf(t1_x, fmaxf(t1_y, t1_z));
-        float tmax = fminf(t2_x, fminf(t2_y, t2_z));
-
-        // assign the t-value of the intersection point
-        t = tmin;
+        // Assign tmin and tmax using the intersection points
+        tmin = fmaxf(t1_x, fmaxf(t1_y, t1_z));
+        tmax = fminf(t2_x, fminf(t2_y, t2_z));
 
         // return true if the ray intersects the bounding box
         return tmax >= tmin;
@@ -62,8 +61,7 @@ struct BoundingBox {
         return x >= min_x && x <= max_x
             && y >= min_y && y <= max_y
             && z >= min_z && z <= max_z;
-   }
-
+    }
 
     inline NRC_HOST_DEVICE float pos_to_unit_x(const float& x) const { return (x - min_x) / size_x; }
     inline NRC_HOST_DEVICE float pos_to_unit_y(const float& y) const { return (y - min_y) / size_y; }

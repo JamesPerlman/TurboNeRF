@@ -46,7 +46,7 @@ private:
                 CUDA_CHECK_THROW(cudaSetDevice(i));
                 cudaStream_t stream;
                 CUDA_CHECK_THROW(cudaStreamCreate(&stream));
-                _streams.emplace_back(stream);
+                _streams.push_back(stream);
             }
 
             CUDA_CHECK_THROW(cudaSetDevice(prev_device));

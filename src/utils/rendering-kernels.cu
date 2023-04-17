@@ -8,35 +8,36 @@
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
 #include "../utils/color-utils.cuh"
+#include "../utils/common-network-kernels.cuh"
 #include "../utils/nerf-constants.cuh"
 
 using namespace tcnn;
 
 TURBO_NAMESPACE_BEGIN
 
-__global__ void march_rays_to_first_occupied_cell_kernel(
+__global__ void prepare_for_linear_raymarching_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
-	const OccupancyGrid* grid,
-	const BoundingBox* bbox,
+	const uint32_t n_nerfs,
+	const OccupancyGrid* __restrict__ grids,
+	const BoundingBox* __restrict__ bboxes,
+	const Transform4f* __restrict__ transforms,
 	const float dt_min,
-	const float dt_max,
 	const float cone_angle,
 	
 	// input buffers (read-only)
+	const float* __restrict__ ray_ori,
 	const float* __restrict__ ray_dir,
-	const float* __restrict__ ray_idir,
 
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
-	float* __restrict__ ray_ori,
-    float* __restrict__ ray_t,
-	float* __restrict__ ray_t_max,
+	float* __restrict__ ray_tmax,
 
 	// output buffers (write-only)
-	float* __restrict__ network_pos,
-	float* __restrict__ network_dir,
-	float* __restrict__ network_dt
+	uint32_t* __restrict__ intersectors,
+	bool* __restrict__ nerf_ray_active,
+    float* __restrict__ nerf_ray_t,
+	float* __restrict__ nerf_tmax
 ) {
 	// get thread index
 	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -59,64 +60,77 @@ __global__ void march_rays_to_first_occupied_cell_kernel(
 	const float d_x = ray_dir[i_offset_0];
 	const float d_y = ray_dir[i_offset_1];
 	const float d_z = ray_dir[i_offset_2];
-	
-	const float id_x = ray_idir[i_offset_0];
-	const float id_y = ray_idir[i_offset_1];
-	const float id_z = ray_idir[i_offset_2];
 
-    // make sure this ray intersects the bbox
-	float _t;
-	const bool intersects_bbox = bbox->get_ray_t_intersection(
-		o_x, o_y, o_z,
-		d_x, d_y, d_z,
-		id_x, id_y, id_z,
-		_t
-	);
+    // make sure this ray intersects some NeRF's bbox
+	// tmin = float max
+	float t_min = FLT_MAX;
+	float t_max = 0.0f;
+	int nearest_nerf = -1;
 
-	if (!intersects_bbox) {
+	uint32_t nerf_offset = 0;
+	for (int n = 0; n < n_nerfs; ++n) {
+
+		const uint32_t nerf_ray_idx = nerf_offset + i;
+
+		const BoundingBox& bbox = bboxes[n];
+		const Transform4f& transform = transforms[n];
+		const Transform4f& itrans = transform.inverse();
+
+		float _tmin;
+		float _tmax;
+
+		// we need to transform the ray into the NeRF's local space
+		float3 o = itrans * float3{ o_x, o_y, o_z };
+		float3 d = normalized(itrans.mmul_ul3x3(float3{ d_x, d_y, d_z }));
+		float3 id = float3{ 1.0f / d.x, 1.0f / d.y, 1.0f / d.z };
+
+		const bool intersects_bbox = bbox.get_ray_t_intersections(
+			o.x, o.y, o.z,
+			d.x, d.y, d.z,
+			id.x, id.y, id.z,
+			_tmin, _tmax
+		);
+
+		if (!intersects_bbox) {
+			continue;
+		}
+
+		_tmin = fmaxf(_tmin, 1e-4f);
+
+		const uint32_t ixn_idx = (n / 32) * batch_size + i;
+		intersectors[ixn_idx] |= (1 << (n % 32));
+
+		if (_tmin < t_min) {
+			t_min = _tmin;
+			nearest_nerf = n;
+		}
+
+		if (_tmax > t_max) {
+			t_max = _tmax;
+		}
+
+		// set min and max for this NeRF's ray
+		nerf_ray_t[nerf_ray_idx] = _tmin;
+		nerf_tmax[nerf_ray_idx] = _tmax;
+
+		// there can only be one active ray
+		nerf_ray_active[nerf_ray_idx] = false;
+		
+		nerf_offset += batch_size;
+	}
+
+	if (nearest_nerf == -1) {
+		// ray intersects zero NeRFs, and thus can be terminated immediately
 		ray_alive[i] = false;
 		return;
 	}
 
-    float t = fmaxf(ray_t[i], _t + 1e-5f);
-	float t_max = ray_t_max[i];
+	uint32_t nearest_nerf_idx = (uint32_t)nearest_nerf * batch_size + i;
+	nerf_ray_active[nearest_nerf_idx] = true;
 
-	// Perform raymarching
-	
-	while (t < t_max) {
-		const float x = o_x + t * d_x;
-		const float y = o_y + t * d_y;
-		const float z = o_z + t * d_z;
+	// t_max is the greatest value less than or equal to ray_tmax[i]
 
-		if (!bbox->contains(x, y, z)) {
-			break;
-		}
-
-		const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
-		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
-
-		if (grid->is_occupied_at(grid_level, x, y, z)) {
-			ray_ori[i_offset_0] = x;
-			ray_ori[i_offset_1] = y;
-			ray_ori[i_offset_2] = z;
-			ray_t[i] = 0.0f;
-			ray_t_max[i] = t_max - t;
-
-			return;
-		} else {
-			// otherwise we need to find the next occupied cell
-			t += grid->get_dt_to_next_voxel(
-				x, y, z,
-				d_x, d_y, d_z,
-				id_x, id_y, id_z,
-				dt_min,
-				grid_level
-			);
-		}
-	};
-
-	// if we get here, then the ray has terminated
-	ray_alive[i] = false;
+	ray_tmax[i] = fminf(t_max, ray_tmax[i]);
 }
 
 __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
@@ -132,7 +146,7 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	const stbi_uc* __restrict__ train_img_data,
 	const float* __restrict__ ray_ori,
 	const float* __restrict__ ray_dir,
-	float* __restrict__ ray_t_max,
+	float* __restrict__ ray_tmax,
 	float* __restrict__ out_rgba_buf
 ) {
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -163,8 +177,9 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	for (int i = 0; i < n_cameras; ++i) {
 		const Camera cam = cameras[i];
 		
-		if (!cam.show_image_planes)
+		if (!cam.show_image_planes) {
 			continue;
+		}
 
 		const Transform4f c2w = cam.transform;
 		const Transform4f w2c = c2w.inverse();
@@ -176,8 +191,6 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 			cam.resolution_f.x / cam.focal_length.x,
 			cam.resolution_f.y / cam.focal_length.y
 		};
-		
-
 
 		if (show_near_planes) {
 			const float3 near_center = cam.near * plane_normal + c2w_xyz;
@@ -196,7 +209,6 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 				uv_near,
 				t_near
 			);
-		
 
 			if (intersects_near && t_near < t_min) {
 				t_min = t_near;
@@ -263,7 +275,7 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 		out_rgba_buf[out_idx_offset_3] = (float)train_rgba[3] / 255.0f;
 
 		// set t_max
-		ray_t_max[idx] = t_min;
+		ray_tmax[idx] = t_min;
 	} else {
 		// clear output pixel
 		out_rgba_buf[out_idx_offset_0] = 0.0f;
@@ -273,31 +285,40 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	}
 }
 
+/**
+ * The multi-nerf raymarching algorithm goes as follows:
+ * 1. Filter only nerfs that intersect the ray
+ * 2. For each active ray, march it forward until it hits a voxel
+ * 3. Assign a new t-value to the nerf's ray
+ * 4. The nerf ray with the smallest t-value becomes active
+ * 5. Generate a sample point for that ray so it will be rendered.
+ * 
+ */
+
 __global__ void march_rays_and_generate_network_inputs_kernel(
     const uint32_t n_rays,
+	const uint32_t n_nerfs,
 	const uint32_t batch_size,
-	const uint32_t n_steps_max,
-	const uint32_t network_stride,
-	const OccupancyGrid* grid,
-	const BoundingBox* bbox,
-	const float inv_aabb_size,
+	const uint32_t network_batch,
+	const OccupancyGrid* grids,
+	const BoundingBox* bboxes,
+	const Transform4f* transforms,
 	const float dt_min,
-	const float dt_max,
 	const float cone_angle,
 	
 	// input buffers (read-only)
 	const float* __restrict__ ray_ori,
 	const float* __restrict__ ray_dir,
-	const float* __restrict__ ray_idir,
-	const float* __restrict__ ray_t_max,
+	const float* __restrict__ ray_tmax,
+	const float* __restrict__ nerf_tmax,
+	const uint32_t* __restrict__ intersectors,
 
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
-    bool* __restrict__ ray_active,
-    float* __restrict__ ray_t,
+    bool* __restrict__ nerf_ray_active,
+    float* __restrict__ nerf_ray_t,
 
 	// output buffers (write-only)
-	uint32_t* __restrict__ n_ray_steps,
 	float* __restrict__ network_pos,
 	float* __restrict__ network_dir,
 	float* __restrict__ network_dt
@@ -308,8 +329,8 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	// check if thread is out of bounds
 	if (i >= n_rays) return;
 
-    // check if ray has terminated or is currently inactive
-    if (!ray_alive[i] || !ray_active[i]) return;
+    // check if ray has terminated
+    if (!ray_alive[i]) return;
 
 	// References to input buffers
 	const uint32_t i_offset_0 = i;
@@ -323,90 +344,282 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const float d_x = ray_dir[i_offset_0];
 	const float d_y = ray_dir[i_offset_1];
 	const float d_z = ray_dir[i_offset_2];
-	
-	const float id_x = ray_idir[i_offset_0];
-	const float id_y = ray_idir[i_offset_1];
-	const float id_z = ray_idir[i_offset_2];
 
+	// Local variables for output buffers
+	float nearest_pos_x, nearest_pos_y, nearest_pos_z;
+	float nearest_dir_x, nearest_dir_y, nearest_dir_z;
+	float nearest_dt;
+	
 	// Perform raymarching
+	float global_tmax = ray_tmax[i];
+
+	float nearest_inv_aabb_size = 0.0f;
+	float nearest_t = FLT_MAX;
+	int nearest_nerf = -1;
+
+	// first we need to march each nerf's ray to the next occupied voxel
+	for (int n = 0; n < n_nerfs; ++n) {
+		const uint32_t nerf_ray_idx = n * batch_size + i;
+		
+		// check if this ray even intersects this NeRF
+		const uint32_t ixn_idx = (n / 32) * batch_size + i;
+		const bool intersects = intersectors[ixn_idx] & (1 << (n % 32));
+		if (!intersects) {
+			continue;
+		}
+
+		// we need to find the first NeRF that this ray intersects
+
+		float t = nerf_ray_t[nerf_ray_idx];
+		const float t_max = nerf_tmax[nerf_ray_idx];
+
+		// is the ray position currently inside this NeRF?
+		if (t > t_max) {
+			continue;
+		}
+
+		const OccupancyGrid& grid = grids[n];
+		const BoundingBox& bbox = bboxes[n];
+		const Transform4f itrans = transforms[n].inverse();
+
+		const float dt_max = dt_min * bbox.size();
+		const float inv_aabb_size = 1.0f / bbox.size();
 	
-	float t = ray_t[i];
-	float t_max = ray_t_max[i];
+		const float3 o = itrans * float3{o_x, o_y, o_z};
+		const float3 d = normalized(itrans.mmul_ul3x3(float3{d_x, d_y, d_z}));
+		const float3 id{ 1.0f / d.x, 1.0f / d.y, 1.0f / d.z };
 
-	uint32_t n_steps = 0;
+		/**
+		 * this nerf will be active if its grid is occupied at the current t value
+		 * we can only march each ray by one step using this technique
+		 * but it does get the job done!
+		 */
 
-	while (n_steps < n_steps_max && t < t_max) {
-		const float x = o_x + t * d_x;
-		const float y = o_y + t * d_y;
-		const float z = o_z + t * d_z;
+		const float abs_t_max = fminf(t_max, global_tmax);
 
-		if (!bbox->contains(x, y, z)) {
-			break;
+		float x, y, z;
+		float dt;
+
+		// only march if ray is active
+		if (nerf_ray_active[nerf_ray_idx]) {
+
+			do {
+				x = o.x + t * d.x;
+				y = o.y + t * d.y;
+				z = o.z + t * d.z;
+
+				dt = grid.get_dt(t, cone_angle, dt_min, dt_max);
+				const int grid_level = grid.get_grid_level_at(x, y, z, dt);
+
+				if (grid.is_occupied_at(grid_level, x, y, z)) {
+
+					t += dt;
+
+					break;
+				} else {
+					// otherwise we need to find the next occupied cell
+					t += grid.get_dt_to_next_voxel(
+						x, y, z,
+						d.x, d.y, d.z,
+						id.x, id.y, id.z,
+						dt_min,
+						grid_level
+					);
+				}
+
+			} while (t < abs_t_max);
+			
+			// update nerf t value
+			nerf_ray_t[nerf_ray_idx] = t;
+			
+			// only one nerf may be active at a time
+			nerf_ray_active[nerf_ray_idx] = false;
+		
+		} // if (nerf_ray_active[nerf_ray_idx])
+		else {
+			x = o.x + t * d.x;
+			y = o.y + t * d.y;
+			z = o.z + t * d.z;
+
+			dt = grid.get_dt(t, cone_angle, dt_min, dt_max);
 		}
 
-		const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
-		const int grid_level = grid->get_grid_level_at(x, y, z, dt);
+		if (t < nearest_t) {
+			nearest_t = t;
+			nearest_nerf = n;
 
-		if (grid->is_occupied_at(grid_level, x, y, z)) {
-
-			const uint32_t step_offset_0 = n_steps * n_rays + i;
-			const uint32_t step_offset_1 = step_offset_0 + network_stride;
-			const uint32_t step_offset_2 = step_offset_1 + network_stride;
-
-			network_pos[step_offset_0] = x * inv_aabb_size + 0.5f;
-			network_pos[step_offset_1] = y * inv_aabb_size + 0.5f;
-			network_pos[step_offset_2] = z * inv_aabb_size + 0.5f;
-
-			network_dir[step_offset_0] = 0.5f * d_x + 0.5f;
-			network_dir[step_offset_1] = 0.5f * d_y + 0.5f;
-			network_dir[step_offset_2] = 0.5f * d_z + 0.5f;
-
-			network_dt[step_offset_0] = dt * inv_aabb_size;
-
-			t += dt;
-
-			++n_steps;
-		} else {
-			// otherwise we need to find the next occupied cell
-			t += grid->get_dt_to_next_voxel(
-				x, y, z,
-				d_x, d_y, d_z,
-				id_x, id_y, id_z,
-				dt_min,
-				grid_level
-			);
+			nearest_inv_aabb_size = inv_aabb_size;
+			nearest_pos_x = x; nearest_pos_y = y; nearest_pos_z = z;
+			nearest_dir_x = d.x; nearest_dir_y = d.y; nearest_dir_z = d.z;
+			nearest_dt = dt;
 		}
+	} // for (int n = 0; n < n_nerfs; ++n)
+
+	if (nearest_nerf > -1) {
+		nerf_ray_active[nearest_nerf * batch_size + i] = true;
+
+		const uint32_t net_offset_0 = i;
+		const uint32_t net_offset_1 = net_offset_0 + network_batch;
+		const uint32_t net_offset_2 = net_offset_1 + network_batch;
+
+		network_pos[net_offset_0] = nearest_inv_aabb_size * nearest_pos_x + 0.5f;
+		network_pos[net_offset_1] = nearest_inv_aabb_size * nearest_pos_y + 0.5f;
+		network_pos[net_offset_2] = nearest_inv_aabb_size * nearest_pos_z + 0.5f;
+
+		network_dir[net_offset_0] = 0.5f * nearest_dir_x + 0.5f;
+		network_dir[net_offset_1] = 0.5f * nearest_dir_y + 0.5f;
+		network_dir[net_offset_2] = 0.5f * nearest_dir_z + 0.5f;
+
+		network_dt[net_offset_0] = nearest_inv_aabb_size * nearest_dt;
+	} else {
+		// no nerf is active, the ray must die.
+		ray_alive[i] = false;
 	}
-	
-	n_ray_steps[i] = n_steps;
-	ray_alive[i] = n_steps > 0;
-	ray_t[i] = t;
+}
+
+// sample compaction
+__global__ void compact_network_inputs_kernel(
+	const uint32_t n_active_rays,
+	const uint32_t old_batch_size,
+	const uint32_t new_batch_size,
+	const int* __restrict__ indices,
+
+	// input buffers (read-only)
+	const float* __restrict__ in_network_pos,
+	const float* __restrict__ in_network_dir,
+
+	// output buffers (write-only)
+	float* __restrict__ out_network_pos,
+	float* __restrict__ out_network_dir
+) {
+	const int c_idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (c_idx >= n_active_rays) return;
+
+	// 3-component buffers
+	const int c_offset_0 = c_idx;
+	const int c_offset_1 = c_offset_0 + new_batch_size;
+	const int c_offset_2 = c_offset_1 + new_batch_size;
+
+	const int e_offset_0 = indices[c_idx];
+	const int e_offset_1 = e_offset_0 + old_batch_size;
+	const int e_offset_2 = e_offset_1 + old_batch_size;
+
+	out_network_pos[c_offset_0] = in_network_pos[e_offset_0];
+	out_network_pos[c_offset_1] = in_network_pos[e_offset_1];
+	out_network_pos[c_offset_2] = in_network_pos[e_offset_2];
+
+	out_network_dir[c_offset_0] = in_network_dir[e_offset_0];
+	out_network_dir[c_offset_1] = in_network_dir[e_offset_1];
+	out_network_dir[c_offset_2] = in_network_dir[e_offset_2];
+}
+
+// alpha compositing kernel, composites the latest samples into the output image
+__global__ void composite_samples_kernel(
+	const uint32_t n_rays,
+	const uint32_t network_stride,
+	const uint32_t output_stride,
+
+    // read-only
+    const int* __restrict__ ray_idx,
+	const int* __restrict__ active_idx,
+	const float* __restrict__ ray_dt,
+	const tcnn::network_precision_t* __restrict__ network_rgb,
+	const tcnn::network_precision_t* __restrict__ network_density,
+	const float* __restrict__ abc,
+
+    // read/write
+	float* __restrict__ ray_trans,
+    float* __restrict__ output_rgba,
+
+	// write-only
+	bool* __restrict__ ray_alive
+) {
+    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx >= n_rays) return;
+
+	const int a_idx = active_idx == nullptr ? idx : active_idx[idx];
+	if (ray_alive[a_idx] == false) return;
+
+	// pixel indices
+	const int idx_offset_0 = ray_idx[a_idx];
+	const int idx_offset_1 = idx_offset_0 + (int)output_stride;
+	const int idx_offset_2 = idx_offset_1 + (int)output_stride;
+	const int idx_offset_3 = idx_offset_2 + (int)output_stride;
+
+	// accumulated pixel colors
+	float out_r = output_rgba[idx_offset_0];
+	float out_g = output_rgba[idx_offset_1];
+	float out_b = output_rgba[idx_offset_2];
+	float out_a = output_rgba[idx_offset_3];
+
+	float trans = ray_trans[a_idx];
+
+	const uint32_t net_idx_r = idx;
+	const uint32_t net_idx_g = net_idx_r + network_stride;
+	const uint32_t net_idx_b = net_idx_g + network_stride;
+
+	const float net_r = (float)network_rgb[net_idx_r];
+	const float net_g = (float)network_rgb[net_idx_g];
+	const float net_b = (float)network_rgb[net_idx_b];
+
+	const float alpha = density_to_alpha(
+		network_density[idx],
+		ray_dt[a_idx]
+	);
+
+	const float weight = alpha * trans;
+
+	// composite the same way we do accumulation during training
+	out_r += weight * net_r;
+	out_g += weight * net_g;
+	out_b += weight * net_b;
+	out_a += weight;
+
+	// update and threshold transmittance
+	trans *= 1.0f - alpha;
+
+	output_rgba[idx_offset_0] = out_r;
+	output_rgba[idx_offset_1] = out_g;
+	output_rgba[idx_offset_2] = out_b;
+	output_rgba[idx_offset_3] = out_a;
+
+	if (trans < NeRFConstants::min_transmittance) {
+		ray_alive[a_idx] = false;
+		return;
+	}
+
+	ray_trans[a_idx] = trans;
 }
 
 // ray compaction
 __global__ void compact_rays_kernel(
     const int n_compacted_rays,
+	const int n_nerfs,
 	const int batch_size,
     const int* __restrict__ indices,
 
 	// input buffers (read-only)
 	const int* __restrict__ in_idx, // this is the ray-pixel index
-	const bool* __restrict__ in_active,
-	const float* __restrict__ in_t,
-	const float* __restrict__ in_t_max,
-	const float* __restrict__ in_origin,
+	const bool* __restrict__ in_nerf_ray_active,
+	const float* __restrict__ in_nerf_ray_t,
+	const float* __restrict__ in_nerf_ray_tmax,
+	const uint32_t* __restrict__ in_intersectors,
+	const float* __restrict__ in_ray_tmax,
+	const float* __restrict__ in_ori,
 	const float* __restrict__ in_dir,
-	const float* __restrict__ in_idir,
 	const float* __restrict__ in_trans,
 
 	// compacted output buffers (write-only)
 	int* __restrict__ out_idx,
-	bool* __restrict__ out_active,
-	float* __restrict__ out_t,
-	float* __restrict__ out_t_max,
-	float* __restrict__ out_origin,
+	bool* __restrict__ out_nerf_ray_active,
+	float* __restrict__ out_nerf_ray_t,
+	float* __restrict__ out_nerf_ray_tmax,
+	uint32_t* __restrict__ out_intersectors,
+	float* __restrict__ out_ray_tmax,
+	float* __restrict__ out_ori,
 	float* __restrict__ out_dir,
-	float* __restrict__ out_idir,
 	float* __restrict__ out_trans
 ) {
     // compacted index is the index to write to
@@ -416,12 +629,10 @@ __global__ void compact_rays_kernel(
 
 	// expanded index is the index to read from
 	const int e_idx = indices[c_idx];
-	
-	// 1-component buffers
+
+	// 1-component buffers (global)
 	out_idx[c_idx]		= in_idx[e_idx];
-	out_active[c_idx]	= in_active[e_idx];
-	out_t[c_idx]		= in_t[e_idx];
-	out_t_max[c_idx]	= in_t_max[e_idx];
+	out_ray_tmax[c_idx]	= in_ray_tmax[e_idx];
 	out_trans[c_idx]	= in_trans[e_idx];
 
 	// local references to pointer offsets
@@ -433,98 +644,38 @@ __global__ void compact_rays_kernel(
 	const int e_offset_1 = e_offset_0 + batch_size;
 	const int e_offset_2 = e_offset_1 + batch_size;
 
-	// 3-component buffers
-	out_origin[c_offset_0] = in_origin[e_offset_0];
-	out_origin[c_offset_1] = in_origin[e_offset_1];
-	out_origin[c_offset_2] = in_origin[e_offset_2];
+	// 3-component buffers (global)
+	out_ori[c_offset_0] = in_ori[e_offset_0];
+	out_ori[c_offset_1] = in_ori[e_offset_1];
+	out_ori[c_offset_2] = in_ori[e_offset_2];
 
 	out_dir[c_offset_0] = in_dir[e_offset_0];
 	out_dir[c_offset_1] = in_dir[e_offset_1];
 	out_dir[c_offset_2] = in_dir[e_offset_2];
 
-	out_idir[c_offset_0] = in_idir[e_offset_0];
-	out_idir[c_offset_1] = in_idir[e_offset_1];
-	out_idir[c_offset_2] = in_idir[e_offset_2];
+	// nerf buffers
+	int c_nerf_offset = c_idx;
+	int e_nerf_offset = e_idx;
 
-}
-
-// alpha compositing kernel, composites the latest samples into the output image
-__global__ void composite_samples_kernel(
-	const uint32_t n_rays,
-	const uint32_t network_stride,
-	const uint32_t output_stride,
-
-    // read-only
-	const bool* __restrict__ ray_active,
-	const uint32_t* __restrict__ n_ray_steps,
-    const int* __restrict__ ray_idx,
-	const network_precision_t* __restrict__ network_output,
-    const float* __restrict__ sample_alpha,
-
-    // read/write
-    bool* __restrict__ ray_alive,
-	float* __restrict__ ray_trans,
-    float* __restrict__ output_rgba
-) {
-    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (idx >= n_rays) return;
-
-    // check if ray has terminated or is currently inactive
-    if (!ray_alive[idx] || !ray_active[idx]) return;
-
-	// pixel indices
-	const int idx_offset_0 = ray_idx[idx];
-	const int idx_offset_1 = idx_offset_0 + (int)output_stride;
-	const int idx_offset_2 = idx_offset_1 + (int)output_stride;
-	const int idx_offset_3 = idx_offset_2 + (int)output_stride;
-
-	// accumulated pixel colors
-	float out_r = output_rgba[idx_offset_0];
-	float out_g = output_rgba[idx_offset_1];
-	float out_b = output_rgba[idx_offset_2];
-	float out_a = output_rgba[idx_offset_3];
-
-	// iterate through steps
-	const uint32_t n_steps = n_ray_steps[idx];
-
-	float trans = ray_trans[idx];
-
-	for (int i = 0; i < n_steps; ++i) {
+	for (int n = 0; n < n_nerfs; ++n) {
+		out_nerf_ray_active[c_nerf_offset]	= in_nerf_ray_active[e_nerf_offset];
+		out_nerf_ray_t[c_nerf_offset]		= in_nerf_ray_t[e_nerf_offset];
+		out_nerf_ray_tmax[c_nerf_offset]	= in_nerf_ray_tmax[e_nerf_offset];
 		
-		const uint32_t step_offset_0 = i * n_rays + idx;
-		const uint32_t step_offset_1 = step_offset_0 + network_stride;
-		const uint32_t step_offset_2 = step_offset_1 + network_stride;
-
-		// sample properties
-		const float alpha = sample_alpha[step_offset_0];
-		const float weight = alpha * trans;
-
-		// composite the same way we do accumulation during training
-		const float s_r = (float)network_output[step_offset_0];
-		const float s_g = (float)network_output[step_offset_1];
-		const float s_b = (float)network_output[step_offset_2];
-
-		out_r += weight * s_r;
-		out_g += weight * s_g;
-		out_b += weight * s_b;
-		out_a += weight;
-
-		// update and threshold transmittance
-		trans *= 1.0f - alpha;
-
-		if (trans <= NeRFConstants::min_transmittance) {
-			ray_alive[idx] = false;
-			break;
-		}
+		c_nerf_offset += batch_size;
+		e_nerf_offset += batch_size;
 	}
 
-	output_rgba[idx_offset_0] = out_r;
-	output_rgba[idx_offset_1] = out_g;
-	output_rgba[idx_offset_2] = out_b;
-	output_rgba[idx_offset_3] = out_a;
+	// intersector buffers
+	int c_intx_offset = c_idx;
+	int e_intx_offset = e_idx;
 
-	ray_trans[idx] = trans;
+	for (int i = 0; i <= n_nerfs / 32; ++i) {
+		out_intersectors[c_intx_offset] = in_intersectors[e_intx_offset];
+
+		c_intx_offset += batch_size;
+		e_intx_offset += batch_size;
+	}
 }
 
 // Thank you Copilot + GPT-4!

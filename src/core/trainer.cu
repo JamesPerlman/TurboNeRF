@@ -58,7 +58,6 @@ void Trainer::generate_next_training_batch(
 	 */
 
 	const float n_rays_per_image = static_cast<float>(ctx.n_rays_in_batch) / static_cast<float>(ctx.dataset->images.size());
-	const float chunk_size = static_cast<float>(ctx.dataset->n_pixels_per_image) / n_rays_per_image;
 
 	initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(ctx.n_rays_in_batch), n_threads_linear, 0, ctx.stream>>>(
 		ctx.n_rays_in_batch,
@@ -67,7 +66,6 @@ void Trainer::generate_next_training_batch(
 		ctx.dataset->n_pixels_per_image,
 		ctx.dataset->image_dimensions,
 		n_rays_per_image,
-		chunk_size,
 
 		// input buffers
 		ctx.nerf->dataset_ws.bounding_box,
@@ -79,7 +77,6 @@ void Trainer::generate_next_training_batch(
 		ctx.workspace.pix_rgba,
 		ctx.workspace.ray_origin,
 		ctx.workspace.ray_dir,
-		ctx.workspace.ray_inv_dir,
 		ctx.workspace.ray_t,
 		ctx.workspace.ray_t_max,
 		ctx.workspace.ray_alive
@@ -101,7 +98,6 @@ void Trainer::generate_next_training_batch(
 
 		// input buffers
 		ctx.workspace.ray_dir,
-		ctx.workspace.ray_inv_dir,
 		ctx.workspace.ray_t_max,
 
 		// output buffers
@@ -183,7 +179,6 @@ void Trainer::generate_next_training_batch(
 		// input buffers
 		ctx.workspace.ray_origin,
 		ctx.workspace.ray_dir,
-		ctx.workspace.ray_inv_dir,
 		ctx.workspace.ray_t,
 		ctx.workspace.ray_t_max,
 		ctx.workspace.ray_offset,
@@ -202,10 +197,12 @@ void Trainer::generate_next_training_batch(
 // update occupancy grid
 
 uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& training_step) {
+	const auto& proxy = ctx.nerf->proxy;
 	const uint32_t grid_volume = ctx.nerf->occupancy_grid.volume_i;
 	const uint32_t n_bitfield_bytes = ctx.nerf->occupancy_grid.get_n_bitfield_elements();
 	const uint32_t n_levels = ctx.nerf->occupancy_grid.n_levels;
-	const float inv_aabb_size = 1.0f / ctx.nerf->bounding_box.size_x;
+	const float aabb_size = proxy->bounding_box.size();
+	const float inv_aabb_size = 1.0f / aabb_size;
 
 	// decay occupancy grid values
 	decay_occupancy_grid_values_kernel<<<n_blocks_linear(grid_volume), n_threads_linear, 0, ctx.stream>>>(
@@ -249,7 +246,7 @@ uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& t
 				ctx.stream,
 				ctx.nerf->params,
 				batch_size,
-				ctx.nerf->aabb_scale(),
+				aabb_size,
 				ctx.workspace.sample_pos,
 				nullptr,
 				ctx.workspace.network_concat,
@@ -264,7 +261,7 @@ uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& t
 				level,
 				training_step < 256,
 				ctx.workspace.random_float + 3 * batch_size, // (random_float + 3 * batch_size) is so thresholding doesn't correspond to x,y,z positions
-				ctx.workspace.network_output + 3 * batch_size,
+				ctx.workspace.network_concat,
 				ctx.workspace.occupancy_grid
 			);
 
@@ -303,7 +300,7 @@ float Trainer::train_step(
 		ctx.workspace.batch_size,
 		ctx.n_rays_in_batch,
 		ctx.n_samples_in_batch,
-		ctx.nerf->aabb_scale(),
+		ctx.nerf->proxy->bounding_box.size(),
 		ctx.workspace.random_float + ctx.workspace.batch_size,
 		ctx.workspace.ray_step,
 		ctx.workspace.ray_offset,

@@ -1,3 +1,4 @@
+#include "common-network-kernels.cuh"
 #include "occupancy-grid-kernels.cuh"
 
 /**
@@ -81,7 +82,7 @@ __global__ void update_occupancy_with_density_kernel(
     const uint32_t level,
     const bool sample_all_cells,
     const float* __restrict__ random_float,
-    const tcnn::network_precision_t* __restrict__ network_sigma,
+    const tcnn::network_precision_t* __restrict__ network_density,
     OccupancyGrid* grid
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -110,7 +111,7 @@ __global__ void update_occupancy_with_density_kernel(
         }
     }
 
-    grid->update_sigma_at(level, idx, (float)network_sigma[i]);
+    grid->update_sigma_at(level, idx, density_to_sigma(network_density[i]));
 }
 
 // occupancy bits are updated by thresholding each cell's density, default = 0.01 * 1024 / sqrt(3)

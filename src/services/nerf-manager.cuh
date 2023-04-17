@@ -14,6 +14,7 @@
 #include "../models/dataset.h"
 #include "../models/nerf-proxy.cuh"
 #include "../services/device-manager.cuh"
+#include "../utils/nerf-constants.cuh"
 #include "../utils/parallel-utils.cuh"
 #include "../common.h"
 #include "file-manager.cuh"
@@ -26,17 +27,23 @@ using proxy_id_t = uint32_t;
 
 struct NeRFManager {
 private:
-	std::map<proxy_id_t, NeRFProxy> proxies;
-	proxy_id_t max_id = 0;
+	std::vector<NeRFProxy> proxies;
 
-	proxy_id_t add_empty_proxy() {
-		proxy_id_t proxy_id = max_id;
-		proxies[proxy_id] = NeRFProxy();
-		max_id++;
-		return proxy_id;
+	NeRFProxy* find_first_unused_proxy() {
+		for (auto& proxy : proxies) {
+			if (!proxy.is_valid) {
+				return &proxy;
+			}
+		}
+		throw std::runtime_error("No more proxies available");
 	}
 
 public:
+
+	NeRFManager() {
+		proxies.resize(NeRFConstants::n_max_nerfs);
+	}
+
 	// TODO: protect nerfs with const getter?
 	// There are downstream effects which make this impossible for now
 	// like the fact that Workspaces are stored within the NeRF
@@ -44,48 +51,41 @@ public:
 		std::vector<NeRFProxy*> proxy_ptrs;
 		proxy_ptrs.reserve(proxies.size());
 		// enumerate through proxies
-		for (auto& [id, proxy] : proxies) {
+		for (auto& proxy : proxies) {
 			proxy_ptrs.push_back(&proxy);
 		}
 
 		return proxy_ptrs;
 	}
 
-	NeRFProxy& get_proxy(const uint32_t& proxy_id) {
-		return proxies[proxy_id];
-	}
-
-	NeRFProxy* get_proxy_ptr(const uint32_t& proxy_id) {
-		return &proxies[proxy_id];
-	}
-
 	// create a new nerf
-	proxy_id_t create(
+	NeRFProxy* create(
 		const Dataset& dataset
 	) {
-		proxy_id_t proxy_id = add_empty_proxy();
-		auto& proxy = proxies[proxy_id];
+		NeRFProxy* proxy = find_first_unused_proxy();
 
-		proxy.dataset = dataset;
-		proxy.nerfs.reserve(DeviceManager::get_device_count());
+		proxy->dataset = dataset;
+		proxy->nerfs.reserve(DeviceManager::get_device_count());
+		proxy->bounding_box = dataset.bounding_box;
 
 		DeviceManager::foreach_device([&](const int& device_id, const cudaStream_t& stream) {
-			proxy.nerfs.emplace_back(device_id, dataset.bounding_box);
+			proxy->nerfs.emplace_back(device_id, proxy);
 		});
 
-		return proxy_id;
+		proxy->is_valid = true;
+
+		return proxy;
 	}
 
-	void save(const proxy_id_t& proxy_id, const std::string& path) const {
-		const NeRFProxy& proxy = proxies.at(proxy_id);
+	void save(const NeRFProxy* proxy, const std::string& path) const {
 		FileManager::save(proxy, path);
 	}
 
-	proxy_id_t load(const std::string& path) {
-		proxy_id_t proxy_id = add_empty_proxy();
-		auto& proxy = proxies[proxy_id];
+	NeRFProxy* load(const std::string& path) {
+		NeRFProxy* proxy = find_first_unused_proxy();
 		FileManager::load(proxy, path);
-		return proxy_id;
+		proxy->is_valid = true;
+		return proxy;
 	}
 
 	// destroy nerfs
@@ -97,7 +97,7 @@ public:
 		
 		std::vector<size_t> sizes(n_gpus, 0);
 
-		for (const auto& [id, proxy] : proxies) {
+		for (const auto& proxy : proxies) {
 			int i = 0;
 			// one nerf per gpu
 			for (const auto& nerf : proxy.nerfs) {

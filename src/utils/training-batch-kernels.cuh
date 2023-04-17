@@ -85,7 +85,6 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const uint32_t n_pixels_per_image,
 	const int2 image_dimensions,
 	const float n_rays_per_image,
-	const float random_pixel_chunk_size,
 
 	// input buffers
 	const BoundingBox* __restrict__ bbox,
@@ -97,7 +96,6 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	float* __restrict__ pix_rgba,
 	float* __restrict__ ori_xyz,
 	float* __restrict__ dir_xyz,
-	float* __restrict__ idir_xyz,
 	float* __restrict__ ray_t,
 	float* __restrict__ ray_t_max,
 	bool* __restrict__ ray_alive
@@ -127,12 +125,12 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	const float idir_y = 1.0f / dir_y;
 	const float idir_z = 1.0f / dir_z;
 	
-	float t;
-	const bool intersects_bbox = bbox->get_ray_t_intersection(
+	float tmin, tmax;
+	const bool intersects_bbox = bbox->get_ray_t_intersections(
 		global_ori.x, global_ori.y, global_ori.z,
 		dir_x, dir_y, dir_z,
 		idir_x, idir_y, idir_z,
-		t
+		tmin, tmax
 	);
 	
 	if (!intersects_bbox) {
@@ -141,8 +139,8 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	}
 
 	// calculate t_max
-	const float t_max = cam.far - cam.near;
-	t = fmaxf(0.0f, t + 1e-5f);
+	const float t_max = fminf(cam.far - cam.near, tmax);
+	const float t = fmaxf(0.0f, tmin + 1e-5f);
 
 	if (t_max < t) {
 		ray_alive[i] = false;
@@ -178,10 +176,6 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	dir_xyz[i_offset_0] = dir_x;
 	dir_xyz[i_offset_1] = dir_y;
 	dir_xyz[i_offset_2] = dir_z;
-
-	idir_xyz[i_offset_0] = idir_x;
-	idir_xyz[i_offset_1] = idir_y;
-	idir_xyz[i_offset_2] = idir_z;
 	
 	ray_t[i] = t;
 	ray_t_max[i] = t_max;
@@ -201,7 +195,6 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	
 	// input buffers
 	const float* __restrict__ dir_xyz,
-	const float* __restrict__ idir_xyz,
 	const float* __restrict__ ray_t_max,
 
 	// output/mixed use buffers
@@ -233,9 +226,9 @@ __global__ void march_and_count_steps_per_ray_kernel(
 	const float d_y = dir_xyz[i_offset_1];
 	const float d_z = dir_xyz[i_offset_2];
 
-	const float id_x = idir_xyz[i_offset_0];
-	const float id_y = idir_xyz[i_offset_1];
-	const float id_z = idir_xyz[i_offset_2];
+	const float id_x = 1.0f / d_x;
+	const float id_y = 1.0f / d_y;
+	const float id_z = 1.0f / d_z;
 
 	uint32_t n_steps_taken = 0;
 
@@ -340,7 +333,6 @@ __global__ void march_and_generate_network_positions_kernel(
 	// input buffers
 	const float* __restrict__ in_ori_xyz,
 	const float* __restrict__ in_dir_xyz,
-	const float* __restrict__ in_idir_xyz,
 	const float* __restrict__ in_ray_t,
 	const float* __restrict__ in_ray_t_max,
 	const uint32_t* __restrict__ ray_offset,
@@ -381,9 +373,9 @@ __global__ void march_and_generate_network_positions_kernel(
 	const float d_y = in_dir_xyz[i_offset_1];
 	const float d_z = in_dir_xyz[i_offset_2];
 	
-	const float id_x = in_idir_xyz[i_offset_0];
-	const float id_y = in_idir_xyz[i_offset_1];
-	const float id_z = in_idir_xyz[i_offset_2];
+	const float id_x = 1.0f / d_x;
+	const float id_y = 1.0f / d_y;
+	const float id_z = 1.0f / d_z;
 	
 	// Perform raymarching
 

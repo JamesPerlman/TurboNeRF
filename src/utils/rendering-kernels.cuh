@@ -13,29 +13,29 @@
 
 TURBO_NAMESPACE_BEGIN
 
-__global__ void march_rays_to_first_occupied_cell_kernel(
+__global__ void prepare_for_linear_raymarching_kernel(
     const uint32_t n_rays,
 	const uint32_t batch_size,
-	const OccupancyGrid* grid,
-	const BoundingBox* bbox,
+	const uint32_t n_nerfs,
+	const OccupancyGrid* grids,
+	const BoundingBox* bboxes,
+	const Transform4f* transforms,
 	const float dt_min,
-	const float dt_max,
 	const float cone_angle,
 	
 	// input buffers (read-only)
+	const float* __restrict__ ray_ori,
 	const float* __restrict__ ray_dir,
-	const float* __restrict__ ray_idir,
 
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
-	float* __restrict__ ray_ori,
-    float* __restrict__ ray_t,
-	float* __restrict__ ray_t_max,
+	float* __restrict__ ray_tmax,
 
 	// output buffers (write-only)
-	float* __restrict__ network_pos,
-	float* __restrict__ network_dir,
-	float* __restrict__ network_dt
+	uint32_t* __restrict__ intersectors,
+	bool* __restrict__ nerf_ray_active,
+    float* __restrict__ nerf_ray_t,
+	float* __restrict__ nerf_tmax
 );
 
 __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
@@ -57,58 +57,46 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 
 __global__ void march_rays_and_generate_network_inputs_kernel(
     const uint32_t n_rays,
+	const uint32_t n_nerfs,
 	const uint32_t batch_size,
-	const uint32_t n_steps_max,
-	const uint32_t network_stride,
-	const OccupancyGrid* grid,
-	const BoundingBox* bbox,
-	const float inv_aabb_size,
+	const uint32_t network_batch,
+	const OccupancyGrid* grids,
+	const BoundingBox* bboxes,
+	const Transform4f* transforms,
 	const float dt_min,
-	const float dt_max,
 	const float cone_angle,
 	
 	// input buffers (read-only)
 	const float* __restrict__ ray_ori,
 	const float* __restrict__ ray_dir,
-	const float* __restrict__ ray_idir,
-	const float* __restrict__ ray_t_max,
+	const float* __restrict__ ray_tmax,
+	const float* __restrict__ nerf_tmax,
+	const uint32_t* __restrict__ intersectors,
 
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
-    bool* __restrict__ ray_active,
-    float* __restrict__ ray_t,
+    bool* __restrict__ nerf_ray_active,
+    float* __restrict__ nerf_ray_t,
 
 	// output buffers (write-only)
-	uint32_t* __restrict__ n_ray_steps,
 	float* __restrict__ network_pos,
 	float* __restrict__ network_dir,
 	float* __restrict__ network_dt
 );
 
-__global__ void compact_rays_kernel(
-    const int n_compacted_rays,
-	const int batch_size,
-    const int* __restrict__ indices,
+__global__ void compact_network_inputs_kernel(
+	const uint32_t n_active_rays,
+	const uint32_t batch_size,
+	const uint32_t network_batch,
+	const int* __restrict__ indices,
 
 	// input buffers (read-only)
-	const int* __restrict__ in_idx, // this is the ray-pixel index
-	const bool* __restrict__ in_active,
-	const float* __restrict__ in_t,
-	const float* __restrict__ in_t_max,
-	const float* __restrict__ in_origin,
-	const float* __restrict__ in_dir,
-	const float* __restrict__ in_idir,
-	const float* __restrict__ in_trans,
+	const float* __restrict__ in_network_pos,
+	const float* __restrict__ in_network_dir,
 
-	// compacted output buffers (write-only)
-	int* __restrict__ out_idx,
-	bool* __restrict__ out_active,
-	float* __restrict__ out_t,
-	float* __restrict__ out_t_max,
-	float* __restrict__ out_origin,
-	float* __restrict__ out_dir,
-	float* __restrict__ out_idir,
-	float* __restrict__ out_trans
+	// output buffers (write-only)
+	float* __restrict__ out_network_pos,
+	float* __restrict__ out_network_dir
 );
 
 __global__ void composite_samples_kernel(
@@ -117,16 +105,48 @@ __global__ void composite_samples_kernel(
 	const uint32_t output_stride,
 
     // read-only
-	const bool* __restrict__ ray_active,
-	const uint32_t* __restrict__ n_ray_steps,
     const int* __restrict__ ray_idx,
-	const tcnn::network_precision_t* __restrict__ network_output,
-	const float* __restrict__ sample_alpha,
+	const int* __restrict__ active_idx,
+	const float* __restrict__ ray_dt,
+	const tcnn::network_precision_t* __restrict__ network_rgb,
+	const tcnn::network_precision_t* __restrict__ network_density,
+	const float* __restrict__ abc,
 
     // read/write
-    bool* __restrict__ ray_alive,
 	float* __restrict__ ray_trans,
-    float* __restrict__ output_rgba
+    float* __restrict__ output_rgba,
+
+	// write-only
+	bool* __restrict__ ray_alive
+);
+
+__global__ void compact_rays_kernel(
+    const int n_compacted_rays,
+	const int n_nerfs,
+	const int batch_size,
+    const int* __restrict__ indices,
+
+	// input buffers (read-only)
+	const int* __restrict__ in_idx, // this is the ray-pixel index
+	const bool* __restrict__ in_nerf_ray_active,
+	const float* __restrict__ in_nerf_ray_t,
+	const float* __restrict__ in_nerf_ray_tmax,
+	const uint32_t* __restrict__ in_intersectors,
+	const float* __restrict__ in_ray_tmax,
+	const float* __restrict__ in_ori,
+	const float* __restrict__ in_dir,
+	const float* __restrict__ in_trans,
+
+	// compacted output buffers (write-only)
+	int* __restrict__ out_idx,
+	bool* __restrict__ out_nerf_ray_active,
+	float* __restrict__ out_nerf_ray_t,
+	float* __restrict__ out_nerf_ray_tmax,
+	uint32_t* __restrict__ out_intersectors,
+	float* __restrict__ out_ray_tmax,
+	float* __restrict__ out_ori,
+	float* __restrict__ out_dir,
+	float* __restrict__ out_trans
 );
 
 __global__ void alpha_composite_kernel(

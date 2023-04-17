@@ -22,8 +22,7 @@ manager = tn.Manager()
 dataset = tn.Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json")
 dataset.load_transforms()
 
-nerf_id = manager.create(dataset)
-nerf = manager.get_proxy_ptr(nerf_id)
+nerf = manager.create(dataset)
 
 trainer = tn.Trainer(nerf, batch_size=2<<21)
 
@@ -80,7 +79,7 @@ def img_load_status(i, n):
 
 trainer.load_images(on_image_loaded=img_load_status)
 
-for i in range(128):
+for i in range(16):
     print(f"Training step {i}...")
     trainer.train_step()
 

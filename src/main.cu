@@ -11,7 +11,6 @@
 #include "main.h"
 #include "controllers/nerf-training-controller.h"
 #include "controllers/nerf-rendering-controller.h"
-#include "core/occupancy-grid.cuh"
 #include "models/camera.cuh"
 #include "models/dataset.h"
 #include "models/render-request.cuh"
@@ -90,7 +89,7 @@ int main(int argc, char* argv[])
 	turbo::Dataset dataset = turbo::Dataset(DATASET_PATH);
 	dataset.load_transforms();
 	
-	auto nerf_manager = turbo::NeRFManager();
+	auto nerf_manager = std::make_shared<NeRFManager>();
 
 
 	
@@ -126,21 +125,21 @@ int main(int argc, char* argv[])
 
 	// return 0;
 
-	auto nerf_id = nerf_manager.create(dataset);
-	auto nerf = nerf_manager.get_proxy_ptr(nerf_id);
+	turbo::NeRFProxy* proxy = nerf_manager->create(dataset);
 
 	// set up training controller
-	auto trainer = turbo::NeRFTrainingController(nerf, NeRFConstants::batch_size);
+	auto trainer = turbo::NeRFTrainingController(proxy, NeRFConstants::batch_size);
 	trainer.prepare_for_training();
 	trainer.load_images([](int a, int b) {
 		printf("Loading images: %d / %d\n", a, b);
 	});
 
 	// fetch nerfs as pointers
-	auto proxy_ptrs = nerf_manager.get_proxies();
+	std::vector<NeRFProxy*> nerf_proxies{ proxy };
 
-	for (int i = 0; i < 128; ++i) {
-		trainer.train_step();
+	for (int i = 0; i < 3360; ++i) {
+		auto& info = trainer.train_step();
+		printf("step: %d, loss: %f\n", info.step, info.loss);
 		// every 16 training steps, update the occupancy grid
 
 		if (i % 16 == 0 && i > 16) {
@@ -148,13 +147,13 @@ int main(int argc, char* argv[])
 			trainer.update_occupancy_grid(i);
 		}
 
-		if (i % 16 == 0 && i > 0) {
-			float progress = (float)i / (360.f * 16.0f);
+		if (i % 32 == 0) {
+			float progress = (float)i / (360.f * 0.5f);
 			float tau = 2.0f * 3.14159f;
-			//auto tform = turbo::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
+			auto tform = turbo::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
 			auto render_cam = turbo::Camera(
 				make_int2(IMG_SIZE, IMG_SIZE),
-				cam0.near,
+				0.03f,
 				cam0.far,
 				cam0.focal_length,
 				cam0.principal_point,
@@ -162,12 +161,12 @@ int main(int argc, char* argv[])
 				cam0.transform,
 				cam0.dist_params
 			);
-
+			auto mods = RenderModifiers();
 			auto render_request = std::make_shared<RenderRequest>(
 				render_cam,
-				proxy_ptrs,
+				nerf_proxies,
 				&render_buffer,
-				RenderModifiers(),
+				mods,
 				RenderFlags::Final,
 				// on_complete
 				[]() {},
@@ -177,12 +176,15 @@ int main(int argc, char* argv[])
 				}
 			);
 
+			printf("Rendering image %d\n", i);
 			renderer.submit(render_request);
+			printf("Saving image %d\n", i);
 			render_buffer.save_image(OUTPUT_PATH + fmt::format("img-{}.png", i), stream);
+			printf("Done!\n");
 		}
 	}
 
-	nerf_manager.save(nerf_id, "H:\\dozer.turbo");
+	nerf_manager->save(proxy, "H:\\dozer.turbo");
 
 	// Wait for the kernel to finish executing
 	cudaDeviceSynchronize();

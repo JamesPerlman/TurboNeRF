@@ -23,10 +23,10 @@ struct SceneWorkspace: Workspace {
     OccupancyGrid* occupancy_grids;
     Transform4f* nerf_transforms;
 
+    bool* ray_active[2];
     float* ray_t[2];
     float* ray_tmax[2];
-    bool* ray_active[2];
-    uint32_t* intersect_nerfs;
+    uint32_t* intersectors[2];
 
     uint32_t n_rays;
 
@@ -43,16 +43,17 @@ struct SceneWorkspace: Workspace {
 
         const uint32_t n_elems = n_rays * n_nerfs;
 
+        ray_active[0]   = allocate<bool>(stream, n_elems);
+        ray_active[1]   = allocate<bool>(stream, n_elems);
+
         ray_t[0]        = allocate<float>(stream, n_elems);
         ray_t[1]        = allocate<float>(stream, n_elems);
 
         ray_tmax[0]     = allocate<float>(stream, n_elems);
         ray_tmax[1]     = allocate<float>(stream, n_elems);
 
-        ray_active[0]   = allocate<bool>(stream, n_elems);
-        ray_active[1]   = allocate<bool>(stream, n_elems);
-
-        intersect_nerfs = allocate<uint32_t>(stream, n_rays * NeRFConstants::n_max_nerfs / sizeof(uint32_t));
+        intersectors[0] = allocate<uint32_t>(stream, n_rays * NeRFConstants::n_max_nerfs / sizeof(uint32_t));
+        intersectors[1] = allocate<uint32_t>(stream, n_rays * NeRFConstants::n_max_nerfs / sizeof(uint32_t));
 
         this->n_nerfs = n_nerfs;
         this->n_rays = n_rays;

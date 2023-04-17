@@ -1,6 +1,7 @@
 #include <tiny-cuda-nn/common.h>
 
 #include "../models/camera.cuh"
+#include "../models/nerf-proxy.cuh"
 #include "../models/ray-batch.cuh"
 #include "../utils/nerf-constants.cuh"
 #include "../utils/parallel-utils.cuh"
@@ -20,14 +21,14 @@ using namespace tcnn;
 void Renderer::prepare_for_rendering(
     Renderer::Context& ctx,
     const Camera& camera,
-    const NeRF& nerf,
+    const std::vector<NeRF*>& nerfs,
     const uint32_t& n_rays
 ) {
     cudaStream_t stream = ctx.stream;
-    auto& workspace = ctx.workspace;
+    auto& render_ws = ctx.render_ws;
 
-    if (workspace.n_rays != n_rays) {
-        workspace.enlarge(
+    if (render_ws.n_rays != n_rays) {
+        render_ws.enlarge(
             stream,
             n_rays,
             ctx.batch_size,
@@ -36,10 +37,21 @@ void Renderer::prepare_for_rendering(
         );
     }
 
-    // workspace.camera = request->camera
+    auto& scene_ws = ctx.scene_ws;
+    const uint32_t n_nerfs = nerfs.size();
+
+    if (scene_ws.n_nerfs != n_nerfs || scene_ws.n_rays != n_rays) {
+        scene_ws.enlarge(
+            stream,
+            n_nerfs,
+            n_rays
+        );
+    }
+
+    // copy camera 
     CUDA_CHECK_THROW(
         cudaMemcpyAsync(
-            workspace.camera,
+            scene_ws.camera,
             &camera,
             sizeof(Camera),
             cudaMemcpyHostToDevice,
@@ -47,58 +59,63 @@ void Renderer::prepare_for_rendering(
         )
     );
 
-    // workspace.bounding_box = nerf.bounding_box
-    CUDA_CHECK_THROW(
-        cudaMemcpyAsync(
-            workspace.bounding_box,
-            &nerf.bounding_box,
-            sizeof(BoundingBox),
-            cudaMemcpyHostToDevice,
-            stream
-        )
-    );
+    for (int i = 0; i < n_nerfs; i++) {
+        const NeRF* nerf = nerfs[i];
 
-    // workspace.occupancy_grid = nerf.occupancy_grid
-    CUDA_CHECK_THROW(
-        cudaMemcpyAsync(
-            workspace.occupancy_grid,
-            &nerf.occupancy_grid,
-            sizeof(OccupancyGrid),
-            cudaMemcpyHostToDevice,
-            stream
-        )
-    );
+        const NeRFProxy* proxy = nerf->proxy;
+
+        // copy bounding boxes
+        CUDA_CHECK_THROW(
+            cudaMemcpyAsync(
+                scene_ws.bounding_boxes + i,
+                &proxy->bounding_box,
+                sizeof(BoundingBox),
+                cudaMemcpyHostToDevice,
+                stream
+            )
+        );
+
+        // copy occupancy grids
+        CUDA_CHECK_THROW(
+            cudaMemcpyAsync(
+                scene_ws.occupancy_grids + i,
+                &nerf->occupancy_grid,
+                sizeof(OccupancyGrid),
+                cudaMemcpyHostToDevice,
+                stream
+            )
+        );
+
+        // copy nerf transforms
+        CUDA_CHECK_THROW(
+            cudaMemcpyAsync(
+                scene_ws.nerf_transforms + i,
+                &proxy->transform,
+                sizeof(Transform4f),
+                cudaMemcpyHostToDevice,
+                stream
+            )
+        );
+    }
 }
 
 void Renderer::perform_task(
     Renderer::Context& ctx,
     RenderTask& task
 ) {
-    RenderingWorkspace& workspace = ctx.workspace;
-    
-    // TODO: this should happen for all NeRFs
-    NeRF* nerf = task.nerfs[0];
-    
+    RenderingWorkspace& render_ws = ctx.render_ws;
+    SceneWorkspace& scene_ws = ctx.scene_ws;
+        
     cudaStream_t stream = ctx.stream;
-
+    
     // double buffer indices
     int active_buf_idx = 0;
     int compact_buf_idx = 1;
 
     const int n_rays = task.n_rays;
 
-    // ray.active = true
-    CUDA_CHECK_THROW(
-        cudaMemsetAsync(
-            workspace.ray_active[active_buf_idx],
-            true,
-            n_rays * sizeof(bool),
-            stream
-        )
-    );
-
     // ray.transmittance = 1.0
-    float* __restrict__ T = workspace.ray_trans[active_buf_idx];
+    float* __restrict__ T = render_ws.ray_trans[active_buf_idx];
     parallel_for_gpu(stream, n_rays, [T] __device__ (uint32_t i) {
         T[i] = 1.0f;
     });
@@ -107,191 +124,256 @@ void Renderer::perform_task(
     RayBatch ray_batch{
         0,
         (int)n_rays,
-        workspace.ray_origin[active_buf_idx],
-        workspace.ray_dir[active_buf_idx],
-        workspace.ray_idir[active_buf_idx],
-        workspace.ray_t[active_buf_idx],
-        workspace.ray_t_max[active_buf_idx],
-        workspace.ray_trans[active_buf_idx],
-        workspace.ray_idx[active_buf_idx],
-        workspace.ray_active[active_buf_idx],
-        workspace.ray_alive
+        render_ws.ray_origin[active_buf_idx],
+        render_ws.ray_dir[active_buf_idx],
+        render_ws.ray_tmax[active_buf_idx],
+        render_ws.ray_trans[active_buf_idx],
+        render_ws.ray_idx[active_buf_idx],
+        render_ws.ray_alive
     };
-    
-    // TODO: optimization here - add "clip to bbox" option to avoid extra computations for rays that don't intersect bbox
+
     task.batch_coordinator->generate_rays(
-        workspace.camera,
-        workspace.bounding_box,
+        scene_ws.camera,
         ray_batch,
         stream
     );
 
+    size_t n_nerfs = task.nerfs.size();
+
     const float dt_min = NeRFConstants::min_step_size;
-    const float dt_max = nerf->bounding_box.size_x * dt_min;
     const float cone_angle = NeRFConstants::cone_angle;
 
     bool show_training_cameras = task.modifiers.properties.show_near_planes || task.modifiers.properties.show_far_planes;
     if (show_training_cameras) {
-        // clear bg rgba first
-        CUDA_CHECK_THROW(
-            cudaMemsetAsync(
-                workspace.bg_rgba,
-                0,
-                4 * n_rays * sizeof(float),
-                stream
-            )
-        );
+        NeRF* nerf = nullptr;
+        for (auto& task_nerf : task.nerfs) {
+            auto& task_proxy = task_nerf->proxy;
+            const bool has_dataset = task_proxy->dataset.has_value();
+            if (has_dataset) {
+                nerf = task_nerf;
+                // only one nerf can have a dataset for now
+                break;
+            }
+        }
 
-        // then draw clipping planes
-        draw_training_img_clipping_planes_and_assign_t_max_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
-            n_rays,
-            n_rays,
-            n_rays,
-            nerf->dataset_ws.n_images,
-            nerf->dataset_ws.image_dims,
-            nerf->dataset_ws.n_pixels_per_image,
-            task.modifiers.properties.show_near_planes,
-            task.modifiers.properties.show_far_planes,
-            nerf->dataset_ws.cameras,
-            nerf->dataset_ws.image_data,
-            workspace.ray_origin[active_buf_idx],
-            workspace.ray_dir[active_buf_idx],
-            workspace.ray_t_max[active_buf_idx],
-            workspace.bg_rgba
-        );
+        if (nerf != nullptr) {
+            // clear bg rgba first
+            CUDA_CHECK_THROW(
+                cudaMemsetAsync(
+                    render_ws.bg_rgba,
+                    0,
+                    4 * n_rays * sizeof(float),
+                    stream
+                )
+            );
+
+            // then draw clipping planes
+            draw_training_img_clipping_planes_and_assign_t_max_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+                n_rays,
+                n_rays,
+                n_rays,
+                nerf->dataset_ws.n_images,
+                nerf->dataset_ws.image_dims,
+                nerf->dataset_ws.n_pixels_per_image,
+                task.modifiers.properties.show_near_planes,
+                task.modifiers.properties.show_far_planes,
+                nerf->dataset_ws.cameras,
+                nerf->dataset_ws.image_data,
+                render_ws.ray_origin[active_buf_idx],
+                render_ws.ray_dir[active_buf_idx],
+                render_ws.ray_tmax[active_buf_idx],
+                render_ws.bg_rgba
+            );
+        }
     }
 
-    march_rays_to_first_occupied_cell_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+    // this optimization only works if the camera rays travel in straight lines
+    prepare_for_linear_raymarching_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
         n_rays,
         n_rays,
-        workspace.occupancy_grid,
-        workspace.bounding_box,
+        n_nerfs,
+        scene_ws.occupancy_grids,
+        scene_ws.bounding_boxes,
+        scene_ws.nerf_transforms,
         dt_min,
-        dt_max,
         cone_angle,
 
         // input buffers
-        workspace.ray_dir[active_buf_idx],
-        workspace.ray_idir[active_buf_idx],
+        render_ws.ray_origin[active_buf_idx],
+        render_ws.ray_dir[active_buf_idx],
 
         // dual-use buffers
-        workspace.ray_alive,
-        workspace.ray_origin[active_buf_idx],
-        workspace.ray_t[active_buf_idx],
-        workspace.ray_t_max[active_buf_idx],
+        render_ws.ray_alive,
+        render_ws.ray_tmax[active_buf_idx],
 
         // output buffers
-        workspace.network_pos,
-        workspace.network_dir,
-        workspace.network_dt
+        scene_ws.intersectors[active_buf_idx],
+        scene_ws.ray_active[active_buf_idx],
+        scene_ws.ray_t[active_buf_idx],
+        scene_ws.ray_tmax[active_buf_idx]
     );
 
-
     // ray marching loop
-    uint32_t n_rays_alive = n_rays;
     int n_steps = 0;
     bool rgba_cleared = false;
+    
+    uint32_t n_rays_processed = 0;
+    
+    uint32_t n_rays_alive = n_rays;
 
     while (n_rays_alive > 0) {
         CHECK_IS_CANCELED(task);
 
-        // need to figure out how many rays can fit in this batch
-        const uint32_t n_steps_per_ray = std::max(ctx.batch_size / n_rays_alive, (uint32_t)1);
-        const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_rays_alive, tcnn::batch_size_granularity);
+        const uint32_t network_batch = tcnn::next_multiple(n_rays_alive, tcnn::batch_size_granularity);
 
         march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
             n_rays_alive,
+            n_nerfs,
             n_rays,
-            n_steps_per_ray,
             network_batch,
-            workspace.occupancy_grid,
-            workspace.bounding_box,
-            1.0f / nerf->bounding_box.size_x,
+            scene_ws.occupancy_grids,
+            scene_ws.bounding_boxes,
+            scene_ws.nerf_transforms,
             dt_min,
-            dt_max,
             cone_angle,
 
             // input buffers
-            workspace.ray_origin[active_buf_idx],
-            workspace.ray_dir[active_buf_idx],
-            workspace.ray_idir[active_buf_idx],
-            workspace.ray_t_max[active_buf_idx],
+            render_ws.ray_origin[active_buf_idx],
+            render_ws.ray_dir[active_buf_idx],
+            render_ws.ray_tmax[active_buf_idx],
+            scene_ws.ray_tmax[active_buf_idx],
+            scene_ws.intersectors[active_buf_idx],
 
             // dual-use buffers
-            workspace.ray_alive,
-            workspace.ray_active[active_buf_idx],
-            workspace.ray_t[active_buf_idx],
+            render_ws.ray_alive,
+            scene_ws.ray_active[active_buf_idx],
+            scene_ws.ray_t[active_buf_idx],
 
             // output buffers
-            workspace.ray_steps[active_buf_idx],
-            workspace.network_pos,
-            workspace.network_dir,
-            workspace.network_dt
+            render_ws.network_pos[0],
+            render_ws.network_dir[0],
+            render_ws.network_dt
         );
-
-        // query the NeRF network for the samples
-        ctx.network.inference(
-            stream,
-            nerf->params,
-            network_batch,
-            nerf->aabb_scale(),
-            workspace.network_pos,
-            workspace.network_dir,
-            workspace.network_concat,
-            workspace.network_output
-        );
-
-        GPUMemory<float> net_con_f(network_batch);
-        copy_and_cast<float, tcnn::network_precision_t>(stream, network_batch, net_con_f.data(), workspace.network_concat);
-
-        CHECK_DATA(net_con_cpu, float, net_con_f.data(), network_batch, stream);
-
-        // save alpha in a buffer
-        sigma_to_alpha_forward_kernel<<<n_blocks_linear(network_batch), n_threads_linear, 0, stream>>>(
-            network_batch,
-            workspace.network_output + 3 * network_batch,
-            workspace.network_dt,
-            workspace.sample_alpha
-        );
-
-        CHECK_DATA(alpha_cpu, float, workspace.sample_alpha, network_batch, stream);
 
         /**
-         * It is best to clear RGBA right before we composite the first sample.
-         * Just in case the task is canceled before we get a chance to draw anything.
+         * Next we compact the network inputs for the active rays of each NeRF
+         * Then we will query each respective NeRF network and composite the samples into the output buffer
          */
 
-        if (!rgba_cleared) {
-            // clear workspace.rgba
-            CUDA_CHECK_THROW(cudaMemsetAsync(workspace.rgba, 0, 4 * n_rays * sizeof(float), stream));
-            rgba_cleared = true;
-        }
+        for (int n = 0; n < n_nerfs; ++n) {
+            bool* rays_active_ptr = scene_ws.ray_active[active_buf_idx] + n * n_rays;
 
-        // accumulate these samples into the pixel colors
-        composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
-            n_rays_alive,
-            network_batch,
-            n_rays,
+            uint32_t n_active_rays = count_true_elements(
+                stream,
+                n_rays_alive,
+                rays_active_ptr
+            );
 
-            // input buffers
-            workspace.ray_active[active_buf_idx],
-            workspace.ray_steps[active_buf_idx],
-            workspace.ray_idx[active_buf_idx],
-            workspace.network_output,
-            workspace.sample_alpha,
+            if (n_active_rays == 0) {
+                continue;
+            }
             
-            // output buffers
-            workspace.ray_alive,
-            workspace.ray_trans[active_buf_idx],
-            workspace.rgba
-        );
+            const uint32_t new_network_batch = tcnn::next_multiple(n_active_rays, tcnn::batch_size_granularity);
+
+            // no need to compact if n_active_rays == n_rays_alive
+
+            float* network_pos;
+            float* network_dir;
+            int* net_compact_idx;
+
+            if (n_active_rays == n_rays_alive) {
+                
+                network_pos = render_ws.network_pos[0];
+                network_dir = render_ws.network_dir[0];
+                net_compact_idx = nullptr;
+
+            } else {
+                generate_compaction_indices(
+                    stream,
+                    n_rays_alive,
+                    rays_active_ptr,
+                    render_ws.net_compact_idx
+                );
+
+                // compact the network inputs for the active rays of this NeRF
+                compact_network_inputs_kernel<<<n_blocks_linear(n_active_rays), n_threads_linear, 0, stream>>>(
+                    n_active_rays,
+                    network_batch,
+                    new_network_batch,
+                    render_ws.net_compact_idx,
+
+                    // input buffers
+                    render_ws.network_pos[0],
+                    render_ws.network_dir[0],
+
+                    // output buffers
+                    render_ws.network_pos[1],
+                    render_ws.network_dir[1]
+                );
+
+                network_pos = render_ws.network_pos[1];
+                network_dir = render_ws.network_dir[1];
+                net_compact_idx = render_ws.net_compact_idx;
+
+            }
+
+            // query the NeRF network for the samples
+            auto& nerf = task.nerfs[n];
+            auto& proxy = nerf->proxy;
+
+            ctx.network.inference(
+                stream,
+                nerf->params,
+                new_network_batch,
+                (int)proxy->bounding_box.size(),
+                network_pos,
+                network_dir,
+                render_ws.network_concat,
+                render_ws.network_output
+            );
+
+            /**
+             * It is best to clear RGBA right before we composite the first sample.
+             * Just in case the task is canceled before we get a chance to draw anything.
+             */
+
+            if (!rgba_cleared) {
+                // clear render_ws.rgba
+                CUDA_CHECK_THROW(cudaMemsetAsync(render_ws.rgba, 0, 4 * n_rays * sizeof(float), stream));
+                rgba_cleared = true;
+            }
+
+            // composite the samples into the output buffer
+
+            // accumulate these samples into the pixel colors
+            composite_samples_kernel<<<n_blocks_linear(n_active_rays), n_threads_linear, 0, stream>>>(
+                n_active_rays,
+                new_network_batch,
+                n_rays,
+
+                // input buffers
+                render_ws.ray_idx[active_buf_idx],
+                net_compact_idx,
+                render_ws.network_dt,
+                render_ws.network_output,
+                render_ws.network_concat,
+                render_ws.network_pos[0],
+
+                // dual-use buffers
+                render_ws.ray_trans[active_buf_idx],
+                render_ws.rgba,
+
+                // output buffers
+                render_ws.ray_alive
+            );
+        }
 
         // We *could* render a partial result here
         // this progress is not very accurate, but it is fast.
         // float progress = (float)(n_rays - n_rays_alive) / (float)n_rays;
         // task.on_progress(progress);
 
-        n_steps += n_steps_per_ray;
+        n_steps += 1;
         if (n_steps < NeRFConstants::n_steps_per_render_compaction) {
             continue;
         }
@@ -300,55 +382,58 @@ void Renderer::perform_task(
         const int n_rays_to_keep = count_true_elements(
             stream,
             n_rays_alive,
-            workspace.ray_alive
+            render_ws.ray_alive
         );
 
         // if no rays are alive, we can skip compositing
         if (n_rays_to_keep == 0) {
             break;
         }
-        
+
         // check if compaction is required
         if (n_rays_to_keep < n_rays_alive / 2) {
             CHECK_IS_CANCELED(task);
-            
+
             // get compacted ray indices
             generate_compaction_indices(
                 stream,
                 n_rays_alive,
-                workspace.ray_alive,
-                workspace.compact_idx
+                render_ws.ray_alive,
+                render_ws.compact_idx
             );
 
             // compact ray properties via the indices
             compact_rays_kernel<<<n_blocks_linear(n_rays_to_keep), n_threads_linear, 0, stream>>>(
                 n_rays_to_keep,
+                n_nerfs,
                 n_rays,
-                workspace.compact_idx,
+                render_ws.compact_idx,
 
                 // input
-                workspace.ray_idx[active_buf_idx],
-                workspace.ray_active[active_buf_idx],
-                workspace.ray_t[active_buf_idx],
-                workspace.ray_t_max[active_buf_idx],
-                workspace.ray_origin[active_buf_idx],
-                workspace.ray_dir[active_buf_idx],
-                workspace.ray_idir[active_buf_idx],
-                workspace.ray_trans[active_buf_idx],
+                render_ws.ray_idx[active_buf_idx],
+                scene_ws.ray_active[active_buf_idx],
+                scene_ws.ray_t[active_buf_idx],
+                scene_ws.ray_tmax[active_buf_idx],
+                scene_ws.intersectors[active_buf_idx],
+                render_ws.ray_tmax[active_buf_idx],
+                render_ws.ray_origin[active_buf_idx],
+                render_ws.ray_dir[active_buf_idx],
+                render_ws.ray_trans[active_buf_idx],
 
                 // output
-                workspace.ray_idx[compact_buf_idx],
-                workspace.ray_active[compact_buf_idx],
-                workspace.ray_t[compact_buf_idx],
-                workspace.ray_t_max[compact_buf_idx],
-                workspace.ray_origin[compact_buf_idx],
-                workspace.ray_dir[compact_buf_idx],
-                workspace.ray_idir[compact_buf_idx],
-                workspace.ray_trans[compact_buf_idx]
+                render_ws.ray_idx[compact_buf_idx],
+                scene_ws.ray_active[compact_buf_idx],
+                scene_ws.ray_t[compact_buf_idx],
+                scene_ws.ray_tmax[compact_buf_idx],
+                scene_ws.intersectors[compact_buf_idx],
+                render_ws.ray_tmax[compact_buf_idx],
+                render_ws.ray_origin[compact_buf_idx],
+                render_ws.ray_dir[compact_buf_idx],
+                render_ws.ray_trans[compact_buf_idx]
             );
 
             // all compacted rays are alive
-            CUDA_CHECK_THROW(cudaMemsetAsync(workspace.ray_alive, true, n_rays_to_keep * sizeof(bool), stream));
+            CUDA_CHECK_THROW(cudaMemsetAsync(render_ws.ray_alive, true, n_rays_to_keep * sizeof(bool), stream));
 
             // swap the active and compact buffer indices
             std::swap(active_buf_idx, compact_buf_idx);
@@ -358,16 +443,16 @@ void Renderer::perform_task(
 
             n_steps = 0;
         }
-    }
 
-    if (show_training_cameras) {
-        alpha_composite_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
-            n_rays,
-            n_rays,
-            workspace.rgba,
-            workspace.bg_rgba,
-            workspace.rgba
-        );
+        if (show_training_cameras) {
+            alpha_composite_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+                n_rays,
+                n_rays,
+                render_ws.rgba,
+                render_ws.bg_rgba,
+                render_ws.rgba
+            );
+        }
     }
 };
 
@@ -382,7 +467,7 @@ void Renderer::write_to_target(
                 task.n_rays,
                 {target->width, target->height},
                 target->n_pixels(),
-                ctx.workspace.rgba,
+                ctx.render_ws.rgba,
                 rgba
             );
         },

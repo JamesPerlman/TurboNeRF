@@ -19,7 +19,6 @@ public:
 
     void generate_rays(
         const Camera* camera,
-        const BoundingBox* bbox,
         RayBatch& ray_batch,
         const cudaStream_t& stream = 0
     ) override;

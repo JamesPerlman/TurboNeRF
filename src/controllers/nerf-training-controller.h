@@ -12,7 +12,6 @@
 
 #include "../common.h"
 #include "../core/nerf-network.cuh"
-#include "../core/occupancy-grid.cuh"
 #include "../core/trainer.cuh"
 #include "../models/bounding-box.cuh"
 #include "../models/dataset.h"
@@ -52,7 +51,10 @@ struct NeRFTrainingController {
 	};
 
 	// constructor
-	NeRFTrainingController(NeRFProxy* nerf_proxy, const uint32_t batch_size);
+	NeRFTrainingController(
+		NeRFProxy* proxy,
+		const uint32_t batch_size
+	);
 
 	// public methods
 	void prepare_for_training();
@@ -64,7 +66,7 @@ struct NeRFTrainingController {
 	OccupancyGridMetrics update_occupancy_grid(const uint32_t& training_step);
 
 	uint32_t get_training_step() const {
-		return _training_step;
+		return nerf_proxy->training_step;
 	}
 	
 	bool is_ready_to_train() const {
@@ -83,7 +85,6 @@ private:
 	Trainer trainer;
 	NeRFProxy* nerf_proxy;
 
-	uint32_t _training_step = 0;
 	bool _is_image_data_loaded = false;
 	bool _is_training_memory_allocated = false;
 
