@@ -1,7 +1,7 @@
 diff --git a/include/pybind11/cast.h b/include/pybind11/cast.h
 index 3a404602..9054478c 100644
---- a/include/pybind11/cast.h
-+++ b/include/pybind11/cast.h
+--- a/includes/pybind11/include/pybind11/cast.h
++++ b/includes/pybind11/include/pybind11/cast.h
 @@ -42,7 +42,9 @@ using make_caster = type_caster<intrinsic_t<type>>;
  // Shortcut for calling a caster's `cast_op_type` cast operator for casting a type_caster to a T
  template <typename T>
