@@ -48,7 +48,19 @@ endif()
 
 set(TCNN_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
 
-find_package(CUDA 12.0 REQUIRED)
+# Prefer CUDA 12, but use 11 if 12 not available
+find_package(CUDA 12 QUIET)
+if(NOT CUDA_FOUND)
+    find_package(CUDA 11 QUIET)
+    if(NOT CUDA_FOUND)
+        message(FATAL_ERROR "CUDA 12 (or 11) not found!")
+    else()
+        message(STATUS "Using CUDA 11 from ${CUDA_TOOLKIT_ROOT_DIR}")
+    endif()    
+else()
+    message(STATUS "Using CUDA 12 from ${CUDA_TOOLKIT_ROOT_DIR}")
+endif()
+
 include_directories(${CUDA_INCLUDE_DIRS})
 
 # OpenGL
@@ -62,7 +74,17 @@ include_directories(includes/glad/include)
 # tiny-cuda-nn
 set(TCNN_BUILD_EXAMPLES OFF)
 set(TCNN_BUILD_BENCHMARK OFF)
+if(UNIX)
+    # Enable generation of PIC code on Linux, otherwise
+    # the tiny-cuda-nn library won't be able to link with
+    # the Python module code
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
 add_subdirectory(includes/tiny-cuda-nn)
+if(UNIX)
+    # And disable again
+    set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
+endif()
 
 # project includes
 set(HEADERS
@@ -209,6 +231,11 @@ if(TN_BUILD_EXE)
 		PRIVATE
 		${TurboNeRF_LIBRARIES}
 	)
+
+    # Set stricter compile flag (for Linux)
+    if(NOT MSVC)
+        target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler -Werror)
+    endif()
 else()
 	message(STATUS "${PROJECT_NAME} Executable will NOT be built!")
 endif()
@@ -240,11 +267,6 @@ if (TN_BUILD_PYD)
 	)
 else()
 	message(STATUS "${PYLIB_NAME} Python Library will NOT be built!")
-endif()
-
-# Set stricter compile flag (for Linux)
-if(NOT MSVC)
-	target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler -Werror)
 endif()
 
 

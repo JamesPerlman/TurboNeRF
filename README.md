@@ -65,6 +65,22 @@ https://www.dropbox.com/sh/qkt4t1tk1o7pdc6/AAD218LLtAavRZykYl33mO8ia?dl=1
 
 This project has only been tested on that one Lego scene.  Real scenes appear to be broken for now.  
 
+### LINUX ADDITIONAL STEP
+
+There is an open [issue](https://github.com/pybind/pybind11/issues/4606) when using CUDA 12 and PyBind11
+(the latter is used by TurboNeRF for the Python module). Currently, a patch manually needs to be applied
+after checking out the TurboNeRF repository as shown above:
+
+```
+git clone git@github.com:JamesPerlman/TurboNeRF --recursive
+cd TurboNeRF
+# Apply patch
+patch -p1 < ../patches/pybind11-cuda12.patch
+# Build as usual
+cmake . -B build
+cmake --build build -j
+```
+
 ## THANK YOU
 
 Extreme gratitude to open source projects that will allow this project to reach its full potential (in order of integration date):

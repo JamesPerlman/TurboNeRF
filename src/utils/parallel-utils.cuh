@@ -29,14 +29,18 @@ inline __host__ int find_last_lt_presorted(
 	const size_t& n_elements,
     const T& max_value
 ) {
+#if CUDA_VERSION >= 12000
 	auto exec_policy = thrust::cuda::par_nosync.on(stream);
+#endif
 
 	auto iter_begin_reverse = thrust::make_reverse_iterator(data_begin_ptr);
 	auto iter_end_reverse = thrust::make_reverse_iterator(data_begin_ptr + n_elements);
 
     // find the last element in the vector that is less than the maximum value
     auto last = thrust::find_if(
+#if CUDA_VERSION >= 12000
 		exec_policy,
+#endif        
         iter_end_reverse,
         iter_begin_reverse,
         [max_value] __device__ (T x) { return x < max_value; }
