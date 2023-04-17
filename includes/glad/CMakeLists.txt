@@ -13,3 +13,7 @@ set(HEADERS
 include_directories(include)
 
 add_library(glad STATIC ${SOURCES} ${HEADERS})
+if (UNIX)
+    # Linux, Python module, needs -fPIC and friends to link
+    set_property(TARGET glad PROPERTY POSITION_INDEPENDENT_CODE ON)
+endif()
