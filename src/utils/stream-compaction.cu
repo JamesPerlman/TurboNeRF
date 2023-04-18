@@ -1,5 +1,4 @@
 #include "stream-compaction.cuh"
-#include <thrust/count.h>
 
 TURBO_NAMESPACE_BEGIN
 
@@ -10,7 +9,7 @@ size_t count_true_elements(
 ) {
     thrust::device_ptr<const bool> predicate_ptr(predicate);
     return thrust::count_if(
-        thrust::cuda::par.on(stream),
+        MAKE_EXEC_POLICY(stream),
         predicate_ptr,
         predicate_ptr + n_elements,
         thrust::detail::equal_to_value<const bool>(true)
@@ -28,7 +27,7 @@ void generate_compaction_indices(
 
     thrust::counting_iterator<int> counting(0);
     thrust::copy_if(
-        thrust::cuda::par.on(stream),
+        MAKE_EXEC_POLICY(stream),
         counting,
         counting + n_elements,
         predicate_ptr,
@@ -52,7 +51,7 @@ size_t count_nonzero_elements(
 ) {
     thrust::device_ptr<const uint32_t> predicate_ptr(predicate);
     return thrust::count_if(
-        thrust::cuda::par.on(stream),
+        MAKE_EXEC_POLICY(stream),
         predicate_ptr,
         predicate_ptr + n_elements,
         nonzero<uint32_t>()
@@ -70,7 +69,7 @@ void generate_nonzero_compaction_indices(
 
     thrust::counting_iterator<int> counting(0);
     thrust::copy_if(
-        thrust::cuda::par.on(stream),
+        MAKE_EXEC_POLICY(stream),
         counting,
         counting + n_elements,
         values_ptr,
