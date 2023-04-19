@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
 	std::vector<NeRFProxy*> nerf_proxies{ proxy };
 
 	for (int i = 0; i < 3360; ++i) {
-		auto& info = trainer.train_step();
+		const auto& info = trainer.train_step();
 		printf("step: %d, loss: %f\n", info.step, info.loss);
 		// every 16 training steps, update the occupancy grid
 
