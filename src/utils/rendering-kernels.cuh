@@ -60,6 +60,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const uint32_t n_nerfs,
 	const uint32_t batch_size,
 	const uint32_t network_batch,
+	const int n_steps_max,
 	const OccupancyGrid* grids,
 	const BoundingBox* bboxes,
 	const Transform4f* transforms,
@@ -79,13 +80,15 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
     float* __restrict__ nerf_ray_t,
 
 	// output buffers (write-only)
+	int* __restrict__ n_steps_total,
+	int* __restrict__ sample_nerf_id,
 	float* __restrict__ network_pos,
 	float* __restrict__ network_dir,
 	float* __restrict__ network_dt
 );
 
 __global__ void compact_network_inputs_kernel(
-	const uint32_t n_active_rays,
+	const uint32_t n_compacted_samples,
 	const uint32_t batch_size,
 	const uint32_t network_batch,
 	const int* __restrict__ indices,
@@ -99,18 +102,33 @@ __global__ void compact_network_inputs_kernel(
 	float* __restrict__ out_network_dir
 );
 
+__global__ void expand_network_outputs_kernel(
+	const uint32_t n_compacted_samples,
+	const uint32_t old_batch_size,
+	const uint32_t new_batch_size,
+	const int* __restrict__ indices,
+
+	// input buffers (read-only)
+	const tcnn::network_precision_t* __restrict__ in_network_rgb,
+	const tcnn::network_precision_t* __restrict__ in_network_density,
+
+	// output buffers (write-only)
+	tcnn::network_precision_t* __restrict__ out_network_rgb,
+	tcnn::network_precision_t* __restrict__ out_network_density
+);
+
 __global__ void composite_samples_kernel(
 	const uint32_t n_rays,
 	const uint32_t network_stride,
 	const uint32_t output_stride,
+	const uint32_t n_steps_max,
 
     // read-only
     const int* __restrict__ ray_idx,
-	const int* __restrict__ active_idx,
 	const float* __restrict__ ray_dt,
 	const tcnn::network_precision_t* __restrict__ network_rgb,
 	const tcnn::network_precision_t* __restrict__ network_density,
-	const float* __restrict__ abc,
+	const int* __restrict__ n_steps_total,
 
     // read/write
 	float* __restrict__ ray_trans,

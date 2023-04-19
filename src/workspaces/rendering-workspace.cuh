@@ -32,10 +32,12 @@ struct RenderingWorkspace: Workspace {
 	float* network_dir[2];
 	float* network_dt;
 	int* net_compact_idx;
+	int* sample_nerf_id;
+	int* n_steps_total;
 
 	// network buffers
-	tcnn::network_precision_t* network_concat;
-	tcnn::network_precision_t* network_output;
+	tcnn::network_precision_t* net_concat[2];
+	tcnn::network_precision_t* net_output[2];
 
 	// output buffers
 	float* rgba;
@@ -91,9 +93,16 @@ struct RenderingWorkspace: Workspace {
 
 		net_compact_idx	= allocate<int>(stream, batch_size);
 
+		sample_nerf_id	= allocate<int>(stream, batch_size);
+
+		n_steps_total	= allocate<int>(stream, batch_size);
+
 		// network
-		network_concat	= allocate<tcnn::network_precision_t>(stream, n_network_concat_elements * batch_size);
-		network_output	= allocate<tcnn::network_precision_t>(stream, n_network_output_elements * batch_size);
+		net_concat[0]	= allocate<tcnn::network_precision_t>(stream, n_network_concat_elements * batch_size);
+		net_concat[1]	= allocate<tcnn::network_precision_t>(stream, n_network_concat_elements * batch_size);
+
+		net_output[0]	= allocate<tcnn::network_precision_t>(stream, n_network_output_elements * batch_size);
+		net_output[1]	= allocate<tcnn::network_precision_t>(stream, n_network_output_elements * batch_size);
 
 		// output
 		rgba			= allocate<float>(stream, n_output_pixel_elements);

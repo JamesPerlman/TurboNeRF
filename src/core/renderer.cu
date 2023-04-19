@@ -224,13 +224,15 @@ void Renderer::perform_task(
     while (n_rays_alive > 0) {
         CHECK_IS_CANCELED(task);
 
-        const uint32_t network_batch = tcnn::next_multiple(n_rays_alive, tcnn::batch_size_granularity);
+        const uint32_t n_steps_per_ray = std::max(ctx.batch_size / (3 * n_rays_alive * (uint32_t)n_nerfs), (uint32_t)1);
+        const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_rays_alive, tcnn::batch_size_granularity);
 
         march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
             n_rays_alive,
             n_nerfs,
             n_rays,
             network_batch,
+            n_steps_per_ray,
             scene_ws.occupancy_grids,
             scene_ws.bounding_boxes,
             scene_ws.nerf_transforms,
@@ -250,6 +252,8 @@ void Renderer::perform_task(
             scene_ws.ray_t[active_buf_idx],
 
             // output buffers
+            render_ws.n_steps_total,
+            render_ws.sample_nerf_id,
             render_ws.network_pos[0],
             render_ws.network_dir[0],
             render_ws.network_dt
@@ -261,45 +265,50 @@ void Renderer::perform_task(
          */
 
         for (int n = 0; n < n_nerfs; ++n) {
-            bool* rays_active_ptr = scene_ws.ray_active[active_buf_idx] + n * n_rays;
+            // bool* rays_active_ptr = scene_ws.ray_active[active_buf_idx] + n * n_rays;
+            uint32_t n_nerf_samples = n_nerfs == 1
+                ? network_batch // minor optimization for single nerf
+                : count_valued_elements(
+                    stream,
+                    n_rays_alive,
+                    render_ws.sample_nerf_id,
+                    n
+                );
 
-            uint32_t n_active_rays = count_true_elements(
-                stream,
-                n_rays_alive,
-                rays_active_ptr
-            );
-
-            if (n_active_rays == 0) {
+            if (n_nerf_samples == 0) {
                 continue;
             }
             
-            const uint32_t new_network_batch = tcnn::next_multiple(n_active_rays, tcnn::batch_size_granularity);
+            const uint32_t mini_network_batch = tcnn::next_multiple(n_nerf_samples, tcnn::batch_size_granularity);
 
-            // no need to compact if n_active_rays == n_rays_alive
+            // no need to compact if the network batch is the same size as the number of samples
 
             float* network_pos;
             float* network_dir;
             int* net_compact_idx;
+            bool compacted = false;
 
-            if (n_active_rays == n_rays_alive) {
+            if (mini_network_batch == network_batch) {
                 
                 network_pos = render_ws.network_pos[0];
                 network_dir = render_ws.network_dir[0];
                 net_compact_idx = nullptr;
 
             } else {
-                generate_compaction_indices(
+                
+                generate_valued_compaction_indices(
                     stream,
                     n_rays_alive,
-                    rays_active_ptr,
+                    render_ws.sample_nerf_id,
+                    n,
                     render_ws.net_compact_idx
                 );
 
                 // compact the network inputs for the active rays of this NeRF
-                compact_network_inputs_kernel<<<n_blocks_linear(n_active_rays), n_threads_linear, 0, stream>>>(
-                    n_active_rays,
+                compact_network_inputs_kernel<<<n_blocks_linear(n_nerf_samples), n_threads_linear, 0, stream>>>(
+                    n_nerf_samples,
                     network_batch,
-                    new_network_batch,
+                    mini_network_batch,
                     render_ws.net_compact_idx,
 
                     // input buffers
@@ -315,58 +324,80 @@ void Renderer::perform_task(
                 network_dir = render_ws.network_dir[1];
                 net_compact_idx = render_ws.net_compact_idx;
 
+                compacted = true;
             }
 
             // query the NeRF network for the samples
             auto& nerf = task.nerfs[n];
             auto& proxy = nerf->proxy;
 
+            // the data always flows to net_concat[1] and net_output[1], sorry for all the ternaries and conditionals
             ctx.network.inference(
                 stream,
                 nerf->params,
-                new_network_batch,
+                mini_network_batch,
                 (int)proxy->bounding_box.size(),
                 network_pos,
                 network_dir,
-                render_ws.network_concat,
-                render_ws.network_output
+                render_ws.net_concat[compacted ? 0 : 1],
+                render_ws.net_output[compacted ? 0 : 1]
             );
 
-            /**
-             * It is best to clear RGBA right before we composite the first sample.
-             * Just in case the task is canceled before we get a chance to draw anything.
-             */
+            // expand the network outputs back to the original network batch size
+            if (compacted) {
+                expand_network_outputs_kernel<<<n_blocks_linear(n_nerf_samples), n_threads_linear, 0, stream>>>(
+                    n_nerf_samples,
+                    mini_network_batch,
+                    network_batch,
+                    render_ws.net_compact_idx,
 
-            if (!rgba_cleared) {
-                // clear render_ws.rgba
-                CUDA_CHECK_THROW(cudaMemsetAsync(render_ws.rgba, 0, 4 * n_rays * sizeof(float), stream));
-                rgba_cleared = true;
+                    // input buffers
+                    render_ws.net_output[0],
+                    render_ws.net_concat[0],
+
+                    // output buffers
+                    render_ws.net_output[1],
+                    render_ws.net_concat[1]
+                );
             }
-
-            // composite the samples into the output buffer
-
-            // accumulate these samples into the pixel colors
-            composite_samples_kernel<<<n_blocks_linear(n_active_rays), n_threads_linear, 0, stream>>>(
-                n_active_rays,
-                new_network_batch,
-                n_rays,
-
-                // input buffers
-                render_ws.ray_idx[active_buf_idx],
-                net_compact_idx,
-                render_ws.network_dt,
-                render_ws.network_output,
-                render_ws.network_concat,
-                render_ws.network_pos[0],
-
-                // dual-use buffers
-                render_ws.ray_trans[active_buf_idx],
-                render_ws.rgba,
-
-                // output buffers
-                render_ws.ray_alive
-            );
         }
+
+
+
+        /**
+         * It is best to clear RGBA right before we composite the first sample.
+         * Just in case the task is canceled before we get a chance to draw anything.
+         */
+
+        if (!rgba_cleared) {
+            // clear render_ws.rgba
+            CUDA_CHECK_THROW(cudaMemsetAsync(render_ws.rgba, 0, 4 * n_rays * sizeof(float), stream));
+            rgba_cleared = true;
+        }
+
+        // composite the samples into the output buffer
+
+        // accumulate these samples into the pixel colors
+        composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+            n_rays_alive,
+            network_batch,
+            n_rays,
+
+            // input buffers
+            n_steps_per_ray,
+            render_ws.ray_idx[active_buf_idx],
+            render_ws.network_dt,
+            render_ws.net_output[1],
+            render_ws.net_concat[1],
+            render_ws.n_steps_total,
+
+            // dual-use buffers
+            render_ws.ray_trans[active_buf_idx],
+            render_ws.rgba,
+
+            // write-only buffers
+            render_ws.ray_alive
+        );
 
         // We *could* render a partial result here
         // this progress is not very accurate, but it is fast.
