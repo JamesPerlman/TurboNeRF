@@ -23,8 +23,6 @@
 
 TURBO_NAMESPACE_BEGIN
 
-using proxy_id_t = uint32_t;
-
 struct NeRFManager {
 private:
 	std::vector<NeRFProxy> proxies;
@@ -52,9 +50,12 @@ public:
 		proxy_ptrs.reserve(proxies.size());
 		// enumerate through proxies
 		for (auto& proxy : proxies) {
+			if (!proxy.is_valid) {
+				continue;
+			}
 			proxy_ptrs.push_back(&proxy);
 		}
-
+		proxy_ptrs.shrink_to_fit();
 		return proxy_ptrs;
 	}
 
@@ -65,6 +66,7 @@ public:
 		NeRFProxy* proxy = find_first_unused_proxy();
 
 		proxy->dataset = dataset;
+		proxy->nerfs.clear();
 		proxy->nerfs.reserve(DeviceManager::get_device_count());
 		proxy->bounding_box = dataset.bounding_box;
 
@@ -75,6 +77,24 @@ public:
 		proxy->is_valid = true;
 
 		return proxy;
+	}
+
+	NeRFProxy* clone(const NeRFProxy* proxy) {
+		NeRFProxy* new_proxy = find_first_unused_proxy();
+
+		// the dataset is the only part that should not be cloned
+		new_proxy->dataset = std::nullopt;
+		new_proxy->nerfs.clear();
+		new_proxy->nerfs.reserve(DeviceManager::get_device_count());
+		new_proxy->bounding_box = proxy->bounding_box;
+
+		DeviceManager::foreach_device([&](const int& device_id, const cudaStream_t& stream) {
+			new_proxy->nerfs.emplace_back(proxy->nerfs[device_id]);
+		});
+
+		new_proxy->is_valid = true;
+
+		return new_proxy;
 	}
 
 	void save(const NeRFProxy* proxy, const std::string& path) const {

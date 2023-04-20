@@ -222,6 +222,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<NeRFProxy>(m, "NeRF")
         .def_readwrite("is_visible", &NeRFProxy::is_visible)
         .def_readwrite("is_dataset_dirty", &NeRFProxy::is_dataset_dirty)
+        .def_readwrite("transform", &NeRFProxy::transform)
         .def_readonly("dataset", &NeRFProxy::dataset)
         .def_readonly("bounding_box", &NeRFProxy::bounding_box)
     ;
@@ -533,6 +534,11 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             "create",
             &NeRFManager::create,
             py::arg("dataset")
+        )
+        .def(
+            "clone",
+            &NeRFManager::clone,
+            py::arg("nerf")
         )
         .def(
             "save",
