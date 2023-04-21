@@ -90,6 +90,8 @@ public:
 
 		DeviceManager::foreach_device([&](const int& device_id, const cudaStream_t& stream) {
 			new_proxy->nerfs.emplace_back(proxy->nerfs[device_id]);
+			NeRF& nerf = new_proxy->nerfs.back();
+			nerf.proxy = new_proxy;
 		});
 
 		new_proxy->is_valid = true;
