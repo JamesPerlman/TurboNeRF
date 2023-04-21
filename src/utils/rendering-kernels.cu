@@ -482,7 +482,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 
 			sample_nerf_id[sample_offset_0] = nearest_nerf;
 
-			nerf_ray_active[nearest_nerf * batch_size + idx] = true;
+			nerf_ray_active[(uint32_t)nearest_nerf * n_rays + idx] = true;
 		} else {
 			// no nerf is active, the ray must die.
 			ray_alive[idx] = false;
