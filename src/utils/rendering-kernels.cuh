@@ -89,8 +89,8 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 
 __global__ void compact_network_inputs_kernel(
 	const uint32_t n_compacted_samples,
-	const uint32_t batch_size,
-	const uint32_t network_batch,
+	const uint32_t old_batch_size,
+	const uint32_t new_batch_size,
 	const int* __restrict__ indices,
 
 	// input buffers (read-only)
