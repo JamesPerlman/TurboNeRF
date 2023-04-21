@@ -404,7 +404,7 @@ void Renderer::perform_task(
         // float progress = (float)(n_rays - n_rays_alive) / (float)n_rays;
         // task.on_progress(progress);
 
-        n_steps += 1;
+        n_steps += n_steps_per_ray;
         if (n_steps < NeRFConstants::n_steps_per_render_compaction) {
             continue;
         }
