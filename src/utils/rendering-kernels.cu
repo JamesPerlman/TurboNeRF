@@ -562,8 +562,8 @@ __global__ void expand_network_outputs_kernel(
 	for (int i = 0; i < 3; ++i) {
 		out_network_rgb[e_offset] = in_network_rgb[c_offset];
 
-		c_offset += new_batch_size;
-		e_offset += old_batch_size;
+		c_offset += old_batch_size;
+		e_offset += new_batch_size;
 	}
 }
 
