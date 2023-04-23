@@ -60,7 +60,8 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const uint32_t n_nerfs,
 	const uint32_t batch_size,
 	const uint32_t network_batch,
-	const int n_steps_max,
+	const uint32_t n_samples_per_step,
+	const uint32_t n_steps_max,
 	const OccupancyGrid* grids,
 	const BoundingBox* bboxes,
 	const Transform4f* transforms,
@@ -119,9 +120,12 @@ __global__ void expand_network_outputs_kernel(
 
 __global__ void composite_samples_kernel(
 	const uint32_t n_rays,
+	const uint32_t batch_size,
 	const uint32_t network_stride,
 	const uint32_t output_stride,
+	const uint32_t n_samples_per_step,
 	const uint32_t n_steps_max,
+	const uint32_t n_nerfs,
 
     // read-only
     const int* __restrict__ ray_idx,

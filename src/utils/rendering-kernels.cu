@@ -67,10 +67,9 @@ __global__ void prepare_for_linear_raymarching_kernel(
 	float t_max = 0.0f;
 	int nearest_nerf = -1;
 
-	uint32_t nerf_offset = 0;
 	for (int n = 0; n < n_nerfs; ++n) {
 
-		const uint32_t nerf_ray_idx = nerf_offset + i;
+		const uint32_t nerf_ray_idx = n * batch_size + i;
 
 		const BoundingBox& bbox = bboxes[n];
 		const Transform4f& transform = transforms[n];
@@ -115,8 +114,6 @@ __global__ void prepare_for_linear_raymarching_kernel(
 
 		// there can only be one active ray
 		nerf_ray_active[nerf_ray_idx] = false;
-		
-		nerf_offset += batch_size;
 	}
 
 	if (nearest_nerf == -1) {
@@ -300,7 +297,8 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const uint32_t n_nerfs,
 	const uint32_t batch_size,
 	const uint32_t network_batch,
-	const int n_steps_max,
+	const uint32_t n_samples_per_step,
+	const uint32_t n_steps_max,
 	const OccupancyGrid* grids,
 	const BoundingBox* bboxes,
 	const Transform4f* transforms,
@@ -351,7 +349,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	// Perform raymarching
 	float global_tmax = ray_tmax[idx];
 
-	int n_steps = 0;
+	uint32_t n_steps = 0;
 
 	while (n_steps < n_steps_max) {
 
@@ -466,7 +464,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 
 		if (nearest_nerf > -1) {
 
-			const uint32_t sample_offset_0 = n_rays * n_steps + idx;
+			const uint32_t sample_offset_0 = n_samples_per_step * n_steps + idx;
 			const uint32_t sample_offset_1 = sample_offset_0 + network_batch;
 			const uint32_t sample_offset_2 = sample_offset_1 + network_batch;
 
@@ -482,19 +480,19 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 
 			sample_nerf_id[sample_offset_0] = nearest_nerf;
 
-			nerf_ray_active[(uint32_t)nearest_nerf * n_rays + idx] = true;
+			nerf_ray_active[nearest_nerf * batch_size + idx] = true;
+
+			++n_steps;
 		} else {
 			// no nerf is active, the ray must die.
-			ray_alive[idx] = false;
+			ray_alive[idx] = n_steps > 0;
 			break;
 		}
-
-		++n_steps;
 	}
 
 	// we must set the remaining sample_nerf_id values to -1
-	for (int i = n_steps; i < n_steps_max; ++i) {
-		const uint32_t sample_offset = n_rays * i + idx;
+	for (uint32_t i = n_steps; i < n_steps_max; ++i) {
+		const uint32_t sample_offset = n_samples_per_step * i + idx;
 		sample_nerf_id[sample_offset] = -1;
 	}
 
@@ -570,9 +568,12 @@ __global__ void expand_network_outputs_kernel(
 // alpha compositing kernel, composites the latest samples into the output image
 __global__ void composite_samples_kernel(
 	const uint32_t n_rays,
+	const uint32_t batch_size,
 	const uint32_t network_stride,
 	const uint32_t output_stride,
+	const uint32_t n_samples_per_step,
 	const uint32_t n_steps_max,
+	const uint32_t n_nerfs,
 
     // read-only
     const int* __restrict__ ray_idx,
@@ -611,7 +612,7 @@ __global__ void composite_samples_kernel(
 	
 	for (uint32_t step = 0; step < n_steps; ++step) {
 			
-		const uint32_t net_idx_0 = n_rays * step + idx;
+		const uint32_t net_idx_0 = n_samples_per_step * step + idx;
 		const uint32_t net_idx_1 = net_idx_0 + network_stride;
 		const uint32_t net_idx_2 = net_idx_1 + network_stride;
 
