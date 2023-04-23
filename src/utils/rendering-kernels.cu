@@ -67,6 +67,11 @@ __global__ void prepare_for_linear_raymarching_kernel(
 	float t_max = 0.0f;
 	int nearest_nerf = -1;
 
+	// clear intersectors
+	for (int n = 0; n <= n_nerfs / 32; ++n) {
+		intersectors[n * batch_size + i] = 0;
+	}
+
 	for (int n = 0; n < n_nerfs; ++n) {
 
 		const uint32_t nerf_ray_idx = n * batch_size + i;
@@ -365,7 +370,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 		// first we need to march each nerf's ray to the next occupied voxel
 		for (int n = 0; n < n_nerfs; ++n) {
 			const uint32_t nerf_ray_idx = n * batch_size + idx;
-			
+
 			// check if this ray even intersects this NeRF
 			const uint32_t ixn_idx = (n / 32) * batch_size + idx;
 			const bool intersects = intersectors[ixn_idx] & (1 << (n % 32));
@@ -376,7 +381,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			// we need to find the first NeRF that this ray intersects
 
 			float t = nerf_ray_t[nerf_ray_idx];
-			const float t_max = nerf_tmax[nerf_ray_idx];
+			const float t_max = fminf(global_tmax, nerf_tmax[nerf_ray_idx]);
 
 			// is the ray position currently inside this NeRF?
 			if (t > t_max) {
@@ -401,8 +406,6 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			 * we can only march each ray by one step using this technique
 			 * but it does get the job done!
 			 */
-
-			const float abs_t_max = fminf(t_max, global_tmax);
 
 			float x, y, z;
 			float dt;
@@ -434,7 +437,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 						);
 					}
 
-				} while (t < abs_t_max);
+				} while (t < t_max);
 				
 				// update nerf t value
 				nerf_ray_t[nerf_ray_idx] = t;
@@ -484,11 +487,11 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 
 			++n_steps;
 		} else {
-			// no nerf is active, the ray must die.
+			// no nerf is active
 			ray_alive[idx] = n_steps > 0;
 			break;
 		}
-	}
+	} // while (n_steps < n_steps_max)
 
 	// we must set the remaining sample_nerf_id values to -1
 	for (uint32_t i = n_steps; i < n_steps_max; ++i) {
