@@ -275,7 +275,7 @@ void Renderer::perform_task(
                 ? network_batch // minor optimization for single nerf
                 : count_valued_elements(
                     stream,
-                    n_rays,
+                    network_batch,
                     render_ws.sample_nerf_id,
                     n
                 );
@@ -302,7 +302,7 @@ void Renderer::perform_task(
             } else {
                 generate_valued_compaction_indices(
                     stream,
-                    n_rays,
+                    network_batch,
                     render_ws.sample_nerf_id,
                     n,
                     render_ws.net_compact_idx
