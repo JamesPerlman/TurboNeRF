@@ -152,6 +152,7 @@ set(HEADERS
 	src/utils/rendering-kernels.cuh
 	src/utils/stream-compaction.cuh
 	src/utils/training-batch-kernels.cuh
+	src/utils/training-kernels-fused.cuh
 	src/utils/training-network-kernels.cuh
 
 	# services
