@@ -98,15 +98,8 @@ private:
 	std::unique_ptr<ForwardContext> forward(
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,
-		const uint32_t& n_rays,
-		const uint32_t& n_samples,
-		const uint32_t* ray_steps,
-		const uint32_t* ray_offset,
-		const float* random_rgb,
-		float* target_rgba,
 		float* pos_batch,
 		float* dir_batch,
-		float* dt_batch,
 		tcnn::network_precision_t* concat_buffer,
 		tcnn::network_precision_t* output_buffer
 	);
@@ -125,18 +118,27 @@ private:
 	void backward(
 		const cudaStream_t& stream,
 		const std::unique_ptr<NerfNetwork::ForwardContext>& fwd_ctx,
+		const uint32_t& batch_size,
+		const uint32_t& n_rays,
+		const uint32_t& n_samples
+	);
+
+	void fused_custom_forward_backward(
+		const cudaStream_t& stream,
+		const uint32_t& batch_size,
 		const uint32_t& n_rays,
 		const uint32_t& n_samples,
-		const uint32_t& batch_size,
+
 		const uint32_t* ray_steps,
 		const uint32_t* ray_offset,
-		const tcnn::network_precision_t* network_density,
-		const tcnn::network_precision_t* network_color,
 		const float* random_rgb,
+		float* target_rgba,
 		float* pos_batch,
 		float* dir_batch,
 		float* dt_batch,
-		float* target_rgba
+
+		tcnn::network_precision_t* concat_buffer,
+		tcnn::network_precision_t* output_buffer
 	);
 	
 	void enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size);
