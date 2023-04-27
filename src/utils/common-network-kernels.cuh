@@ -6,7 +6,7 @@
 
 template <typename T>
 inline __device__ float density_to_sigma(const T& density) {
-	return __expf((float)density - 1.0f);
+	return __expf(fminf((float)density, 12.0f) - 1.0f);
 }
 
 inline __device__ float sigma_to_alpha(
