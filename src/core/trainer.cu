@@ -82,6 +82,22 @@ void Trainer::generate_next_training_batch(
 		ctx.workspace.ray_alive
 	);
 
+	if (ctx.alpha_selection_threshold < 1.0f && ctx.alpha_selection_probability < 1.0f) {
+		deactivate_rays_with_alpha_threshold_kernel<<<n_blocks_linear(ctx.n_rays_in_batch), n_threads_linear, 0, ctx.stream>>>(
+			ctx.n_rays_in_batch,
+			ctx.workspace.batch_size,
+			ctx.alpha_selection_threshold,
+			ctx.alpha_selection_probability,
+
+			// input buffers
+			ctx.workspace.pix_rgba,
+			ctx.workspace.random_float + ctx.workspace.batch_size,
+
+			// output buffer
+			ctx.workspace.ray_alive
+		);
+	}
+
 	const float dt_min = NeRFConstants::min_step_size;
 	const float dt_max = ctx.dataset->bounding_box.size_x * dt_min;
 	const float cone_angle = NeRFConstants::cone_angle;

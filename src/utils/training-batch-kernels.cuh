@@ -182,6 +182,27 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 	ray_alive[i] = true;
 }
 
+__global__ void deactivate_rays_with_alpha_threshold_kernel(
+	const uint32_t n_rays,
+	const uint32_t batch_size,
+	const float alpha_threshold,
+	const float selection_probability,
+	const float* __restrict__ pix_rgba,
+	const float* __restrict__ random,
+	bool* __restrict__ ray_alive
+) {
+	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+
+	if (i >= n_rays) return;
+
+	const float alpha = pix_rgba[3 * batch_size + i];
+	const float random_value = random[i];
+
+	if (alpha < alpha_threshold && random_value > selection_probability) {
+		ray_alive[i] = false;
+	}
+}
+
 // CONSIDER: move rays inside bounding box first?
 
 __global__ void march_and_count_steps_per_ray_kernel(
@@ -250,19 +271,10 @@ __global__ void march_and_count_steps_per_ray_kernel(
 		if (grid->is_occupied_at(grid_level, x, y, z)) {
 
 			t += dt;
-
-			if (n_steps_taken == 0) {
-				// on first hit of an occupied cell, move ray origin to this cell
-				ray_t[i] = 0.0f;
-				ori_xyz[i_offset_0] = x;
-				ori_xyz[i_offset_1] = y;
-				ori_xyz[i_offset_2] = z;
-			}
-
 			++n_steps_taken;
+		
 		} else {
-			// otherwise we need to find the next occupied cell
-			// TODO: feed in normalized positions so we don't have to calculate them here!
+
 			t += grid->get_dt_to_next_voxel(
 				x, y, z,
 				d_x, d_y, d_z,
@@ -270,6 +282,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 				dt_min,
 				grid_level
 			);
+		
 		}
 	};
 

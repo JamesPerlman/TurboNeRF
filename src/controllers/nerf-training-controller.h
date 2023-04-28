@@ -79,6 +79,9 @@ struct NeRFTrainingController {
 
 	void reset_training_state();
 
+	void set_alpha_selection_threshold(const float& threshold);
+	void set_alpha_selection_probability(const float& probability);
+
 private:
 	// private properties
 	std::vector<Trainer::Context> contexts;

@@ -30,6 +30,8 @@ public:
 		uint32_t batch_size;
 		uint32_t n_rays_in_batch;
 		uint32_t n_samples_in_batch;
+		float alpha_selection_threshold = 1.0f;
+		float alpha_selection_probability = 1.0f;
 
 		curandGenerator_t rng;
 		unsigned long long rng_offset = 0;

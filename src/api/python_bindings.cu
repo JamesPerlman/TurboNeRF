@@ -47,6 +47,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     m.doc() = "TurboNeRF Python Bindings";
     m.attr("__version__") = "0.0.10";
+    m.attr("__abc__") = "d2efo1u";
 
     /**
      * Global functions
@@ -358,7 +359,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     // TrainingController class
 
-    py::class_<NeRFTrainingController>(m, "Trainer")
+    py::class_<NeRFTrainingController, std::shared_ptr<NeRFTrainingController>>(m, "Trainer")
         .def(
             py::init<
                 NeRFProxy*,
@@ -403,6 +404,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("train_step", &NeRFTrainingController::train_step)
         .def("is_ready_to_train", &NeRFTrainingController::is_ready_to_train)
         .def("is_image_data_loaded", &NeRFTrainingController::is_image_data_loaded)
+        .def("set_alpha_selection_threshold", &NeRFTrainingController::set_alpha_selection_threshold)
+        .def("set_alpha_selection_probability", &NeRFTrainingController::set_alpha_selection_probability)
     ;
 
     /**
@@ -465,6 +468,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("proxies"),
             py::arg("modifiers") = RenderModifiers()
         )
+        .def("get_trainer", &BlenderBridge::get_trainer)
         .def("get_render_rgba", [](BlenderBridge& bb) {
             float* rgba = bb.get_render_rgba();
             std::size_t n_pixels = bb.get_render_n_pixels();

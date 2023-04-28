@@ -66,7 +66,7 @@ class BlenderBridge
 
     NeRFRenderingController _previewer;
     NeRFRenderingController _renderer;
-    std::optional<NeRFTrainingController> _trainer;
+    std::shared_ptr<NeRFTrainingController> _trainer = nullptr;
     CPURenderBuffer _preview_target;
     CPURenderBuffer _render_target;
     std::vector<EventObserver> _event_observers;
@@ -173,7 +173,7 @@ class BlenderBridge
 
         do {
             // check if we need to train a step
-            if (_trainer.has_value() && _is_training) {
+            if (_trainer != nullptr && _is_training) {
                 // train a single step
                 auto metrics = _trainer->train_step();
                 auto training_step = _trainer->get_training_step();
@@ -187,7 +187,7 @@ class BlenderBridge
             // check if we need to reset training
             if (_needs_reset_training) {
                 _needs_reset_training = false;
-                if (_trainer.has_value()) {
+                if (_trainer != nullptr) {
                     _trainer->reset_training_state();
                     _trainer->prepare_for_training();
                     dispatch(ObservableEvent::OnTrainingReset);
@@ -227,34 +227,38 @@ class BlenderBridge
     public:
 
     uint32_t get_training_step() const {
-        if (_trainer.has_value()) {
-            return _trainer->get_training_step();
+        if (_trainer == nullptr) {
+            return 0;
         }
-        return 0;
+        _trainer->get_training_step();
     }
 
     bool can_load_images() const {
-        return _trainer.has_value() && !_trainer->is_image_data_loaded();
+        return _trainer != nullptr && !_trainer->is_image_data_loaded();
     }
 
     bool is_image_data_loaded() const {
-        return _trainer.has_value() && _trainer->is_image_data_loaded();
+        return _trainer != nullptr && _trainer->is_image_data_loaded();
     }
 
     bool is_ready_to_train() const {
-        return _trainer.has_value() && _trainer->is_ready_to_train();
+        return _trainer != nullptr && _trainer->is_ready_to_train();
     }
 
     bool is_training() const {
         return _is_training;
     }
 
+    std::shared_ptr<NeRFTrainingController>& get_trainer() {
+        return _trainer;
+    }
+
     void prepare_for_training(
         NeRFProxy* proxy,
         const uint32_t& batch_size = NeRFConstants::batch_size
     ) {
-        if (!_trainer.has_value()) {
-            _trainer = NeRFTrainingController(proxy, batch_size);
+        if (_trainer == nullptr) {
+            _trainer.reset(new NeRFTrainingController(proxy, batch_size));
 
             _img_load_future = std::async(
                 std::launch::async,
@@ -302,7 +306,7 @@ class BlenderBridge
     }
 
     void reset_training() {
-        if (!_trainer.has_value()) {
+        if (_trainer == nullptr) {
             return;
         }
         _needs_reset_training = true;
