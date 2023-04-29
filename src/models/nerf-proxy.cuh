@@ -49,15 +49,18 @@ struct NeRFProxy {
     }
 
     void update_dataset_if_necessary(const cudaStream_t& stream) {
+        if (!is_dataset_dirty) {
+            return;
+        }
+
+        is_dataset_dirty = false;
+
         if (!dataset.has_value()) {
             return;
         }
 
         // supported changes: Everything about Cameras, except how many there are.
         // aka the number of cameras must remain the same as when the nerf_proxy was constructed.
-        if (!is_dataset_dirty) {
-            return;
-        }
 
         // TODO: do for all NeRFs
         auto& nerf = nerfs[0];
@@ -71,8 +74,6 @@ struct NeRFProxy {
                 stream
             )
         );
-
-        is_dataset_dirty = false;
     }
 };
 
