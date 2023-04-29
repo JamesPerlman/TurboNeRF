@@ -25,6 +25,9 @@ TURBO_NAMESPACE_BEGIN
 
 struct NeRFManager {
 private:
+
+	int n_proxies_created = 0;
+
 	std::vector<NeRFProxy> proxies;
 
 	NeRFProxy* find_first_unused_proxy() {
@@ -64,7 +67,7 @@ public:
 		const Dataset& dataset
 	) {
 		NeRFProxy* proxy = find_first_unused_proxy();
-
+		proxy->id = n_proxies_created++;
 		proxy->dataset = dataset;
 		proxy->nerfs.clear();
 		proxy->nerfs.reserve(DeviceManager::get_device_count());
@@ -75,6 +78,7 @@ public:
 		});
 
 		proxy->is_valid = true;
+		proxy->can_render = false;
 
 		return proxy;
 	}
@@ -87,6 +91,7 @@ public:
 		new_proxy->nerfs.clear();
 		new_proxy->nerfs.reserve(DeviceManager::get_device_count());
 		new_proxy->bounding_box = proxy->bounding_box;
+		new_proxy->id = proxy->id;
 
 		DeviceManager::foreach_device([&](const int& device_id, const cudaStream_t& stream) {
 			new_proxy->nerfs.emplace_back(proxy->nerfs[device_id]);
@@ -95,6 +100,7 @@ public:
 		});
 
 		new_proxy->is_valid = true;
+		new_proxy->can_render = true;
 
 		return new_proxy;
 	}
@@ -107,10 +113,34 @@ public:
 		NeRFProxy* proxy = find_first_unused_proxy();
 		FileManager::load(proxy, path);
 		proxy->is_valid = true;
+		proxy->can_render = true;
 		return proxy;
 	}
 
 	// destroy nerfs
+
+	void destroy(NeRFProxy* proxy) {
+		proxy->is_valid = false;
+		proxy->can_render = false;
+		if (proxy->dataset.has_value()) {
+			proxy->dataset->unload_images();
+		}
+		// need to check for duplicates before clearing nerfs
+		size_t n_nerfs_with_this_id = 0;
+		
+		for (const auto& other_proxy : proxies) {
+			if (other_proxy.is_valid && other_proxy.id == proxy->id) {
+				++n_nerfs_with_this_id;
+			}
+		}
+
+		proxy->id = -1;
+
+		if (n_nerfs_with_this_id == 0) {
+			printf("clearing nerfs\n");
+			proxy->nerfs.clear();
+		}
+	}
 
 	// copy between GPUs?	
 

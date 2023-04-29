@@ -537,11 +537,18 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def(
             "create",
             &NeRFManager::create,
-            py::arg("dataset")
+            py::arg("dataset"),
+            py::return_value_policy::reference
         )
         .def(
             "clone",
             &NeRFManager::clone,
+            py::arg("nerf"),
+            py::return_value_policy::reference
+        )
+        .def(
+            "destroy",
+            &NeRFManager::destroy,
             py::arg("nerf")
         )
         .def(

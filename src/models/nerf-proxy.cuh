@@ -25,10 +25,12 @@ struct NeRFProxy {
     Transform4f transform = Transform4f::Identity();
 
     bool is_valid = false;
+    bool can_render = false;
     bool is_visible = true;
     bool is_dataset_dirty = true;
 
 	uint32_t training_step = 0;
+    int id = -1;
 
     NeRFProxy() = default;
     

@@ -51,6 +51,13 @@ void NeRFRenderingController::cancel() {
 void NeRFRenderingController::submit(
     std::shared_ptr<RenderRequest> request
 ) {
+    std::vector<NeRFProxy*> proxies;
+    for (auto& proxy : request->proxies) {
+        if (proxy->can_render) {
+            proxies.push_back(proxy);
+        }
+    }
+    
     // TODO: batching/chunking/distributing requests across multiple GPUs
     const int device_id = 0;
     auto& ctx = contexts[device_id];
@@ -79,7 +86,7 @@ void NeRFRenderingController::submit(
     }
 
     // prepare for rendering and dispatch tasks
-    for (auto& proxy : request->proxies) {
+    for (auto& proxy : proxies) {
         proxy->update_dataset_if_necessary(ctx.stream);
     }
 
