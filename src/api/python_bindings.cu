@@ -226,6 +226,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readwrite("transform", &NeRFProxy::transform)
         .def_readonly("dataset", &NeRFProxy::dataset)
         .def_readonly("bounding_box", &NeRFProxy::bounding_box)
+        .def_readonly("can_train", &NeRFProxy::can_train)
     ;
 
     py::enum_<RenderPattern>(m, "RenderPattern")
