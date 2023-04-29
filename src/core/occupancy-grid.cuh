@@ -260,6 +260,10 @@ public:
 	) const {
 		return tcnn::clamp(t * cone_angle, dt_min, dt_max);
 	}
+
+	void free_device_memory() {
+		workspace.free_allocations();
+	}
 };
 
 TURBO_NAMESPACE_END

@@ -75,6 +75,12 @@ struct NeRFProxy {
             )
         );
     }
+
+    void free_device_memory() {
+        for (auto& nerf : nerfs) {
+            nerf.free_device_memory();
+        }
+    }
 };
 
 TURBO_NAMESPACE_END

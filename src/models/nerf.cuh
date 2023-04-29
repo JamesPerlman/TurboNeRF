@@ -23,6 +23,8 @@ struct NeRF {
     const int device_id;
 
     NeRF(const int& device_id, const NeRFProxy* proxy);
+
+    void free_device_memory();
     
 };
 
