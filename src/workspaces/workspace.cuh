@@ -58,13 +58,8 @@ public:
         _total_size = 0;
     }
 
-    ~Workspace() {
-        try {
-            free_allocations();
-        } catch (const std::exception& e) {
-            std::cout << "Error freeing workspace allocations: " << e.what() << std::endl;
-        }
-    }
+    // watchout - we are not freeing allocations in the destructor since workspaces are often shared.
+    // this is truly horrible, but we need to manage memory manually
 };
 
 TURBO_NAMESPACE_END

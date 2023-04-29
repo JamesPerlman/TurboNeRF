@@ -88,6 +88,7 @@ public:
 
 		// the dataset is the only part that should not be cloned
 		new_proxy->dataset = std::nullopt;
+		// only clear the nerfs if there are no other nerfs with this id
 		new_proxy->nerfs.clear();
 		new_proxy->nerfs.reserve(DeviceManager::get_device_count());
 		new_proxy->bounding_box = proxy->bounding_box;
@@ -137,8 +138,7 @@ public:
 		proxy->id = -1;
 
 		if (n_nerfs_with_this_id == 0) {
-			printf("clearing nerfs\n");
-			proxy->nerfs.clear();
+			proxy->free_device_memory();
 		}
 	}
 
