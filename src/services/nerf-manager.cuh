@@ -102,6 +102,7 @@ public:
 
 		new_proxy->is_valid = true;
 		new_proxy->can_render = true;
+		new_proxy->can_train = false;
 
 		return new_proxy;
 	}
@@ -113,16 +114,22 @@ public:
 	NeRFProxy* load(const std::string& path) {
 		NeRFProxy* proxy = find_first_unused_proxy();
 		FileManager::load(proxy, path);
+		
 		proxy->is_valid = true;
 		proxy->can_render = true;
+		proxy->can_train = false;
+
 		return proxy;
 	}
 
 	// destroy nerfs
 
 	void destroy(NeRFProxy* proxy) {
+		
 		proxy->is_valid = false;
 		proxy->can_render = false;
+		proxy->can_train = false;
+
 		if (proxy->dataset.has_value()) {
 			proxy->dataset->unload_images();
 		}

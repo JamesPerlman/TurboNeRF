@@ -26,6 +26,7 @@ struct NeRFProxy {
 
     bool is_valid = false;
     bool can_render = false;
+    bool can_train = false;
     bool is_visible = true;
     bool is_dataset_dirty = true;
 
