@@ -47,7 +47,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     m.doc() = "TurboNeRF Python Bindings";
     m.attr("__version__") = "0.0.10";
-    m.attr("__abc__") = "d2efo1u";
+    m.attr("__abc__") = "du22u2";
 
     /**
      * Global functions
@@ -227,6 +227,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("dataset", &NeRFProxy::dataset)
         .def_readonly("bounding_box", &NeRFProxy::bounding_box)
         .def_readonly("can_train", &NeRFProxy::can_train)
+        .def_readonly("training_step", &NeRFProxy::training_step)
     ;
 
     py::enum_<RenderPattern>(m, "RenderPattern")
@@ -560,10 +561,9 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         )
         .def(
             "load",
-            [](NeRFManager& mgr, const std::string& path) -> NeRFProxy* {
-                return mgr.load(path);
-            },
-            py::arg("path")
+            &NeRFManager::load,
+            py::arg("path"),
+            py::return_value_policy::reference
         )
     ;
 }
