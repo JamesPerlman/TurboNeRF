@@ -66,6 +66,8 @@ void NeRFRenderingController::submit(
     // TODO: batching/chunking/distributing requests across multiple GPUs
     const int device_id = 0;
     auto& ctx = contexts[device_id];
+
+    ctx.min_step_size = min_step_size;
     
     this->request = request;
 

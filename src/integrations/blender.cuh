@@ -61,12 +61,13 @@ class BlenderBridge
         {};
     };
 
+    // be careful when accessing these
+    std::shared_ptr<NeRFRenderingController> previewer = nullptr;
+    std::shared_ptr<NeRFRenderingController> renderer = nullptr;
+    std::shared_ptr<NeRFTrainingController> trainer = nullptr;
+
     /** PRIVATE PROPERTIES */
     private:
-
-    NeRFRenderingController _previewer;
-    NeRFRenderingController _renderer;
-    std::shared_ptr<NeRFTrainingController> _trainer = nullptr;
     CPURenderBuffer _preview_target;
     CPURenderBuffer _render_target;
     std::vector<EventObserver> _event_observers;
@@ -93,8 +94,8 @@ class BlenderBridge
     public:
 
     BlenderBridge()
-        : _previewer(RenderPattern::HexagonalGrid)
-        , _renderer(RenderPattern::LinearChunks)
+        : previewer(new NeRFRenderingController(RenderPattern::HexagonalGrid))
+        , renderer(new NeRFRenderingController(RenderPattern::LinearChunks))
         , _render_queue()
         , _draw_queue(1)
     {
@@ -173,12 +174,12 @@ class BlenderBridge
 
         do {
             // check if we need to train a step
-            if (_trainer != nullptr && _is_training) {
+            if (trainer != nullptr && _is_training) {
                 // train a single step
-                auto metrics = _trainer->train_step();
-                auto training_step = _trainer->get_training_step();
+                auto metrics = trainer->train_step();
+                auto training_step = trainer->get_training_step();
                 if (training_step % 16 == 0) {
-                    auto occ_metrics = _trainer->update_occupancy_grid(training_step);
+                    auto occ_metrics = trainer->update_occupancy_grid(training_step);
                     dispatch(ObservableEvent::OnUpdateOccupancyGrid, occ_metrics.as_map());
                 }
                 dispatch(ObservableEvent::OnTrainingStep, metrics.as_map());
@@ -187,9 +188,9 @@ class BlenderBridge
             // check if we need to reset training
             if (_needs_reset_training) {
                 _needs_reset_training = false;
-                if (_trainer != nullptr) {
-                    _trainer->reset_training_state();
-                    _trainer->prepare_for_training();
+                if (trainer != nullptr) {
+                    trainer->reset_training_state();
+                    trainer->prepare_for_training();
                     dispatch(ObservableEvent::OnTrainingReset);
                 }
             }
@@ -227,38 +228,34 @@ class BlenderBridge
     public:
 
     uint32_t get_training_step() const {
-        if (_trainer == nullptr) {
+        if (trainer == nullptr) {
             return 0;
         }
-        _trainer->get_training_step();
+        trainer->get_training_step();
     }
 
     bool can_load_images() const {
-        return _trainer != nullptr && !_trainer->is_image_data_loaded();
+        return trainer != nullptr && !trainer->is_image_data_loaded();
     }
 
     bool is_image_data_loaded() const {
-        return _trainer != nullptr && _trainer->is_image_data_loaded();
+        return trainer != nullptr && trainer->is_image_data_loaded();
     }
 
     bool is_ready_to_train() const {
-        return _trainer != nullptr && _trainer->is_ready_to_train();
+        return trainer != nullptr && trainer->is_ready_to_train();
     }
 
     bool is_training() const {
         return _is_training;
     }
 
-    std::shared_ptr<NeRFTrainingController>& get_trainer() {
-        return _trainer;
-    }
-
     void prepare_for_training(
         NeRFProxy* proxy,
         const uint32_t& batch_size = NeRFConstants::batch_size
     ) {
-        if (_trainer == nullptr) {
-            _trainer.reset(new NeRFTrainingController(proxy, batch_size));
+        if (trainer == nullptr) {
+            trainer.reset(new NeRFTrainingController(proxy, batch_size));
 
             _img_load_future = std::async(
                 std::launch::async,
@@ -268,8 +265,8 @@ class BlenderBridge
                         {{ "n_total", proxy->dataset->images.size() }}
                     );
 
-                    _trainer->prepare_for_training();
-                    _trainer->load_images(
+                    trainer->prepare_for_training();
+                    trainer->load_images(
                         [this](int n_loaded, int n_total) {
                             std::map<std::string, std::any> data{
                                 {"n_loaded", n_loaded},
@@ -306,7 +303,7 @@ class BlenderBridge
     }
 
     void reset_training() {
-        if (_trainer == nullptr) {
+        if (trainer == nullptr) {
             return;
         }
         _needs_reset_training = true;
@@ -333,7 +330,7 @@ class BlenderBridge
     }
 
     void cancel_render() {
-        _renderer.cancel();
+        renderer->cancel();
     }
 
     void request_render(
@@ -380,7 +377,7 @@ class BlenderBridge
 
             this->dispatch(ObservableEvent::OnRenderStart);
             this->_render_target.clear();
-            this->_renderer.submit(request);
+            this->renderer->submit(request);
         });
         
         start_runloop(false);
@@ -410,7 +407,7 @@ class BlenderBridge
     }
 
     void cancel_preview() {
-        _previewer.cancel();
+        previewer->cancel();
     }
 
     void request_preview(
@@ -451,7 +448,7 @@ class BlenderBridge
 
             this->_is_previewing = true;
             this->dispatch(ObservableEvent::OnPreviewStart);
-            this->_previewer.submit(request);
+            this->previewer->submit(request);
         });
 
         start_runloop(false);

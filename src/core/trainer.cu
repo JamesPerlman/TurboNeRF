@@ -98,7 +98,7 @@ void Trainer::generate_next_training_batch(
 		);
 	}
 
-	const float dt_min = NeRFConstants::min_step_size;
+	const float dt_min = ctx.min_step_size;
 	const float dt_max = ctx.dataset->bounding_box.size_x * dt_min;
 	const float cone_angle = NeRFConstants::cone_angle;
 

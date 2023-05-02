@@ -19,6 +19,8 @@ struct Renderer {
 
         const uint32_t batch_size;
 
+        float min_step_size = NeRFConstants::min_step_size;
+
         Context(
             const cudaStream_t& stream,
             RenderingWorkspace render_ws,

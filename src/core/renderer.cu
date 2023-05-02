@@ -140,7 +140,7 @@ void Renderer::perform_task(
 
     size_t n_nerfs = task.nerfs.size();
 
-    const float dt_min = NeRFConstants::min_step_size;
+    const float dt_min = ctx.min_step_size;
     const float cone_angle = NeRFConstants::cone_angle;
 
     bool show_training_cameras = task.modifiers.properties.show_near_planes || task.modifiers.properties.show_far_planes;

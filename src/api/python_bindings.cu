@@ -331,7 +331,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
      * Controller classes
      */
 
-    py::class_<NeRFRenderingController>(m, "Renderer")
+    py::class_<NeRFRenderingController, std::shared_ptr<NeRFRenderingController>>(m, "Renderer")
         .def(
            py::init<const RenderPattern&, const uint32_t&>(),
            py::arg("pattern") = RenderPattern::LinearChunks,
@@ -342,6 +342,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             &NeRFRenderingController::submit,
             py::arg("request")
         )
+        .def_readwrite("min_step_size", &NeRFRenderingController::min_step_size)
     ;
 
     // TrainingController helpers
@@ -405,8 +406,9 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("train_step", &NeRFTrainingController::train_step)
         .def("is_ready_to_train", &NeRFTrainingController::is_ready_to_train)
         .def("is_image_data_loaded", &NeRFTrainingController::is_image_data_loaded)
-        .def("set_alpha_selection_threshold", &NeRFTrainingController::set_alpha_selection_threshold)
-        .def("set_alpha_selection_probability", &NeRFTrainingController::set_alpha_selection_probability)
+        .def_readwrite("alpha_selection_threshold", &NeRFTrainingController::alpha_selection_threshold)
+        .def_readwrite("alpha_selection_probability", &NeRFTrainingController::alpha_selection_probability)
+        .def_readwrite("min_step_size", &NeRFTrainingController::min_step_size)
     ;
 
     /**
@@ -442,6 +444,10 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     py::class_<BlenderBridge>(m, "BlenderBridge")
         .def(py::init<>())
+        // properties
+        .def_readonly("trainer", &BlenderBridge::trainer)
+        .def_readonly("previewer", &BlenderBridge::previewer)
+        .def_readonly("renderer", &BlenderBridge::renderer)
         // training
         .def("can_load_images", &BlenderBridge::can_load_images)
         .def("is_image_data_loaded", &BlenderBridge::is_image_data_loaded)
@@ -469,7 +475,6 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("proxies"),
             py::arg("modifiers") = RenderModifiers()
         )
-        .def("get_trainer", &BlenderBridge::get_trainer)
         .def("get_render_rgba", [](BlenderBridge& bb) {
             float* rgba = bb.get_render_rgba();
             std::size_t n_pixels = bb.get_render_n_pixels();

@@ -29,6 +29,8 @@ private:
 public:
     NeRFRenderingController(const RenderPattern& pattern = RenderPattern::LinearChunks, const uint32_t& batch_size = 0);
 
+    float min_step_size = NeRFConstants::min_step_size;
+
     void submit(
         std::shared_ptr<RenderRequest> request
     );

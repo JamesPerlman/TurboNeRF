@@ -161,22 +161,14 @@ void NeRFTrainingController::load_images(
 	_is_image_data_loaded = true;
 }
 
-void NeRFTrainingController::set_alpha_selection_threshold(const float& threshold) {
-	for (auto& ctx : contexts) {
-		ctx.alpha_selection_threshold = threshold;
-	}
-}
-
-void NeRFTrainingController::set_alpha_selection_probability(const float& probability) {
-	for (auto& ctx : contexts) {
-		ctx.alpha_selection_probability = probability;
-	}
-}
-
 NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
 
 	// TODO: multi-gpu training.  For now we just train on the first device.
 	auto& ctx = contexts[0];
+
+	ctx.alpha_selection_probability = alpha_selection_probability;
+	ctx.alpha_selection_threshold = alpha_selection_threshold;
+	ctx.min_step_size = min_step_size;
 
 	nerf_proxy->update_dataset_if_necessary(ctx.stream);
 	

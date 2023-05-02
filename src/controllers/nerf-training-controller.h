@@ -79,8 +79,11 @@ struct NeRFTrainingController {
 
 	void reset_training_state();
 
-	void set_alpha_selection_threshold(const float& threshold);
-	void set_alpha_selection_probability(const float& probability);
+	// training settings
+	// TODO: put these in their own struct?
+	float alpha_selection_threshold = 1.0f;
+	float alpha_selection_probability = 1.0f;
+	float min_step_size = NeRFConstants::min_step_size;
 
 private:
 	// private properties
