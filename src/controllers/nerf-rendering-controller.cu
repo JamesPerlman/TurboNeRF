@@ -57,6 +57,11 @@ void NeRFRenderingController::submit(
             proxies.push_back(proxy);
         }
     }
+
+    if (proxies.size() == 0) {
+        request->on_complete();
+        return;
+    }
     
     // TODO: batching/chunking/distributing requests across multiple GPUs
     const int device_id = 0;
