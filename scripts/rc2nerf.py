@@ -136,7 +136,7 @@ if __name__ == '__main__':
     frames = []
     for img_path, xmp_path in imgs_and_xmps:
         
-        relative_img_path = get_relative_or_absolute_path(img_path, output_path)
+        relative_img_path = get_relative_or_absolute_path(img_path, output_path.parent)
         xmp_data = read_file(xmp_path)
         img_dims = get_image_dims(img_path)
         frame = xmp_to_frame(xmp_data, img_dims, str(relative_img_path), args.keep_distortion)
