@@ -17,8 +17,8 @@ DEFAULT_AABB = 16
 def parse_args():
     parser = ArgumentParser()
 
-    parser.add_argument("--input", "-i", type=str, required=True, help="Path to the input project (RealityCapture)")
-    parser.add_argument("--output", "-o", type=str, required=True, help="Path to the output file (JSON)")
+    parser.add_argument("--input", "-i", type=str, required=True, help="Path to the input project (RealityCapture, folder of images and XMP files)")
+    parser.add_argument("--output", "-o", type=str, required=True, help="Path to the output file (JSON, ideally in the parent folder of the input project)")
     parser.add_argument("--keep-distortion", action="store_true", help="Keep distortion coefficients (k1, k2, k3, p1, p2) and principal point (cx, cy) in the output file")
 
     return parser.parse_args()
