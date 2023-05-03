@@ -19,6 +19,7 @@ def parse_args():
 
     parser.add_argument("--input", "-i", type=str, required=True, help="Path to the input project (RealityCapture)")
     parser.add_argument("--output", "-o", type=str, required=True, help="Path to the output file (JSON)")
+    parser.add_argument("--keep-distortion", action="store_true", help="Keep distortion coefficients (k1, k2, k3, p1, p2) and principal point (cx, cy) in the output file")
 
     return parser.parse_args()
 
@@ -27,7 +28,7 @@ def get_image_dims(image_path: Path) -> tuple[int, int]:
     with Image.open(image_path) as image:
         return image.size
 
-def xmp_to_frame(xmp_data: str, img_dims: tuple[int, int], img_path_str: str) -> dict:
+def xmp_to_frame(xmp_data: str, img_dims: tuple[int, int], img_path_str: str, keep_distortion_params: bool) -> dict:
     img_width, img_height = img_dims
 
     # Parse XML data
@@ -42,13 +43,17 @@ def xmp_to_frame(xmp_data: str, img_dims: tuple[int, int], img_path_str: str) ->
     # Extract values from XML
     fl_35mm = float(description.get(f'{xcr_ns}FocalLength35mm'))
     fl = fl_35mm / 36.0 * img_width
-    cx = float(description.get(f'{xcr_ns}PrincipalPointU'))
-    cy = float(description.get(f'{xcr_ns}PrincipalPointV'))
 
-    distortion_coefs = list(map(float, description.find(f'{xcr_ns}DistortionCoeficients').text.split()))
-    k1, k2, k3, p1, p2, _ = distortion_coefs
+    k1, k2, k3, p1, p2 = 0, 0, 0, 0, 0
+    cx, cy = 0, 0
 
-    
+    if keep_distortion_params:        
+        distortion_coeffs = list(map(float, description.find(f'{xcr_ns}DistortionCoeficients').text.split()))
+        k1, k2, k3, p1, p2, _ = distortion_coeffs
+
+        cx = float(description.get(f'{xcr_ns}PrincipalPointU'))
+        cy = float(description.get(f'{xcr_ns}PrincipalPointV'))
+
     rotation = list(map(float, description.find(f'{xcr_ns}Rotation').text.split()))
     position: list
 
@@ -59,7 +64,6 @@ def xmp_to_frame(xmp_data: str, img_dims: tuple[int, int], img_path_str: str) ->
         position = list(map(float, description.find(f'{xcr_ns}Position').text.split()))
     else:
         position = list(map(float, re.findall(r"[-+]?\d*\.\d+|\d+", position_str)))
-
     
     # Construct the transform matrix
     rotation_3x3 = np.array([
@@ -80,7 +84,7 @@ def xmp_to_frame(xmp_data: str, img_dims: tuple[int, int], img_path_str: str) ->
     transform_4x4[:3, 3] = position
 
     # Construct the dictionary
-    result = {
+    frame_dict = {
         "cx": (cx + 0.5) * img_width,
         "cy": (cy + 0.5) * img_height,
         "far": DEFAULT_FAR,
@@ -98,7 +102,7 @@ def xmp_to_frame(xmp_data: str, img_dims: tuple[int, int], img_path_str: str) ->
         "h": img_height
     }
 
-    return result
+    return frame_dict
 
 def read_file(file_path: Path) -> str:
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -119,7 +123,6 @@ if __name__ == '__main__':
     args = parse_args()
 
     output_path = Path(args.output)
-
     input_path = Path(args.input)
 
     path_to_imgs_and_xmps = input_path
@@ -136,9 +139,8 @@ if __name__ == '__main__':
         relative_img_path = get_relative_or_absolute_path(img_path, output_path)
         xmp_data = read_file(xmp_path)
         img_dims = get_image_dims(img_path)
-        frame = xmp_to_frame(xmp_data, img_dims, str(relative_img_path))
+        frame = xmp_to_frame(xmp_data, img_dims, str(relative_img_path), args.keep_distortion)
         frames.append(frame)
-    
 
     transforms_data = {
         "aabb_scale": DEFAULT_AABB,
