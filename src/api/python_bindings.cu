@@ -23,6 +23,7 @@
 #include "../render-targets/opengl-render-surface.cuh"
 #include "../services/device-manager.cuh"
 #include "../services/nerf-manager.cuh"
+#include "../services/runtime-manager.cuh"
 #include "pybind_cpp_utils.cuh"
 #include "pybind_cuda.cuh"
 
@@ -47,6 +48,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     m.doc() = "TurboNeRF Python Bindings";
     m.attr("__version__") = "0.0.11";
+    m.attr("__abc__") = "du22u2";
 
     /**
      * Global functions
@@ -569,5 +571,33 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("path"),
             py::return_value_policy::reference
         )
+    ;
+
+    /**
+     * Runtime Utils (for checking CUDA compatibility)
+     */
+
+    py::class_<RuntimeVersion>(m, "RuntimeVersion")
+        .def_readonly("major", &RuntimeVersion::major)
+        .def_readonly("minor", &RuntimeVersion::minor)
+        .def_readonly("subminor", &RuntimeVersion::subminor)
+        .def("to_string", &RuntimeVersion::to_string)
+        .def_static("CompiledRuntimeVersion", &RuntimeVersion::CompiledRuntimeVersion)
+    ;
+
+    py::class_<DeviceArchitecture>(m, "DeviceArchitecture")
+        .def_readonly("major", &DeviceArchitecture::major)
+        .def_readonly("minor", &DeviceArchitecture::minor)
+        .def("to_string", &DeviceArchitecture::to_string)
+        .def("arch_name", &DeviceArchitecture::arch_name)
+    ;
+
+    py::class_<RuntimeManager>(m, "RuntimeManager")
+        .def_readonly("cuda_archs", &RuntimeManager::cuda_archs)
+        .def_static("required_runtime_version", &RuntimeManager::required_runtime_version)
+        .def_static("current_runtime_version", &RuntimeManager::current_runtime_version)
+        .def_static("is_driver_version_sufficient", &RuntimeManager::is_driver_version_sufficient)
+        .def_static("get_device_architecture", &RuntimeManager::get_device_architecture)
+        .def("check_runtime", &RuntimeManager::check_runtime)
     ;
 }

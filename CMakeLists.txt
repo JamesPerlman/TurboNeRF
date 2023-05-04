@@ -48,6 +48,15 @@ endif()
 
 set(TCNN_CUDA_ARCHITECTURES ${CMAKE_CUDA_ARCHITECTURES})
 
+# function to add CUDA archs as preprocessor definitions
+function(add_cuda_archs_as_defines target)
+	# Convert the list of architectures to a semicolon-separated string
+	string(REPLACE ";" "," CUDA_ARCHS_STR "${CMAKE_CUDA_ARCHITECTURES}")
+
+	# Pass the string as a preprocessor definition
+	target_compile_definitions(${target} PRIVATE CUDA_ARCHS="${CUDA_ARCHS_STR}")
+endfunction()
+
 # Prefer CUDA 12, but use 11 if 12 not available
 find_package(CUDA 12 QUIET)
 if(NOT CUDA_FOUND)
@@ -158,6 +167,7 @@ set(HEADERS
 	src/services/device-manager.cuh
 	src/services/nerf-manager.cuh
 	src/services/file-manager.cuh
+	src/services/runtime-manager.cuh
 
 	# workspaces
 	src/workspaces/dataset-workspace.cuh
@@ -237,9 +247,12 @@ if(TN_BUILD_EXE)
     if(NOT MSVC)
         target_compile_options(${PROJECT_NAME} PRIVATE -Xcompiler -Werror)
     endif()
+
+	add_cuda_archs_as_defines(${PROJECT_NAME})
 else()
 	message(STATUS "${PROJECT_NAME} Executable will NOT be built!")
 endif()
+
 
 # Build Python Library
 if (TN_BUILD_PYD)
@@ -266,10 +279,11 @@ if (TN_BUILD_PYD)
 		${TurboNeRF_LIBRARIES}
 		pybind11::module
 	)
+
+	add_cuda_archs_as_defines(${PYLIB_NAME})
 else()
 	message(STATUS "${PYLIB_NAME} Python Library will NOT be built!")
 endif()
-
 
 
 # Copy DLLs to output directory
