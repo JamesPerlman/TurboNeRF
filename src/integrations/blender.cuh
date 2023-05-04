@@ -231,7 +231,7 @@ class BlenderBridge
         if (trainer == nullptr) {
             return 0;
         }
-        trainer->get_training_step();
+        return trainer->get_training_step();
     }
 
     bool can_load_images() const {
