@@ -592,6 +592,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     ;
 
     py::class_<RuntimeManager>(m, "RuntimeManager")
+        .def(py::init<>())
         .def_readonly("cuda_archs", &RuntimeManager::cuda_archs)
         .def_static("required_runtime_version", &RuntimeManager::required_runtime_version)
         .def_static("current_runtime_version", &RuntimeManager::current_runtime_version)
