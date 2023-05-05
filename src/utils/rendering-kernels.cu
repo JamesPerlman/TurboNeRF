@@ -144,6 +144,7 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	const uint32_t n_pix_per_training_img,
 	const bool show_near_planes,
 	const bool show_far_planes,
+	const Transform4f* __restrict__ nerf_transform,
 	const Camera* __restrict__ cameras,
 	const stbi_uc* __restrict__ train_img_data,
 	const float* __restrict__ ray_ori,
@@ -154,6 +155,8 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (idx >= n_rays) return;
+
+	const Transform4f nerf_matrix = *nerf_transform;
 
 	const uint32_t i_offset_0 = idx;
 	const uint32_t i_offset_1 = i_offset_0 + batch_size;
@@ -183,7 +186,7 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 			continue;
 		}
 
-		const Transform4f c2w = cam.transform;
+		const Transform4f c2w = nerf_matrix * cam.transform;
 		const Transform4f w2c = c2w.inverse();
 		const float3 c2w_xyz = c2w.get_translation();
 		const float3 r2{ c2w.m02, c2w.m12, c2w.m22 };

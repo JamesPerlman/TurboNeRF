@@ -146,6 +146,7 @@ void Renderer::perform_task(
     bool show_training_cameras = task.modifiers.properties.show_near_planes || task.modifiers.properties.show_far_planes;
     if (show_training_cameras) {
         NeRF* nerf = nullptr;
+        int nerf_idx = 0;
         for (auto& task_nerf : task.nerfs) {
             auto& task_proxy = task_nerf->proxy;
             const bool has_dataset = task_proxy->dataset.has_value();
@@ -154,6 +155,7 @@ void Renderer::perform_task(
                 // only one nerf can have a dataset for now
                 break;
             }
+            ++nerf_idx;
         }
 
         if (nerf != nullptr) {
@@ -177,6 +179,7 @@ void Renderer::perform_task(
                 nerf->dataset_ws.n_pixels_per_image,
                 task.modifiers.properties.show_near_planes,
                 task.modifiers.properties.show_far_planes,
+                scene_ws.nerf_transforms + nerf_idx,
                 nerf->dataset_ws.cameras,
                 nerf->dataset_ws.image_data,
                 render_ws.ray_origin[active_buf_idx],

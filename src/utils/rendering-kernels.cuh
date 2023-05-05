@@ -47,6 +47,7 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
 	const uint32_t n_pix_per_training_img,
 	const bool show_near_planes,
 	const bool show_far_planes,
+	const Transform4f* __restrict__ nerf_transform,
 	const Camera* __restrict__ cameras,
 	const stbi_uc* __restrict__ train_img_data,
 	const float* __restrict__ ray_ori,
