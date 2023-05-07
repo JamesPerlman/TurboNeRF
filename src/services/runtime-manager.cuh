@@ -191,7 +191,7 @@ struct RuntimeManager {
         }
 
         printf(
-            "CUDA runtime is %s which is sufficient to run this binary which was built for %s.\n  We're good to go!\n",
+            "CUDA runtime is %s which is sufficient to run this binary which was built for %s. We're good to go!\n",
             current_runtime_version().to_string().c_str(),
             required_runtime_version().to_string().c_str()
         );
