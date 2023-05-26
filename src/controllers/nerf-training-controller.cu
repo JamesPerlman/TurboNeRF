@@ -39,10 +39,12 @@ NeRFTrainingController::NeRFTrainingController(
 	);
 }
 
-void NeRFTrainingController::prepare_for_training() {
+void NeRFTrainingController::setup_data() {
 
 	// we only prepare the first NeRF (for the first device) - the rest we will copy data to
 	auto& ctx = contexts[0];
+
+	ctx.nerf->occupancy_grid.set_aabb_scale(ctx.dataset->bounding_box.size());
 	
 	// TODO: we should not initialize an occupancy grid if one already exists (aka if we loaded the nerf from a file)
 	ctx.nerf->occupancy_grid.initialize(ctx.stream, true);
@@ -77,7 +79,7 @@ void NeRFTrainingController::prepare_for_training() {
 	nerf_proxy->training_step = 0;
 
 	// Initialize the network
-	ctx.network.prepare_for_training(ctx.stream, ctx.nerf->params);
+	ctx.network.setup_data(ctx.stream, ctx.nerf->params);
 
 	nerf_proxy->can_render = true;
 	nerf_proxy->can_train = true;
@@ -85,20 +87,30 @@ void NeRFTrainingController::prepare_for_training() {
 	_is_training_memory_allocated = true;
 }
 
-void NeRFTrainingController::reset_training_state() {
-	// this should possibly be a method of the context.
-	// there are some quirky things that need to be done to reset the state
+void NeRFTrainingController::clear_training_data() {
+	// this ONLY clears data for the training state, afterwards the nerf can still be used for rendering
 
 	// TODO: for all contexts
 	auto& ctx = contexts[0];
 	ctx.workspace.free_allocations();
-	ctx.nerf->params.free_allocations();
-	ctx.nerf->occupancy_grid.workspace.free_allocations();
 
 	ctx.n_rays_in_batch = ctx.batch_size;
 	ctx.n_samples_in_batch = 0;
 
 	_is_training_memory_allocated = false;
+
+	nerf_proxy->can_train = false;
+}
+
+void NeRFTrainingController::clear_data() {
+
+	// TODO: for all contexts
+	auto& ctx = contexts[0];
+	ctx.workspace.free_allocations();
+	ctx.nerf->occupancy_grid.workspace.free_allocations();
+	ctx.network.clear_data(ctx.stream, ctx.nerf->params);
+
+	clear_training_data();
 }
 
 void NeRFTrainingController::load_images(
@@ -159,6 +171,14 @@ void NeRFTrainingController::load_images(
 	ctx.dataset->unload_images();
 
 	_is_image_data_loaded = true;
+}
+
+void NeRFTrainingController::unload_images() {
+	// TODO: for all contexts
+	auto& ctx = contexts[0];
+
+	// unload images from the GPU
+	ctx.nerf->dataset_ws.free_allocations();
 }
 
 NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {

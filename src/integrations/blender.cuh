@@ -189,8 +189,8 @@ class BlenderBridge
             if (_needs_reset_training) {
                 _needs_reset_training = false;
                 if (trainer != nullptr) {
-                    trainer->reset_training_state();
-                    trainer->prepare_for_training();
+                    trainer->clear_data();
+                    trainer->setup_data();
                     dispatch(ObservableEvent::OnTrainingReset);
                 }
             }
@@ -265,7 +265,7 @@ class BlenderBridge
                         {{ "n_total", proxy->dataset->images.size() }}
                     );
 
-                    trainer->prepare_for_training();
+                    trainer->setup_data();
                     trainer->load_images(
                         [this](int n_loaded, int n_total) {
                             std::map<std::string, std::any> data{

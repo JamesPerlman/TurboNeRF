@@ -57,9 +57,15 @@ struct NeRFTrainingController {
 	);
 
 	// public methods
-	void prepare_for_training();
+	void setup_data();
+
+	void clear_data();
+
+	void clear_training_data();
 	
 	void load_images(std::function<void(int, int)> on_image_loaded = {});
+
+	void unload_images();
 	
 	TrainingMetrics train_step();
 
@@ -76,8 +82,6 @@ struct NeRFTrainingController {
 	bool is_image_data_loaded() const {
 		return _is_image_data_loaded;
 	}
-
-	void reset_training_state();
 
 	// training settings
 	// TODO: put these in their own struct?

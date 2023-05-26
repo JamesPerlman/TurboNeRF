@@ -221,6 +221,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     ;
 
     py::class_<NeRFProxy>(m, "NeRF")
+        .def("attach_dataset", &NeRFProxy::attach_dataset)
+        .def("detach_dataset", &NeRFProxy::detach_dataset)
         .def_readwrite("is_visible", &NeRFProxy::is_visible)
         .def_readwrite("is_dataset_dirty", &NeRFProxy::is_dataset_dirty)
         .def_readwrite("transform", &NeRFProxy::transform)
@@ -372,9 +374,19 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             py::arg("batch_size")
         )
         .def(
-            "prepare_for_training",
-            &NeRFTrainingController::prepare_for_training,
+            "setup_data",
+            &NeRFTrainingController::setup_data,
             "Call this once before starting training."
+        )
+        .def(
+            "clear_data",
+            &NeRFTrainingController::clear_data,
+            "Call this to clear the training data."
+        )
+        .def(
+            "clear_training_data",
+            &NeRFTrainingController::clear_training_data,
+            "Call this to clear the training data."
         )
         .def(
             "load_images",
@@ -519,7 +531,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         // event observers
         .def(
             "add_observer",
-            [] (BlenderBridge& bb, BlenderBridge::ObservableEvent event, py::function callback) -> uint32_t {
+            [](BlenderBridge& bb, BlenderBridge::ObservableEvent event, py::function callback) -> uint32_t {
                 return bb.add_observer(event, [callback](BlenderBridge::EventCallbackParam e) {
                     py::gil_scoped_acquire acquire;
                     callback(cpp_map_to_py_dict(e));
@@ -539,12 +551,11 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
      * Service classes
      */
 
-    py::class_<NeRFManager>(m, "Manager")
+    py::class_<NeRFManager>(m, "NeRFManager")
         .def(py::init<>())
         .def(
             "create",
             &NeRFManager::create,
-            py::arg("dataset"),
             py::return_value_policy::reference
         )
         .def(
@@ -558,17 +569,24 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             &NeRFManager::destroy,
             py::arg("nerf")
         )
-        .def(
-            "save",
-            &NeRFManager::save,
+    ;
+
+    py::class_<FileManager>(m, "FileManager")
+        .def_static(
+            "load",
+            [](NeRFProxy& nerf, std::string& path) {
+                FileManager::load(&nerf, path);
+            },
             py::arg("nerf"),
             py::arg("path")
         )
-        .def(
-            "load",
-            &NeRFManager::load,
-            py::arg("path"),
-            py::return_value_policy::reference
+        .def_static(
+            "save",
+            [](NeRFProxy& nerf, std::string& path) {
+                FileManager::save(&nerf, path);
+            },
+            py::arg("nerf"),
+            py::arg("path")
         )
     ;
 

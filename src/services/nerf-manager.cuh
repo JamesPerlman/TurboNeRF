@@ -63,15 +63,12 @@ public:
 	}
 
 	// create a new nerf
-	NeRFProxy* create(
-		const Dataset& dataset
-	) {
+	NeRFProxy* create() {
 		NeRFProxy* proxy = find_first_unused_proxy();
+		
 		proxy->id = n_proxies_created++;
-		proxy->dataset = dataset;
 		proxy->nerfs.clear();
 		proxy->nerfs.reserve(DeviceManager::get_device_count());
-		proxy->bounding_box = dataset.bounding_box;
 
 		DeviceManager::foreach_device([&](const int& device_id, const cudaStream_t& stream) {
 			proxy->nerfs.emplace_back(device_id, proxy);
@@ -105,21 +102,6 @@ public:
 		new_proxy->can_train = false;
 
 		return new_proxy;
-	}
-
-	void save(const NeRFProxy* proxy, const std::string& path) const {
-		FileManager::save(proxy, path);
-	}
-
-	NeRFProxy* load(const std::string& path) {
-		NeRFProxy* proxy = find_first_unused_proxy();
-		FileManager::load(proxy, path);
-		
-		proxy->is_valid = true;
-		proxy->can_render = true;
-		proxy->can_train = false;
-
-		return proxy;
 	}
 
 	// destroy nerfs

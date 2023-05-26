@@ -114,7 +114,7 @@ void NerfNetwork::update_aabb_scale_if_needed(const int& aabb_scale) {
 }
 
 // initialize params and gradients for the networks (I have no idea if this is correct)
-void NerfNetwork::prepare_for_training(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
+void NerfNetwork::setup_data(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
 
 	size_t rng_seed = 72791;
 	pcg32 rng(rng_seed);
@@ -164,6 +164,11 @@ void NerfNetwork::prepare_for_training(const cudaStream_t& stream, NetworkParams
 
 	// flag for training enabled
 	can_train = true;
+}
+
+void NerfNetwork::clear_data(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
+	// free params
+	params_ws.free_allocations();
 }
 
 void NerfNetwork::set_params(NetworkParamsWorkspace& params_ws) {

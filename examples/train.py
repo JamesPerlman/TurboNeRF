@@ -17,12 +17,13 @@ print("TurboNeRF loaded:", tn is not None)
 
 # initialize all the things
 
-manager = tn.Manager()
+manager = tn.NeRFManager()
 
 dataset = tn.Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json")
 dataset.load_transforms()
 
-nerf = manager.create(dataset)
+nerf = manager.create()
+nerf.attach_dataset(dataset)
 
 trainer = tn.Trainer(nerf, batch_size=2<<21)
 
@@ -72,7 +73,7 @@ render_cam = tn.Camera(
 # this method loads all the images and other data the Trainer needs
 
 
-trainer.prepare_for_training()
+trainer.setup_data()
 
 def img_load_status(i, n):
     print(f"Loaded image {i} of {n}")
@@ -110,7 +111,7 @@ for i in range(16):
 
         print(f"Saved render_{i:05d}.png!")
 
-manager.save(nerf, "H:\\dozer.turbo")
+tn.FileManager.save(nerf, "H:\\dozer.turbo")
 
 # it is recommended to call these methods at the end of your program
 render_buf.free()

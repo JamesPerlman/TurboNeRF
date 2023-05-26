@@ -123,6 +123,8 @@ void Trainer::generate_next_training_batch(
 		ctx.workspace.ray_step
 	);
 
+	CHECK_DATA(bbox, BoundingBox, ctx.nerf->dataset_ws.bounding_box, 1, ctx.stream);
+
 	/**
 	 * Count the number of rays that will fill the batch with the maximum number of samples
 	 * 

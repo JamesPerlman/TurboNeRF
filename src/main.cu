@@ -15,6 +15,7 @@
 #include "models/dataset.h"
 #include "models/render-request.cuh"
 #include "services/nerf-manager.cuh"
+#include "services/runtime-manager.cuh"
 #include "render-targets/cuda-render-buffer.cuh"
 #include "math/transform4f.cuh"
 
@@ -48,6 +49,12 @@ bool check_is_json_file(const std::string&);
 
 int main(int argc, char* argv[])
 {
+	auto runtime_manager = turbo::RuntimeManager();
+	bool can_run_turbo_nerf = runtime_manager.check_runtime();
+	if (!can_run_turbo_nerf) {
+		return -1;
+	}
+	
 	std::unordered_map<std::string, std::string> args;
 	// If we don't have any arguments, we proceed with the default input and output locations.
 	// We start with i = 1 because i = 0 is the program name.
@@ -125,17 +132,21 @@ int main(int argc, char* argv[])
 
 	// return 0;
 
-	turbo::NeRFProxy* proxy = nerf_manager->create(dataset);
+	turbo::NeRFProxy* proxy = nerf_manager->create();
+	proxy->attach_dataset(dataset);
 
 	// set up training controller
 	auto trainer = turbo::NeRFTrainingController(proxy, NeRFConstants::batch_size);
-	trainer.prepare_for_training();
+	trainer.setup_data();
 	trainer.load_images([](int a, int b) {
 		printf("Loading images: %d / %d\n", a, b);
 	});
 
 	// fetch nerfs as pointers
-	std::vector<NeRFProxy*> nerf_proxies{ proxy };
+	turbo::NeRFProxy* proxy2 = nerf_manager->clone(proxy);
+	proxy2->transform = turbo::Transform4f::Translation(0.0f, 0.0f, 0.0f);
+	proxy->transform = turbo::Transform4f::Translation(0.0f, 0.5f, 0.0f);
+	std::vector<NeRFProxy*> nerf_proxies{ proxy, proxy2 };
 
 	for (int i = 0; i < 3360; ++i) {
 		const auto& info = trainer.train_step();
@@ -147,7 +158,7 @@ int main(int argc, char* argv[])
 			trainer.update_occupancy_grid(i);
 		}
 
-		if (i % 32 == 0) {
+		if (i % 128 == 0 && i > 0) {
 			float progress = (float)i / (360.f * 0.5f);
 			float tau = 2.0f * 3.14159f;
 			auto tform = turbo::Transform4f::Rotation(progress * tau, 0.0f, 1.0f, 0.0f) * cam0.transform;
@@ -184,7 +195,7 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	nerf_manager->save(proxy, "H:\\dozer.turbo");
+	FileManager::save(proxy, "H:\\dozer.turbo");
 
 	// Wait for the kernel to finish executing
 	cudaDeviceSynchronize();

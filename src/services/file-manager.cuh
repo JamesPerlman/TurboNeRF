@@ -115,6 +115,7 @@ struct FileManager {
 
         // load dataset
         std::string dataset_path_str(data.dataset_path);
+        // TODO: fix this. it doesn't really do anything, the dataset is unusable here
         proxy->dataset = Dataset(dataset_path_str);
         
         // load nerf params
@@ -179,6 +180,10 @@ struct FileManager {
 
         // synchronize stream
         CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
+
+		proxy->is_valid = true;
+	    proxy->can_render = true;
+		proxy->can_train = false;
     }
 };
 

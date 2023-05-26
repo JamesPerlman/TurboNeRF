@@ -26,7 +26,7 @@ private:
 	uint8_t* __restrict__ bitcounts;
 
 public:
-	const int n_levels;
+	int n_levels;
 	const float resolution_f;
 	const float inv_resolution_f;
 	const int resolution_i;
@@ -35,9 +35,8 @@ public:
 
 	OccupancyGridWorkspace workspace;
 
-	OccupancyGrid(const int& device_id, const int& n_levels, const int& resolution = 128)
+	OccupancyGrid(const int& device_id, const int& resolution = 128)
 		: workspace(device_id)
-		, n_levels(n_levels)
 		, resolution_i(resolution)
 		, resolution_f(resolution)
 		, inv_resolution_f(1.0f / resolution_f)
@@ -86,6 +85,11 @@ public:
 
 	inline NRC_HOST_DEVICE float* get_density() const {
 		return density;
+	}
+
+	// convenience setters
+	void set_aabb_scale(const float& aabb_scale) {
+		n_levels = get_max_n_levels(aabb_scale);
 	}
 
 	// memory setters

@@ -82,6 +82,17 @@ struct NeRFProxy {
             nerf.free_device_memory();
         }
     }
+
+    void attach_dataset(const Dataset& dataset) {
+        this->dataset = dataset;
+		this->bounding_box = dataset.bounding_box;
+        this->is_dataset_dirty = true;
+    }
+
+    void detach_dataset() {
+        this->dataset.reset();
+        this->is_dataset_dirty = true;
+    }
 };
 
 TURBO_NAMESPACE_END

@@ -9,7 +9,7 @@ NeRF::NeRF(const int& device_id, const NeRFProxy* proxy)
     , proxy(proxy)
     , dataset_ws(device_id)
     , params(device_id)
-    , occupancy_grid(device_id, OccupancyGrid::get_max_n_levels(proxy->bounding_box.size()), 128)
+    , occupancy_grid(device_id, 128)
 { };
 
 void NeRF::free_device_memory() {
