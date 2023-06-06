@@ -468,11 +468,12 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("is_training", &BlenderBridge::is_training)
         .def("get_training_step", &BlenderBridge::get_training_step)
         .def(
-            "prepare_for_training",
-            &BlenderBridge::prepare_for_training,
+            "load_training_images",
+            &BlenderBridge::load_training_images,
             py::arg("proxy"),
             py::arg("batch_size")
         )
+        .def("unload_training_images", &BlenderBridge::unload_training_images)
         .def("start_training", &BlenderBridge::start_training)
         .def("stop_training", &BlenderBridge::stop_training)
         .def("reset_training", &BlenderBridge::reset_training)

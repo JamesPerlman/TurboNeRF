@@ -250,7 +250,7 @@ class BlenderBridge
         return _is_training;
     }
 
-    void prepare_for_training(
+    void load_training_images(
         NeRFProxy* proxy,
         const uint32_t& batch_size = NeRFConstants::batch_size
     ) {
@@ -279,6 +279,14 @@ class BlenderBridge
                 }
             );
         }
+    }
+
+    void unload_training_images() {
+        if (trainer == nullptr) {
+            return;
+        }
+        trainer->clear_training_data();
+        trainer.reset();
     }
 
     void start_training() {

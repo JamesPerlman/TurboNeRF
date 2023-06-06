@@ -179,6 +179,8 @@ void NeRFTrainingController::unload_images() {
 
 	// unload images from the GPU
 	ctx.nerf->dataset_ws.free_allocations();
+
+	_is_image_data_loaded = false;
 }
 
 NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
