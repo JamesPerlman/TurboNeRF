@@ -38,7 +38,6 @@ struct TrainingWorkspace: Workspace {
 	
 	// ray origin components
 	float* ray_origin;
-	float* sample_origin;
 
 	// ray direction components
 	float* ray_dir;
