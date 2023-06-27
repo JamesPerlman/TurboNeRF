@@ -21,7 +21,8 @@ struct NeRFProxy {
     std::optional<Dataset> dataset;
     
     // nerf props
-    BoundingBox bounding_box = BoundingBox();
+    BoundingBox training_bbox = BoundingBox();
+    BoundingBox render_bbox = BoundingBox();
     Transform4f transform = Transform4f::Identity();
 
     bool is_valid = false;
@@ -85,7 +86,8 @@ struct NeRFProxy {
 
     void attach_dataset(const Dataset& dataset) {
         this->dataset = dataset;
-		this->bounding_box = dataset.bounding_box;
+        this->render_bbox = dataset.bounding_box;
+		this->training_bbox = dataset.bounding_box;
         this->is_dataset_dirty = true;
     }
 

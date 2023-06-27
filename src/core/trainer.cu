@@ -217,7 +217,7 @@ uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& t
 	const uint32_t grid_volume = ctx.nerf->occupancy_grid.volume_i;
 	const uint32_t n_bitfield_bytes = ctx.nerf->occupancy_grid.get_n_bitfield_elements();
 	const uint32_t n_levels = ctx.nerf->occupancy_grid.n_levels;
-	const float aabb_size = proxy->bounding_box.size();
+	const float aabb_size = proxy->training_bbox.size();
 	const float inv_aabb_size = 1.0f / aabb_size;
 
 	// decay occupancy grid values
@@ -316,7 +316,7 @@ float Trainer::train_step(
 		ctx.workspace.batch_size,
 		ctx.n_rays_in_batch,
 		ctx.n_samples_in_batch,
-		ctx.nerf->proxy->bounding_box.size(),
+		ctx.nerf->proxy->training_bbox.size(),
 		ctx.workspace.random_float + ctx.workspace.batch_size,
 		ctx.workspace.ray_step,
 		ctx.workspace.ray_offset,

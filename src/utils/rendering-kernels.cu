@@ -20,7 +20,7 @@ __global__ void prepare_for_linear_raymarching_kernel(
 	const uint32_t batch_size,
 	const uint32_t n_nerfs,
 	const OccupancyGrid* __restrict__ grids,
-	const BoundingBox* __restrict__ bboxes,
+	const BoundingBox* __restrict__ render_bboxes,
 	const Transform4f* __restrict__ transforms,
 	const float dt_min,
 	const float cone_angle,
@@ -76,7 +76,7 @@ __global__ void prepare_for_linear_raymarching_kernel(
 
 		const uint32_t nerf_ray_idx = n * batch_size + i;
 
-		const BoundingBox& bbox = bboxes[n];
+		const BoundingBox& bbox = render_bboxes[n];
 		const Transform4f& transform = transforms[n];
 		const Transform4f& itrans = transform.inverse();
 
@@ -308,7 +308,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 	const uint32_t n_samples_per_step,
 	const uint32_t n_steps_max,
 	const OccupancyGrid* grids,
-	const BoundingBox* bboxes,
+	const BoundingBox* training_bboxes,
 	const Transform4f* transforms,
 	const float dt_min,
 	const float cone_angle,
@@ -394,7 +394,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			// TODO: shared memory
 
 			const OccupancyGrid& grid = grids[n];
-			const BoundingBox& bbox = bboxes[n];
+			const BoundingBox& bbox = training_bboxes[n];
 			const Transform4f itrans = transforms[n].inverse();
 
 			const float dt_max = dt_min * bbox.size();

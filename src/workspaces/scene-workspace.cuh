@@ -19,7 +19,8 @@ struct SceneWorkspace: Workspace {
     uint32_t n_nerfs = 0;
 
 	Camera* camera;
-    BoundingBox* bounding_boxes;
+    BoundingBox* render_bboxes;
+    BoundingBox* training_bboxes;
     OccupancyGrid* occupancy_grids;
     Transform4f* nerf_transforms;
 
@@ -37,7 +38,8 @@ struct SceneWorkspace: Workspace {
     ) {
         free_allocations();
         camera          = allocate<Camera>(stream, 1);
-        bounding_boxes  = allocate<BoundingBox>(stream, n_nerfs);
+        render_bboxes   = allocate<BoundingBox>(stream, n_nerfs);
+        training_bboxes = allocate<BoundingBox>(stream, n_nerfs);
         occupancy_grids = allocate<OccupancyGrid>(stream, n_nerfs);
         nerf_transforms = allocate<Transform4f>(stream, n_nerfs);
 

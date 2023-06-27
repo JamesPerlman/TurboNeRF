@@ -71,8 +71,18 @@ void Renderer::prepare_for_rendering(
         // copy bounding boxes
         CUDA_CHECK_THROW(
             cudaMemcpyAsync(
-                scene_ws.bounding_boxes + i,
-                &proxy->bounding_box,
+                scene_ws.render_bboxes + i,
+                &proxy->render_bbox,
+                sizeof(BoundingBox),
+                cudaMemcpyHostToDevice,
+                stream
+            )
+        );
+
+        CUDA_CHECK_THROW(
+            cudaMemcpyAsync(
+                scene_ws.training_bboxes + i,
+                &proxy->training_bbox,
                 sizeof(BoundingBox),
                 cudaMemcpyHostToDevice,
                 stream
@@ -214,7 +224,7 @@ void Renderer::perform_task(
         n_rays,
         n_nerfs,
         scene_ws.occupancy_grids,
-        scene_ws.bounding_boxes,
+        scene_ws.render_bboxes,
         scene_ws.nerf_transforms,
         dt_min,
         cone_angle,
@@ -255,7 +265,7 @@ void Renderer::perform_task(
             n_samples_per_step,
             n_steps_per_ray,
             scene_ws.occupancy_grids,
-            scene_ws.bounding_boxes,
+            scene_ws.training_bboxes,
             scene_ws.nerf_transforms,
             dt_min,
             cone_angle,
@@ -365,7 +375,7 @@ void Renderer::perform_task(
                 stream,
                 nerf->params,
                 mini_network_batch,
-                (int)proxy->bounding_box.size(),
+                (int)proxy->training_bbox.size(),
                 network_pos,
                 network_dir,
                 render_ws.net_concat[compacted ? 0 : 1],
