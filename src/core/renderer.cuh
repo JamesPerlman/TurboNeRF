@@ -35,6 +35,11 @@ struct Renderer {
             , batch_size(std::move(batch_size))
         {};
     };
+    
+    void clear_rgba(
+        Context& ctx,
+        RenderTask& task
+    );
 
     void perform_task(
         Context& ctx,

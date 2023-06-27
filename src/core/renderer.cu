@@ -64,6 +64,10 @@ void Renderer::prepare_for_rendering(
 
         const NeRFProxy* proxy = nerf->proxy;
 
+        if (!proxy->can_render) {
+            continue;
+        }
+
         // copy bounding boxes
         CUDA_CHECK_THROW(
             cudaMemcpyAsync(
@@ -97,6 +101,20 @@ void Renderer::prepare_for_rendering(
             )
         );
     }
+}
+
+void Renderer::clear_rgba(
+    Renderer::Context& ctx,
+    RenderTask& task
+) {
+    CUDA_CHECK_THROW(
+        cudaMemsetAsync(
+            ctx.render_ws.rgba,
+            0,
+            4 * task.n_rays * sizeof(float),
+            ctx.stream
+        )
+    );
 }
 
 void Renderer::perform_task(
@@ -273,6 +291,13 @@ void Renderer::perform_task(
                 break;
             }
 
+            auto& nerf = task.nerfs[n];
+            auto& proxy = nerf->proxy;
+
+            if (!proxy->can_render || !proxy->is_visible) {
+                continue;
+            }
+
             // bool* rays_active_ptr = scene_ws.ray_active[active_buf_idx] + n * n_rays;
             uint32_t n_nerf_samples = n_nerfs == 1
                 ? network_batch // minor optimization for single nerf
@@ -334,8 +359,6 @@ void Renderer::perform_task(
             }
 
             // query the NeRF network for the samples
-            auto& nerf = task.nerfs[n];
-            auto& proxy = nerf->proxy;
 
             // the data always flows to net_concat[1] and net_output[1], sorry for all the ternaries and conditionals
             ctx.network.inference(
@@ -375,13 +398,11 @@ void Renderer::perform_task(
 
         if (!rgba_cleared) {
             // clear render_ws.rgba
-            CUDA_CHECK_THROW(cudaMemsetAsync(render_ws.rgba, 0, 4 * n_rays * sizeof(float), stream));
+            clear_rgba(ctx, task);
             rgba_cleared = true;
         }
 
         // composite the samples into the output buffer
-
-        // accumulate these samples into the pixel colors
         composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
             n_rays_alive,
             n_rays,

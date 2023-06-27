@@ -26,7 +26,6 @@ struct NerfNetwork {
 	NerfNetwork(const int& device_id, const int& aabb_scale = 16);
 
 	void setup_data(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws);
-	void clear_data(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws);
 	
 	void set_params(NetworkParamsWorkspace& params_ws);
 

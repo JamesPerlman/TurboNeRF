@@ -228,6 +228,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readwrite("transform", &NeRFProxy::transform)
         .def_readonly("dataset", &NeRFProxy::dataset)
         .def_readonly("bounding_box", &NeRFProxy::bounding_box)
+        .def_readonly("can_render", &NeRFProxy::can_render)
         .def_readonly("can_train", &NeRFProxy::can_train)
         .def_readonly("training_step", &NeRFProxy::training_step)
     ;
@@ -380,13 +381,13 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         )
         .def(
             "clear_data",
-            &NeRFTrainingController::clear_data,
+            &NeRFTrainingController::reset_training_data,
             "Call this to clear the training data."
         )
         .def(
             "clear_training_data",
             &NeRFTrainingController::clear_training_data,
-            "Call this to clear the training data."
+            "Call this before destroying the controller."
         )
         .def(
             "load_images",
@@ -449,6 +450,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .value("OnTrainingImageLoaded", BlenderBridge::ObservableEvent::OnTrainingImageLoaded)
         .value("OnTrainingImagesLoadComplete", BlenderBridge::ObservableEvent::OnTrainingImagesLoadComplete)
         .value("OnTrainingImagesLoadStart", BlenderBridge::ObservableEvent::OnTrainingImagesLoadStart)
+        .value("OnTrainingImagesUnloaded", BlenderBridge::ObservableEvent::OnTrainingImagesUnloaded)
         .value("OnTrainingReset", BlenderBridge::ObservableEvent::OnTrainingReset)
         .value("OnTrainingStart", BlenderBridge::ObservableEvent::OnTrainingStart)
         .value("OnTrainingStop", BlenderBridge::ObservableEvent::OnTrainingStop)

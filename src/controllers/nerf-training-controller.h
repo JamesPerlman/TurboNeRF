@@ -59,13 +59,11 @@ struct NeRFTrainingController {
 	// public methods
 	void setup_data();
 
-	void clear_data();
+	void reset_training_data();
 
 	void clear_training_data();
 	
 	void load_images(std::function<void(int, int)> on_image_loaded = {});
-
-	void unload_images();
 	
 	TrainingMetrics train_step();
 

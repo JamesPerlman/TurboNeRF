@@ -76,6 +76,7 @@ public:
 
 		proxy->is_valid = true;
 		proxy->can_render = false;
+		proxy->training_step = 0;
 
 		return proxy;
 	}
@@ -114,7 +115,9 @@ public:
 
 		if (proxy->dataset.has_value()) {
 			proxy->dataset->unload_images();
+			proxy->dataset.reset();
 		}
+
 		// need to check for duplicates before clearing nerfs
 		size_t n_nerfs_with_this_id = 0;
 		

@@ -54,13 +54,13 @@ public:
 			, n_rays_in_batch(std::move(batch_size))
 			, n_samples_in_batch(0)
 		{
-			// TODO: CURAND_ASSERT_SUCCESS
-			curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_PHILOX4_32_10);
-			curandGenerateSeeds(rng);
-		};
+			CURAND_ASSERT_SUCCESS(curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_PHILOX4_32_10));
+			CURAND_ASSERT_SUCCESS(curandGenerateSeeds(rng));
 
-		~Context() {
-			curandDestroyGenerator(rng);
+		};
+		
+		void destroy() {
+			CURAND_ASSERT_SUCCESS(curandDestroyGenerator(rng));
 		};
 	};
 

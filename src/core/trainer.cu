@@ -42,12 +42,12 @@ void Trainer::generate_next_training_batch(
 	
 	// Generate random floats for use in training
 	// increment the seed by the number of floats generated
-	curandStatus_t status = curandGenerateUniform(ctx.rng, ctx.workspace.random_float, 4 * ctx.workspace.batch_size);
+	CURAND_ASSERT_SUCCESS(
+		curandGenerateUniform(ctx.rng, ctx.workspace.random_float, 4 * ctx.workspace.batch_size)
+	);
+
 	ctx.rng_offset += (unsigned long long)(4 * ctx.workspace.batch_size);
-	curandSetGeneratorOffset(ctx.rng, ctx.rng_offset);
-	if (status != CURAND_STATUS_SUCCESS) {
-		throw std::runtime_error("Error generating random floats for training batch.");
-	}
+	CURAND_ASSERT_SUCCESS(curandSetGeneratorOffset(ctx.rng, ctx.rng_offset));
 	
 	/**
 	 * Generate rays and pixels for training
@@ -122,8 +122,6 @@ void Trainer::generate_next_training_batch(
 		ctx.workspace.ray_t,
 		ctx.workspace.ray_step
 	);
-
-	CHECK_DATA(bbox, BoundingBox, ctx.nerf->dataset_ws.bounding_box, 1, ctx.stream);
 
 	/**
 	 * Count the number of rays that will fill the batch with the maximum number of samples

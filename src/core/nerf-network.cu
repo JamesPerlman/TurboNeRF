@@ -166,11 +166,6 @@ void NerfNetwork::setup_data(const cudaStream_t& stream, NetworkParamsWorkspace&
 	can_train = true;
 }
 
-void NerfNetwork::clear_data(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
-	// free params
-	params_ws.free_allocations();
-}
-
 void NerfNetwork::set_params(NetworkParamsWorkspace& params_ws) {
 	// assign params pointers
 

@@ -24,3 +24,13 @@
 		type name = default; \
 	public: \
 		type get_##name() const { return name; }
+
+#define CURAND_ASSERT_SUCCESS(curand_call) \
+	do { \
+		curandStatus_t curand_status = curand_call; \
+		if (curand_status != CURAND_STATUS_SUCCESS) { \
+			std::stringstream ss; \
+			ss << "CURAND error: " << curand_status; \
+			throw std::runtime_error(ss.str()); \
+		} \
+	} while (0);

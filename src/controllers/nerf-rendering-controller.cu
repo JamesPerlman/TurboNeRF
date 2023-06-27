@@ -51,23 +51,25 @@ void NeRFRenderingController::cancel() {
 void NeRFRenderingController::submit(
     std::shared_ptr<RenderRequest> request
 ) {
-    std::vector<NeRFProxy*> proxies;
-    for (auto& proxy : request->proxies) {
-        if (proxy->can_render) {
-            proxies.push_back(proxy);
-        }
-    }
-
-    if (proxies.size() == 0) {
-        request->on_complete();
-        return;
-    }
-    
     // TODO: batching/chunking/distributing requests across multiple GPUs
     const int device_id = 0;
     auto& ctx = contexts[device_id];
 
     ctx.min_step_size = min_step_size;
+
+    std::vector<NeRF*> nerfs;
+    for (auto& proxy : request->proxies) {
+        if (proxy->can_render) {
+            proxy->update_dataset_if_necessary(ctx.stream);
+            nerfs.push_back(&proxy->nerfs[device_id]);
+        }
+    }
+
+    // TODO: Allow NeRFs and Datasets to be rendered independently
+    if (nerfs.size() == 0) {
+        request->on_complete();
+		return;
+    }
     
     this->request = request;
 
@@ -93,11 +95,6 @@ void NeRFRenderingController::submit(
     }
 
     // prepare for rendering and dispatch tasks
-    for (auto& proxy : proxies) {
-        proxy->update_dataset_if_necessary(ctx.stream);
-    }
-
-    const auto& nerfs = request->get_nerfs(device_id);
 
     renderer.prepare_for_rendering(ctx, request->camera, nerfs, n_rays_max);
 

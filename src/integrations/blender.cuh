@@ -39,6 +39,7 @@ class BlenderBridge
         OnTrainingImageLoaded,
         OnTrainingImagesLoadComplete,
         OnTrainingImagesLoadStart,
+        OnTrainingImagesUnloaded,
         OnTrainingReset,
         OnTrainingStart,
         OnTrainingStop,
@@ -85,6 +86,7 @@ class BlenderBridge
     bool _is_rendering = false;
     bool _is_previewing = false;
     bool _needs_reset_training = false;
+    bool _needs_clear_training = false;
 
     float _preview_progress = 0.0f;
     float _render_progress = 0.0f;
@@ -147,8 +149,68 @@ class BlenderBridge
     }
 
     private:
+    void log_event(ObservableEvent event) {
+        
+        switch (event) {
+            case ObservableEvent::OnUpdateOccupancyGrid:
+                printf("OnUpdateOccupancyGrid\n");
+                break;
+            case ObservableEvent::OnPreviewStart:
+                printf("OnPreviewStart\n");
+                break;
+            case ObservableEvent::OnPreviewProgress:
+                printf("OnPreviewProgress\n");
+                break;
+            case ObservableEvent::OnPreviewComplete:
+                printf("OnPreviewComplete\n");
+                break;
+            case ObservableEvent::OnPreviewCancel:
+                printf("OnPreviewCancel\n");
+                break;
+            case ObservableEvent::OnRenderStart:
+                printf("OnRenderStart\n");
+                break;
+            case ObservableEvent::OnRenderProgress:
+                printf("OnRenderProgress\n");
+                break;
+            case ObservableEvent::OnRenderComplete:
+                printf("OnRenderComplete\n");
+                break;
+            case ObservableEvent::OnRenderCancel:
+                printf("OnRenderCancel\n");
+                break;
+            case ObservableEvent::OnRequestRedraw:
+                printf("OnRequestRedraw\n");
+                break;
+            case ObservableEvent::OnTrainingImageLoaded:
+                printf("OnTrainingImageLoaded\n");
+                break;
+            case ObservableEvent::OnTrainingImagesLoadComplete:
+                printf("OnTrainingImagesLoadComplete\n");
+                break;
+            case ObservableEvent::OnTrainingImagesLoadStart:
+                printf("OnTrainingImagesLoadStart\n");
+                break;
+            case ObservableEvent::OnTrainingImagesUnloaded:
+                printf("OnTrainingImagesUnloaded\n");
+                break;
+            case ObservableEvent::OnTrainingReset:
+                printf("OnTrainingReset\n");
+                break;
+            case ObservableEvent::OnTrainingStart:
+                printf("OnTrainingStart\n");
+                break;
+            case ObservableEvent::OnTrainingStop:
+                printf("OnTrainingStop\n");
+                break;
+            case ObservableEvent::OnTrainingStep:
+                printf("OnTrainingStep\n");
+                break;
+        }
+    }
+
     void dispatch(ObservableEvent event, std::map<std::string, std::any> data = {}) {
-        std::scoped_lock lock(_event_dispatch_mutex);
+        std::lock_guard lock(_event_dispatch_mutex);
         for (auto& observer : _event_observers) {
             if (observer.event == event) {
                 observer.callback(data);
@@ -189,9 +251,19 @@ class BlenderBridge
             if (_needs_reset_training) {
                 _needs_reset_training = false;
                 if (trainer != nullptr) {
-                    trainer->clear_data();
-                    trainer->setup_data();
+                    trainer->reset_training_data();
                     dispatch(ObservableEvent::OnTrainingReset);
+                }
+            }
+            
+
+            // check if we need to clear training data
+            if (_needs_clear_training) {
+                _needs_clear_training = false;
+                if (trainer != nullptr) {
+                    trainer->clear_training_data();
+                    trainer.reset();
+                    dispatch(ObservableEvent::OnTrainingImagesUnloaded);
                 }
             }
 
@@ -199,7 +271,7 @@ class BlenderBridge
             _render_queue.work();
             _render_queue.wait();
             
-        } while (_keep_runloop_alive || _needs_reset_training);
+        } while (_keep_runloop_alive || _needs_reset_training || _needs_clear_training);
     }
 
     void start_runloop(bool keep_alive) {
@@ -222,6 +294,12 @@ class BlenderBridge
 
     void stop_runloop() {
         _keep_runloop_alive = false;
+    }
+
+    void wait_for_runloop() {
+        if (_runloop_future.valid()) {
+            _runloop_future.wait();
+        }
     }
 
     /** TRAINING **/
@@ -265,7 +343,10 @@ class BlenderBridge
                         {{ "n_total", proxy->dataset->images.size() }}
                     );
 
+                    printf("setting up data\n");
+
                     trainer->setup_data();
+                    printf("loading images\n");
                     trainer->load_images(
                         [this](int n_loaded, int n_total) {
                             std::map<std::string, std::any> data{
@@ -275,6 +356,7 @@ class BlenderBridge
                             this->dispatch(ObservableEvent::OnTrainingImageLoaded, data);
                         }
                     );
+                    
                     this->dispatch(ObservableEvent::OnTrainingImagesLoadComplete);
                 }
             );
@@ -285,8 +367,13 @@ class BlenderBridge
         if (trainer == nullptr) {
             return;
         }
-        trainer->clear_training_data();
-        trainer.reset();
+
+        _needs_clear_training = true;
+
+        stop_training();
+        cancel_preview();
+        cancel_render();
+        start_runloop(false);
     }
 
     void start_training() {
@@ -314,6 +401,7 @@ class BlenderBridge
         if (trainer == nullptr) {
             return;
         }
+
         _needs_reset_training = true;
 
         cancel_preview();
