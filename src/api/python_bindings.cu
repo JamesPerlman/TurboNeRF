@@ -213,11 +213,20 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     
     // TODO: split into Training and Rendering bbox?
     py::class_<BoundingBox>(m, "BoundingBox")
+        .def(py::init<>())
         .def(
             py::init<float>(),
             py::arg("size")
         )
         .def("size", &BoundingBox::size)
+        .def(py::self == py::self)
+        .def(py::self != py::self)
+        .def_readwrite("max_x", &BoundingBox::max_x)
+        .def_readwrite("max_y", &BoundingBox::max_y)
+        .def_readwrite("max_z", &BoundingBox::max_z)
+        .def_readwrite("min_x", &BoundingBox::min_x)
+        .def_readwrite("min_y", &BoundingBox::min_y)
+        .def_readwrite("min_z", &BoundingBox::min_z)
     ;
 
     py::class_<NeRFProxy>(m, "NeRF")
