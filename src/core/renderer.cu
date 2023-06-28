@@ -18,6 +18,12 @@ using namespace tcnn;
         return; \
     }
 
+/**
+ * This method prepares the scene for rendering.
+ * It copies various data structures to the GPU.
+ * 
+ * TODO: Come up with a way to only copy the data that is needed. 
+ */
 void Renderer::prepare_for_rendering(
     Renderer::Context& ctx,
     const Camera& camera,
