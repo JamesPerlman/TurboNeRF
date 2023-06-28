@@ -72,6 +72,17 @@ struct BoundingBox {
     inline NRC_HOST_DEVICE float unit_to_pos_z(const float& z) const { return z * size_z + min_z; }
 
     inline NRC_HOST_DEVICE float size() const { return size_x; };
+
+    // equality operator
+    inline NRC_HOST_DEVICE bool operator==(const BoundingBox& other) const {
+        return min_x == other.min_x && min_y == other.min_y && min_z == other.min_z
+            && max_x == other.max_x && max_y == other.max_y && max_z == other.max_z;
+    }
+
+    // inequality operator
+    inline NRC_HOST_DEVICE bool operator!=(const BoundingBox& other) const {
+        return !(*this == other);
+    }
 };
 
 TURBO_NAMESPACE_END
