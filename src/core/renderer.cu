@@ -45,8 +45,10 @@ void Renderer::prepare_for_rendering(
 
     auto& scene_ws = ctx.scene_ws;
     const uint32_t n_nerfs = nerfs.size();
+    
+    const bool needs_update = scene_ws.n_nerfs != n_nerfs || scene_ws.n_rays != n_rays;
 
-    if (scene_ws.n_nerfs != n_nerfs || scene_ws.n_rays != n_rays) {
+    if (needs_update) {
         scene_ws.enlarge(
             stream,
             n_nerfs,
@@ -75,9 +77,17 @@ void Renderer::prepare_for_rendering(
         }
 
         // copy updatable properties (these only get copied if their is_dirty flag is set)
-        proxy->render_bbox.copy_to_device(scene_ws.render_bboxes + i, stream);
-        proxy->training_bbox.copy_to_device(scene_ws.training_bboxes + i, stream);
-        proxy->transform.copy_to_device(scene_ws.nerf_transforms + i, stream);
+        if (needs_update || proxy->render_bbox.is_dirty()) {
+            proxy->render_bbox.copy_to_device(scene_ws.render_bboxes + i, stream);
+        }
+        
+        if (needs_update || proxy->training_bbox.is_dirty()) {
+            proxy->training_bbox.copy_to_device(scene_ws.training_bboxes + i, stream);
+        }
+        
+        if (needs_update || proxy->transform.is_dirty()) {
+            proxy->transform.copy_to_device(scene_ws.nerf_transforms + i, stream);
+        }
 
         // copy occupancy grids
         // TODO: turn this into an UpdatableProperty

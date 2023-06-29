@@ -48,16 +48,11 @@ public:
         return _value;
     }
 
-    // copy to device util, only copies if dirty
     __host__
     void copy_to_device(
         T* device_ptr,
         cudaStream_t stream = 0
     ) {
-        if (!_is_dirty) {
-            return;
-        }
-
         cudaMemcpyAsync(
             device_ptr,
             &_value,
