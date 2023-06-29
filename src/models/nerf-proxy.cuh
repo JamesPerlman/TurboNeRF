@@ -3,6 +3,7 @@
 #include <optional>
 #include <vector>
 
+#include "../models/updatable-property.cuh"
 #include "../math/transform4f.cuh"
 #include "../common.h"
 #include "dataset.h"
@@ -21,9 +22,9 @@ struct NeRFProxy {
     std::optional<Dataset> dataset;
     
     // nerf props
-    BoundingBox training_bbox = BoundingBox();
-    BoundingBox render_bbox = BoundingBox();
-    Transform4f transform = Transform4f::Identity();
+    UpdatableProperty<BoundingBox> training_bbox = BoundingBox();
+    UpdatableProperty<BoundingBox> render_bbox = BoundingBox();
+    UpdatableProperty<Transform4f> transform = Transform4f::Identity();
 
     bool is_valid = false;
     bool can_render = false;
@@ -48,6 +49,10 @@ struct NeRFProxy {
             ptrs.emplace_back(&nerf);
         }
         return ptrs;
+    }
+
+    bool is_dirty() const {
+        return is_dataset_dirty || training_bbox.is_dirty() || render_bbox.is_dirty() || transform.is_dirty();
     }
 
     void update_dataset_if_necessary(const cudaStream_t& stream) {

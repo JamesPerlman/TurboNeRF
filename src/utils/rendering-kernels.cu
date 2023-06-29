@@ -88,7 +88,7 @@ __global__ void prepare_for_linear_raymarching_kernel(
 		float _tmin;
 		float _tmax;
 
-		const bool intersects_bbox = bbox.get_ray_t_intersections(
+		const bool intersects_bbox = (bbox.volume() > 0) && bbox.get_ray_t_intersections(
 			o.x, o.y, o.z,
 			d.x, d.y, d.z,
 			id.x, id.y, id.z,
@@ -448,7 +448,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 				// only one nerf may be active at a time
 				nerf_ray_active[nerf_ray_idx] = false;
 			
-			} // if (nerf_ray_active[nerf_ray_idx])
+			} // closing bracket of condition: if (nerf_ray_active[nerf_ray_idx])
 			else {
 				x = o.x + t * d.x;
 				y = o.y + t * d.y;
@@ -466,7 +466,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 				nearest_dir_x = d.x; nearest_dir_y = d.y; nearest_dir_z = d.z;
 				nearest_dt = dt;
 			}
-		} // for (int n = 0; n < n_nerfs; ++n)
+		} // closing bracket of loop: for (int n = 0; n < n_nerfs; ++n)
 
 		if (nearest_nerf > -1) {
 
@@ -494,7 +494,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			ray_alive[idx] = n_steps > 0;
 			break;
 		}
-	} // while (n_steps < n_steps_max)
+	} // closing bracket of loop: while (n_steps < n_steps_max)
 
 	// we must set the remaining sample_nerf_id values to -1
 	for (uint32_t i = n_steps; i < n_steps_max; ++i) {

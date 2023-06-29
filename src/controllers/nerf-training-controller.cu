@@ -32,7 +32,7 @@ NeRFTrainingController::NeRFTrainingController(
 				TrainingWorkspace(device_id),
 				&nerf_proxy->dataset.value(),
 				&nerf_proxy->nerfs[device_id],
-				NerfNetwork(device_id, nerf_proxy->training_bbox.size()),
+				NerfNetwork(device_id, nerf_proxy->training_bbox.get().size()),
 				batch_size
 			);
 		}

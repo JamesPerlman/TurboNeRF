@@ -174,7 +174,7 @@ json Dataset::to_json() const {
     json_data["w"] = image_dimensions.x;
     json_data["h"] = image_dimensions.y;
 
-    json_data["aabb_scale"] = bounding_box.size_x;
+    json_data["aabb_scale"] = bounding_box.size();
     json_data["scene_scale"] = 1.0f;
 
     json frames = json::array();

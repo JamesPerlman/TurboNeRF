@@ -19,6 +19,7 @@
 #include "../models/dataset.h"
 #include "../models/nerf-proxy.cuh"
 #include "../models/render-request.cuh"
+#include "../models/updatable-property.cuh"
 #include "../render-targets/cuda-render-buffer.cuh"
 #include "../render-targets/opengl-render-surface.cuh"
 #include "../services/device-manager.cuh"
@@ -31,14 +32,25 @@ namespace py = pybind11;
 
 using namespace turbo;
 
-#define GET(type, name) \
-    #name,\
-    [](const type& obj) { return obj.name; }
+// a macro for easily forwarding get/set calls in pybind to UpdatableProperty
+// usage: .def_property(UPDATABLE(SomeClass, PropType, attribute_name))
+#define UPDATABLE(CLASS, TYPE, ATTR) \
+    #ATTR, \
+    [](CLASS& obj) -> TYPE { return obj.ATTR.get(); }, \
+    [](CLASS& obj, TYPE value) { obj.ATTR.set(value); }
 
-#define GETSET(type, name) \
-    #name,\
-    [](const type& obj) { return obj.name; },\
-    [](type& obj, const auto& value) { obj.name = value; }
+// a utility function for easily binding UpdatableProperty<T>
+template <typename T>
+void bind_updatable(py::module& m, const std::string& class_name) {
+    py::class_<UpdatableProperty<T>>(m, class_name.c_str())
+        .def(py::init<>())
+        .def("get", &UpdatableProperty<T>::get)
+        .def("set", &UpdatableProperty<T>::set)
+        .def("set_dirty", &UpdatableProperty<T>::set_dirty)
+        .def("is_dirty", &UpdatableProperty<T>::is_dirty)
+    ;
+}
+
 
 PYBIND11_MODULE(PyTurboNeRF, m) {
     /**
@@ -211,7 +223,6 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("image_dimensions", &Dataset::image_dimensions)
     ;
     
-    // TODO: split into Training and Rendering bbox?
     py::class_<BoundingBox>(m, "BoundingBox")
         .def(py::init<>())
         .def(
@@ -229,15 +240,19 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readwrite("min_z", &BoundingBox::min_z)
     ;
 
+    bind_updatable<BoundingBox>(m, "UpdatableBoundingBox");
+    bind_updatable<Transform4f>(m, "UpdatableTransform4f");
+
     py::class_<NeRFProxy>(m, "NeRF")
         .def("attach_dataset", &NeRFProxy::attach_dataset)
         .def("detach_dataset", &NeRFProxy::detach_dataset)
+        .def("is_dirty", &NeRFProxy::is_dirty)
+        .def_property(UPDATABLE(NeRFProxy, BoundingBox, render_bbox))
+        .def_property(UPDATABLE(NeRFProxy, BoundingBox, training_bbox))
+        .def_property(UPDATABLE(NeRFProxy, Transform4f, transform))
         .def_readwrite("is_visible", &NeRFProxy::is_visible)
         .def_readwrite("is_dataset_dirty", &NeRFProxy::is_dataset_dirty)
-        .def_readwrite("transform", &NeRFProxy::transform)
-        .def_readwrite("render_bbox", &NeRFProxy::render_bbox)
         .def_readonly("dataset", &NeRFProxy::dataset)
-        .def_readonly("training_bbox", &NeRFProxy::training_bbox)
         .def_readonly("can_render", &NeRFProxy::can_render)
         .def_readonly("can_train", &NeRFProxy::can_train)
         .def_readonly("training_step", &NeRFProxy::training_step)

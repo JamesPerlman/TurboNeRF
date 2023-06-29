@@ -68,50 +68,24 @@ void Renderer::prepare_for_rendering(
     for (int i = 0; i < n_nerfs; i++) {
         const NeRF* nerf = nerfs[i];
 
-        const NeRFProxy* proxy = nerf->proxy;
+        NeRFProxy* proxy = nerf->proxy;
 
         if (!proxy->can_render) {
             continue;
         }
 
-        // copy bounding boxes
-        CUDA_CHECK_THROW(
-            cudaMemcpyAsync(
-                scene_ws.render_bboxes + i,
-                &proxy->render_bbox,
-                sizeof(BoundingBox),
-                cudaMemcpyHostToDevice,
-                stream
-            )
-        );
-
-        CUDA_CHECK_THROW(
-            cudaMemcpyAsync(
-                scene_ws.training_bboxes + i,
-                &proxy->training_bbox,
-                sizeof(BoundingBox),
-                cudaMemcpyHostToDevice,
-                stream
-            )
-        );
+        // copy updatable properties (these only get copied if their is_dirty flag is set)
+        proxy->render_bbox.copy_to_device(scene_ws.render_bboxes + i, stream);
+        proxy->training_bbox.copy_to_device(scene_ws.training_bboxes + i, stream);
+        proxy->transform.copy_to_device(scene_ws.nerf_transforms + i, stream);
 
         // copy occupancy grids
+        // TODO: turn this into an UpdatableProperty
         CUDA_CHECK_THROW(
             cudaMemcpyAsync(
                 scene_ws.occupancy_grids + i,
                 &nerf->occupancy_grid,
                 sizeof(OccupancyGrid),
-                cudaMemcpyHostToDevice,
-                stream
-            )
-        );
-
-        // copy nerf transforms
-        CUDA_CHECK_THROW(
-            cudaMemcpyAsync(
-                scene_ws.nerf_transforms + i,
-                &proxy->transform,
-                sizeof(Transform4f),
                 cudaMemcpyHostToDevice,
                 stream
             )
@@ -296,6 +270,10 @@ void Renderer::perform_task(
             render_ws.network_dt
         );
 
+        CHECK_DATA(ray_t, float, scene_ws.ray_t[active_buf_idx], n_rays, stream);
+        CHECK_DATA(training_bboxes, BoundingBox, scene_ws.training_bboxes, n_nerfs, stream);
+        CHECK_DATA(render_bboxes, BoundingBox, scene_ws.render_bboxes, n_nerfs, stream);
+
         /**
          * Next we compact the network inputs for the active rays of each NeRF
          * Then we will query each respective NeRF network and composite the samples into the output buffer
@@ -381,7 +359,7 @@ void Renderer::perform_task(
                 stream,
                 nerf->params,
                 mini_network_batch,
-                (int)proxy->training_bbox.size(),
+                (int)proxy->training_bbox.get().size(),
                 network_pos,
                 network_dir,
                 render_ws.net_concat[compacted ? 0 : 1],

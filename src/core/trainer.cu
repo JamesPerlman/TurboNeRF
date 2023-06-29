@@ -99,7 +99,7 @@ void Trainer::generate_next_training_batch(
 	}
 
 	const float dt_min = ctx.min_step_size;
-	const float dt_max = ctx.dataset->bounding_box.size_x * dt_min;
+	const float dt_max = ctx.dataset->bounding_box.size() * dt_min;
 	const float cone_angle = NeRFConstants::cone_angle;
 
 	// Count the number of steps each ray would take.  We only need to do this for the new rays.
@@ -186,7 +186,7 @@ void Trainer::generate_next_training_batch(
 		ctx.n_rays_in_batch,
 		ctx.workspace.batch_size,
 		ctx.nerf->dataset_ws.bounding_box,
-		1.0f / ctx.dataset->bounding_box.size_x,
+		1.0f / ctx.dataset->bounding_box.size(),
 		ctx.workspace.occupancy_grid,
 		dt_min,
 		dt_max,
@@ -217,7 +217,7 @@ uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& t
 	const uint32_t grid_volume = ctx.nerf->occupancy_grid.volume_i;
 	const uint32_t n_bitfield_bytes = ctx.nerf->occupancy_grid.get_n_bitfield_elements();
 	const uint32_t n_levels = ctx.nerf->occupancy_grid.n_levels;
-	const float aabb_size = proxy->training_bbox.size();
+	const float aabb_size = proxy->training_bbox.get().size();
 	const float inv_aabb_size = 1.0f / aabb_size;
 
 	// decay occupancy grid values
@@ -316,7 +316,7 @@ float Trainer::train_step(
 		ctx.workspace.batch_size,
 		ctx.n_rays_in_batch,
 		ctx.n_samples_in_batch,
-		ctx.nerf->proxy->training_bbox.size(),
+		ctx.nerf->proxy->training_bbox.get().size(),
 		ctx.workspace.random_float + ctx.workspace.batch_size,
 		ctx.workspace.ray_step,
 		ctx.workspace.ray_offset,

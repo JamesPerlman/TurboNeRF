@@ -15,16 +15,11 @@ struct BoundingBox {
 	float max_y;
 	float max_z;
 
-    float size_x;
-	float size_y;
-	float size_z;
-
 	BoundingBox() = default;
 
     BoundingBox(float size)
         : min_x(-0.5f * size), min_y(-0.5f * size), min_z(-0.5f * size)
         , max_x(0.5f * size), max_y(0.5f * size), max_z(0.5f * size)
-		, size_x(size), size_y(size), size_z(size)
     {};
 
     // get nearest intersection point of the ray with the bounding box
@@ -63,15 +58,17 @@ struct BoundingBox {
             && z >= min_z && z <= max_z;
     }
 
-    inline NRC_HOST_DEVICE float pos_to_unit_x(const float& x) const { return (x - min_x) / size_x; }
-    inline NRC_HOST_DEVICE float pos_to_unit_y(const float& y) const { return (y - min_y) / size_y; }
-	inline NRC_HOST_DEVICE float pos_to_unit_z(const float& z) const { return (z - min_z) / size_z; }
+    inline NRC_HOST_DEVICE float pos_to_unit_x(const float& x) const { return (x - min_x) / (max_x - min_x); }
+    inline NRC_HOST_DEVICE float pos_to_unit_y(const float& y) const { return (y - min_y) / (max_y - min_y); }
+	inline NRC_HOST_DEVICE float pos_to_unit_z(const float& z) const { return (z - min_z) / (max_z - min_z); }
 
-    inline NRC_HOST_DEVICE float unit_to_pos_x(const float& x) const { return x * size_x + min_x; }
-    inline NRC_HOST_DEVICE float unit_to_pos_y(const float& y) const { return y * size_y + min_y; }
-    inline NRC_HOST_DEVICE float unit_to_pos_z(const float& z) const { return z * size_z + min_z; }
+    inline NRC_HOST_DEVICE float unit_to_pos_x(const float& x) const { return x * (max_x - min_x) + min_x; }
+    inline NRC_HOST_DEVICE float unit_to_pos_y(const float& y) const { return y * (max_y - min_y) + min_y; }
+    inline NRC_HOST_DEVICE float unit_to_pos_z(const float& z) const { return z * (max_z - min_z) + min_z; }
 
-    inline NRC_HOST_DEVICE float size() const { return size_x; };
+    inline NRC_HOST_DEVICE float size() const { return (max_x - min_x); };
+
+    inline NRC_HOST_DEVICE float volume() const { return (max_x - min_x) * (max_y - min_y) * (max_z - min_z); };
 
     // equality operator
     inline NRC_HOST_DEVICE bool operator==(const BoundingBox& other) const {

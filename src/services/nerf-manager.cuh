@@ -89,7 +89,9 @@ public:
 		// only clear the nerfs if there are no other nerfs with this id
 		new_proxy->nerfs.clear();
 		new_proxy->nerfs.reserve(DeviceManager::get_device_count());
+		new_proxy->render_bbox = proxy->render_bbox;
 		new_proxy->training_bbox = proxy->training_bbox;
+		new_proxy->transform = proxy->transform;
 		new_proxy->id = proxy->id;
 
 		DeviceManager::foreach_device([&](const int& device_id, const cudaStream_t& stream) {

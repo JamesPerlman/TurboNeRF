@@ -52,7 +52,7 @@ struct FileManager {
         data.n_color_params = nerf.params.n_color_params;
         data.n_density_params = nerf.params.n_density_params;
         data.n_occ_grid_bits = nerf.occupancy_grid.workspace.n_bitfield_elements;
-        data.aabb_scale = static_cast<uint32_t>(proxy->training_bbox.size());
+        data.aabb_scale = static_cast<uint32_t>(proxy->training_bbox.get().size());
 
         // copy nerf params data to CPU
         size_t n_params = data.n_color_params + data.n_density_params;
