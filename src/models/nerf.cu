@@ -4,7 +4,7 @@
 
 TURBO_NAMESPACE_BEGIN
 
-NeRF::NeRF(const int& device_id, const NeRFProxy* proxy)
+NeRF::NeRF(const int& device_id, NeRFProxy* proxy)
     : device_id(device_id)
     , proxy(proxy)
     , dataset_ws(device_id)

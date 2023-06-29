@@ -18,11 +18,11 @@ struct NeRF {
     DatasetWorkspace dataset_ws;
     NetworkParamsWorkspace params;
     OccupancyGrid occupancy_grid;
-    const NeRFProxy* proxy;
+    NeRFProxy* proxy;
 
     const int device_id;
 
-    NeRF(const int& device_id, const NeRFProxy* proxy);
+    NeRF(const int& device_id, NeRFProxy* proxy);
 
     void free_device_memory();
     
