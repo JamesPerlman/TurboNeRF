@@ -129,6 +129,7 @@ set(HEADERS
 	src/models/render-request.cuh
 	src/models/render-task.cuh
 	src/models/training-image.cuh
+	src/models/updatable-property.cuh
 
 	# render-targets
 	src/render-targets/cpu-render-buffer.cuh
