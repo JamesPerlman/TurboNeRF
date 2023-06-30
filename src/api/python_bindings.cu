@@ -602,16 +602,16 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<FileManager>(m, "FileManager")
         .def_static(
             "load",
-            [](NeRFProxy& nerf, std::string& path) {
-                FileManager::load(&nerf, path);
+            [](NeRFProxy* nerf, std::string& path) {
+                FileManager::load(nerf, path);
             },
             py::arg("nerf"),
             py::arg("path")
         )
         .def_static(
             "save",
-            [](NeRFProxy& nerf, std::string& path) {
-                FileManager::save(&nerf, path);
+            [](NeRFProxy* nerf, std::string& path) {
+                FileManager::save(nerf, path);
             },
             py::arg("nerf"),
             py::arg("path")
