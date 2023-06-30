@@ -56,7 +56,8 @@ struct Renderer {
         Context& ctx,
         const Camera& camera,
         const std::vector<NeRF*>& nerfs,
-        const uint32_t& n_rays
+        const uint32_t& n_rays,
+        bool always_copy_new_props
     );
 };
 

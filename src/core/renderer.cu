@@ -28,7 +28,8 @@ void Renderer::prepare_for_rendering(
     Renderer::Context& ctx,
     const Camera& camera,
     const std::vector<NeRF*>& nerfs,
-    const uint32_t& n_rays
+    const uint32_t& n_rays,
+    bool always_copy_new_props
 ) {
     cudaStream_t stream = ctx.stream;
     auto& render_ws = ctx.render_ws;
@@ -67,6 +68,8 @@ void Renderer::prepare_for_rendering(
         )
     );
 
+    bool needs_copy = always_copy_new_props || needs_update;
+
     for (int i = 0; i < n_nerfs; i++) {
         const NeRF* nerf = nerfs[i];
 
@@ -77,15 +80,15 @@ void Renderer::prepare_for_rendering(
         }
 
         // copy updatable properties (these only get copied if their is_dirty flag is set)
-        if (needs_update || proxy->render_bbox.is_dirty()) {
+        if (needs_copy || proxy->render_bbox.is_dirty()) {
             proxy->render_bbox.copy_to_device(scene_ws.render_bboxes + i, stream);
         }
         
-        if (needs_update || proxy->training_bbox.is_dirty()) {
+        if (needs_copy || proxy->training_bbox.is_dirty()) {
             proxy->training_bbox.copy_to_device(scene_ws.training_bboxes + i, stream);
         }
         
-        if (needs_update || proxy->transform.is_dirty()) {
+        if (needs_copy || proxy->transform.is_dirty()) {
             proxy->transform.copy_to_device(scene_ws.nerf_transforms + i, stream);
         }
 
