@@ -18,9 +18,12 @@ struct NeRF {
     DatasetWorkspace dataset_ws;
     NetworkParamsWorkspace params;
     OccupancyGrid occupancy_grid;
+    NerfNetwork network;
     NeRFProxy* proxy;
 
     const int device_id;
+    
+    bool is_image_data_loaded = false;
 
     NeRF(const int& device_id, NeRFProxy* proxy);
 

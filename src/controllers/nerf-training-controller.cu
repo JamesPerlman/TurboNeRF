@@ -19,32 +19,40 @@ using namespace nlohmann;
 TURBO_NAMESPACE_BEGIN
 
 NeRFTrainingController::NeRFTrainingController(
-	NeRFProxy* nerf_proxy,
-	const uint32_t batch_size
+	NeRFProxy* proxy
 )
-	: nerf_proxy(nerf_proxy)
-{
-	contexts.reserve(DeviceManager::get_device_count());
-	DeviceManager::foreach_device(
-		[this, nerf_proxy, batch_size](const int& device_id, const cudaStream_t& stream) {
-			contexts.emplace_back(
-				stream,
-				TrainingWorkspace(device_id),
-				&nerf_proxy->dataset.value(),
-				&nerf_proxy->nerfs[device_id],
-				NerfNetwork(device_id, nerf_proxy->training_bbox.get().size()),
-				batch_size
-			);
-		}
-	);
-}
+	: proxy(proxy)
+{}
 
-void NeRFTrainingController::setup_data() {
+void NeRFTrainingController::setup_data(uint32_t batch_size) {
+
+	if (contexts.size() == 0) {
+		// only create contexts if they don't exist yet
+		contexts.reserve(DeviceManager::get_device_count());
+		DeviceManager::foreach_device(
+			[this, batch_size](const int& device_id, const cudaStream_t& stream) {
+				contexts.emplace_back(
+					stream,
+					TrainingWorkspace(device_id),
+					this->proxy->dataset.has_value() ? &this->proxy->dataset.value() : nullptr,
+					&this->proxy->nerfs[device_id],
+					batch_size
+				);
+			}
+		);
+	}
+
+	// update contexts with new batch size if necessary
+	for (auto& ctx : contexts) {
+		if (ctx.batch_size != batch_size) {
+			ctx.batch_size = batch_size;
+		}
+	}
 
 	// we only prepare the first NeRF (for the first device) - the rest we will copy data to
 	auto& ctx = contexts[0];
 
-	ctx.nerf->occupancy_grid.set_aabb_scale(ctx.dataset->bounding_box.size());
+	ctx.nerf->occupancy_grid.set_aabb_scale(ctx.nerf->proxy->training_bbox.get().size());
 	
 	// TODO: we should not initialize an occupancy grid if one already exists (aka if we loaded the nerf from a file)
 	ctx.nerf->occupancy_grid.initialize(ctx.stream, true);
@@ -61,8 +69,8 @@ void NeRFTrainingController::setup_data() {
 		ctx.batch_size,
 		ctx.nerf->occupancy_grid.n_levels,
 		ctx.nerf->occupancy_grid.resolution_i,
-		ctx.network.get_concat_buffer_width(),
-		ctx.network.get_padded_output_width()
+		ctx.nerf->network.get_concat_buffer_width(),
+		ctx.nerf->network.get_padded_output_width()
 	);
 
 	// Copy nerf's OccupancyGrid to the GPU
@@ -76,39 +84,33 @@ void NeRFTrainingController::setup_data() {
 		)
 	);
 
-	nerf_proxy->training_step = 0;
+	proxy->training_step = 0;
 
-	// Initialize the network
-	ctx.network.setup_data(ctx.stream, ctx.nerf->params);
-
-	nerf_proxy->can_train = true;
-
-	_is_training_memory_allocated = true;
+	ctx.nerf->network.update_params_if_needed(ctx.stream, ctx.nerf->params);
 }
 
 // this should be called before destroying the training controller
-void NeRFTrainingController::clear_training_data() {
-	// this ONLY clears data for the training state, afterwards the nerf can still be used for rendering
+void NeRFTrainingController::teardown() {
+	proxy = nullptr;
 
 	// TODO: for all contexts
 	auto& ctx = contexts[0];
 	ctx.workspace.free_allocations();
+	ctx.nerf->network.free_training_data();
 
 	// destroy contexts
 	ctx.destroy();
 
 	ctx.n_rays_in_batch = ctx.batch_size;
 	ctx.n_samples_in_batch = 0;
-
-	_is_image_data_loaded = false;
-	_is_training_memory_allocated = false;
 }
 
-void NeRFTrainingController::reset_training_data() {
+void NeRFTrainingController::reset_training() {
 
 	// TODO: for all contexts
 	auto& ctx = contexts[0];
 
+	ctx.nerf->network.free_training_data();
 	ctx.nerf->occupancy_grid.free_device_memory();
 	ctx.nerf->params.free_allocations();
 	ctx.workspace.free_allocations();
@@ -174,10 +176,10 @@ void NeRFTrainingController::load_images(
 	// unload images from the CPU
 	ctx.dataset->unload_images();
 
-	_is_image_data_loaded = true;
+	ctx.nerf->is_image_data_loaded = true;
 
 	// signal that we need to updqte the dataset
-	nerf_proxy->is_dataset_dirty = true;
+	proxy->is_dataset_dirty = true;
 }
 
 NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
@@ -189,20 +191,20 @@ NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
 	ctx.alpha_selection_threshold = alpha_selection_threshold;
 	ctx.min_step_size = min_step_size;
 
-	nerf_proxy->update_dataset_if_necessary(ctx.stream);
+	proxy->update_dataset_if_necessary(ctx.stream);
 	
-	float loss = trainer.train_step(ctx, nerf_proxy->training_step);
-	nerf_proxy->training_step++;
+	float loss = trainer.train_step(ctx, proxy->training_step);
+	proxy->training_step++;
 
 	NeRFTrainingController::TrainingMetrics info;
 	
 	info.loss = loss;
-	info.step = nerf_proxy->training_step;
+	info.step = proxy->training_step;
 	info.n_rays = ctx.n_rays_in_batch;
 	info.n_samples = ctx.n_samples_in_batch;
 
-	if (!nerf_proxy->can_render && nerf_proxy->training_step >= 1) {
-		nerf_proxy->can_render = true;
+	if (!proxy->can_render && proxy->training_step >= 1) {
+		proxy->can_render = true;
 	}
 
 	return info;
@@ -232,7 +234,7 @@ std::vector<size_t> NeRFTrainingController::get_cuda_memory_allocated() const {
         size_t total = 0;
 
         total += ctx.workspace.get_bytes_allocated();
-		total += ctx.network.workspace.get_bytes_allocated();
+		total += ctx.nerf->network.workspace.get_bytes_allocated();
 
         sizes[i++] = total;
     }

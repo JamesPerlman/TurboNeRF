@@ -23,9 +23,11 @@ struct NerfNetwork {
 	std::shared_ptr<tcnn::Network<tcnn::network_precision_t>> color_network;
 	std::shared_ptr<tcnn::NGPAdamOptimizer<tcnn::network_precision_t>> optimizer;
 	
-	NerfNetwork(const int& device_id, const int& aabb_scale = 16);
+	NerfNetwork(const int& device_id);
 
-	void setup_data(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws);
+	void update_params_if_needed(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws);
+
+	void free_training_data();
 	
 	void set_params(NetworkParamsWorkspace& params_ws);
 
@@ -68,11 +70,16 @@ struct NerfNetwork {
 		return color_network->padded_output_width();
 	};
 
+	bool can_train() const {
+		return _can_train;
+	};
+
+
 private:
 
 	int aabb_scale = 0;
 	uint32_t batch_size = 0;
-	bool can_train = false;
+	bool _can_train = false;
 
 	void update_aabb_scale_if_needed(const int& aabb_scale);
 

@@ -61,8 +61,8 @@ uint32_t count_1s(const T* buffer, uint8_t* counts, const size_t& n_elements, cu
             )
         );
 
-        for (int i = 0; i < num_remaining_bytes; i++) {
-            for (int j = 0; j < 8; j++) {
+        for (int i = 0; i < num_remaining_bytes; ++i) {
+            for (int j = 0; j < 8; ++j) {
                 total_count += (remaining_bytes[i] >> j) & 1;
             }
         }

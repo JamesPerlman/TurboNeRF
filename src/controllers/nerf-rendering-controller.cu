@@ -32,7 +32,6 @@ NeRFRenderingController::NeRFRenderingController(
                 stream,
                 RenderingWorkspace(device_id),
                 SceneWorkspace(device_id),
-                NerfNetwork(device_id, 16),
                 this->batch_size
             );
         }
@@ -140,7 +139,6 @@ std::vector<size_t> NeRFRenderingController::get_cuda_memory_allocated() const {
         
         total += ctx.render_ws.get_bytes_allocated();
         total += ctx.scene_ws.get_bytes_allocated();
-        total += ctx.network.workspace.get_bytes_allocated();
 
         sizes[i++] = total;
     }

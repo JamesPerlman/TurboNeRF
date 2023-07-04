@@ -6,10 +6,11 @@ TURBO_NAMESPACE_BEGIN
 
 NeRF::NeRF(const int& device_id, NeRFProxy* proxy)
     : device_id(device_id)
-    , proxy(proxy)
     , dataset_ws(device_id)
     , params(device_id)
     , occupancy_grid(device_id, 128)
+    , network(device_id)
+    , proxy(proxy)
 { };
 
 void NeRF::free_device_memory() {

@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
 	proxy->attach_dataset(dataset);
 
 	// set up training controller
-	auto trainer = turbo::NeRFTrainingController(proxy, NeRFConstants::batch_size);
+	auto trainer = turbo::NeRFTrainingController(proxy);
 	trainer.setup_data();
 	trainer.load_images([](int a, int b) {
 		printf("Loading images: %d / %d\n", a, b);

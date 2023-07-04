@@ -258,7 +258,7 @@ uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& t
 			);
 
 			// query the density network
-			ctx.network.inference(
+			ctx.nerf->network.inference(
 				ctx.stream,
 				ctx.nerf->params,
 				batch_size,
@@ -309,7 +309,7 @@ float Trainer::train_step(
 	// Generate training batch
 	generate_next_training_batch(ctx);
 
-	const float loss = ctx.network.train(
+	const float loss = ctx.nerf->network.train(
 		ctx.stream,
 		ctx.nerf->params,
 		training_step,

@@ -52,16 +52,17 @@ struct NeRFTrainingController {
 
 	// constructor
 	NeRFTrainingController(
-		NeRFProxy* proxy,
-		const uint32_t batch_size
+		NeRFProxy* proxy
 	);
 
+	NeRFTrainingController() = default;
+
 	// public methods
-	void setup_data();
+	void setup_data(uint32_t batch_size = NeRFConstants::batch_size);
 
-	void reset_training_data();
+	void teardown();
 
-	void clear_training_data();
+	void reset_training();
 	
 	void load_images(std::function<void(int, int)> on_image_loaded = {});
 	
@@ -69,29 +70,18 @@ struct NeRFTrainingController {
 
 	OccupancyGridMetrics update_occupancy_grid(const uint32_t& training_step);
 
-	uint32_t get_training_step() const {
-		return nerf_proxy->training_step;
-	}
-	
-	bool is_ready_to_train() const {
-		return _is_training_memory_allocated && _is_image_data_loaded;
-	}
-	
-	bool is_image_data_loaded() const {
-		return _is_image_data_loaded;
-	}
-
 	// training settings
 	// TODO: put these in their own struct?
 	float alpha_selection_threshold = 1.0f;
 	float alpha_selection_probability = 1.0f;
 	float min_step_size = NeRFConstants::min_step_size;
+	
+	NeRFProxy* proxy;
 
 private:
 	// private properties
 	std::vector<Trainer::Context> contexts;
 	Trainer trainer;
-	NeRFProxy* nerf_proxy;
 
 	bool _is_image_data_loaded = false;
 	bool _is_training_memory_allocated = false;

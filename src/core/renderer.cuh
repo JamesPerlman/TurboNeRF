@@ -15,7 +15,6 @@ struct Renderer {
         const cudaStream_t& stream;
         RenderingWorkspace render_ws;
         SceneWorkspace scene_ws;
-        NerfNetwork network;
 
         const uint32_t batch_size;
 
@@ -25,13 +24,11 @@ struct Renderer {
             const cudaStream_t& stream,
             RenderingWorkspace render_ws,
             SceneWorkspace scene_ws,
-            NerfNetwork network,
             uint32_t batch_size
         )
             : stream(stream)
             , render_ws(std::move(render_ws))
             , scene_ws(std::move(scene_ws))
-            , network(std::move(network))
             , batch_size(std::move(batch_size))
         {};
     };
@@ -58,6 +55,12 @@ struct Renderer {
         const std::vector<NeRF*>& nerfs,
         const uint32_t& n_rays,
         bool always_copy_new_props
+    );
+
+    void enlarge_render_workspace_if_needed(
+        Renderer::Context& ctx,
+        const std::vector<NeRF*>& nerfs,
+        const uint32_t& n_rays
     );
 };
 

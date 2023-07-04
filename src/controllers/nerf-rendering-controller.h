@@ -26,6 +26,8 @@ private:
 
     RenderPattern pattern;
 
+    std::vector<size_t> get_cuda_memory_allocated() const;
+
 public:
     NeRFRenderingController(const RenderPattern& pattern = RenderPattern::LinearChunks, const uint32_t& batch_size = 0);
 
@@ -36,8 +38,6 @@ public:
     );
 
     void cancel();
-
-    std::vector<size_t> get_cuda_memory_allocated() const;
 };
 
 TURBO_NAMESPACE_END

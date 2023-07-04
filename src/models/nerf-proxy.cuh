@@ -20,6 +20,8 @@ TURBO_NAMESPACE_BEGIN
 struct NeRFProxy {
     std::vector<NeRF> nerfs;
     std::optional<Dataset> dataset;
+
+    int id = -1;
     
     // nerf props
     UpdatableProperty<BoundingBox> training_bbox = BoundingBox();
@@ -28,13 +30,19 @@ struct NeRFProxy {
 
     bool is_valid = false;
     bool can_render = false;
-    bool can_train = false;
-    bool is_visible = true;
     bool is_dataset_dirty = true;
-
+    bool is_visible = true;
 	uint32_t training_step = 0;
-    int id = -1;
 
+    // runloop flags (these are only used by the Blender bridge)
+    // TODO: move these to a separate struct (maybe a wrapper?)
+    bool should_destroy = false;
+    bool should_reset = false;
+    bool should_train = false;
+    bool should_free_training_data = false;
+    NeRFProxy* clone_source = nullptr;
+
+    // constructor
     NeRFProxy() = default;
     
     // TODO:
@@ -89,6 +97,12 @@ struct NeRFProxy {
         }
     }
 
+    void free_training_data() {
+        for (auto& nerf : nerfs) {
+            nerf.network.free_training_data();
+        }
+    }
+
     void attach_dataset(const Dataset& dataset) {
         this->dataset = dataset;
         this->render_bbox = dataset.bounding_box;
@@ -99,6 +113,34 @@ struct NeRFProxy {
     void detach_dataset() {
         this->dataset.reset();
         this->is_dataset_dirty = true;
+    }
+
+    bool can_train() const {
+        if (!is_valid) {
+            return false;
+        }
+
+        for (const auto& nerf : nerfs) {
+            if (!nerf.network.can_train() || !nerf.is_image_data_loaded) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    bool is_image_data_loaded() const {
+        if (!is_valid) {
+            return false;
+        }
+
+        for (const auto& nerf : nerfs) {
+            if (!nerf.is_image_data_loaded) {
+                return false;
+            }
+        }
+
+        return true;
     }
 };
 

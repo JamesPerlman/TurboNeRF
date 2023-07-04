@@ -168,6 +168,15 @@ void Dataset::unload_images() {
     }
 }
 
+bool Dataset::is_loaded_cpu() const {
+    for (const auto& image : images) {
+        if (!image.is_loaded()) {
+            return false;
+        }
+    }
+    return true;
+}
+
 json Dataset::to_json() const {
     json json_data;
 

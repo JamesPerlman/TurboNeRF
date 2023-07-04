@@ -183,7 +183,6 @@ struct FileManager {
 
 		proxy->is_valid = true;
 	    proxy->can_render = true;
-		proxy->can_train = false;
     }
 };
 

@@ -25,7 +25,7 @@ dataset.load_transforms()
 nerf = manager.create()
 nerf.attach_dataset(dataset)
 
-trainer = tn.Trainer(nerf, batch_size=2<<21)
+trainer = tn.Trainer(nerf)
 
 renderer = tn.Renderer(pattern=tn.RenderPattern.LinearChunks)
 
@@ -73,7 +73,7 @@ render_cam = tn.Camera(
 # this method loads all the images and other data the Trainer needs
 
 
-trainer.setup_data()
+trainer.setup_data(batch_size=2<<21)
 
 def img_load_status(i, n):
     print(f"Loaded image {i} of {n}")

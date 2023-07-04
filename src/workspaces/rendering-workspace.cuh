@@ -45,6 +45,8 @@ struct RenderingWorkspace: Workspace {
 
 	uint32_t n_rays = 0;
 	uint32_t n_nerfs = 0;
+	size_t n_network_concat_elements = 0;
+	size_t n_network_output_elements = 0;
 
 	void enlarge(
 		const cudaStream_t& stream,
@@ -109,6 +111,8 @@ struct RenderingWorkspace: Workspace {
 		bg_rgba			= allocate<float>(stream, n_output_pixel_elements);
 
 		this->n_rays = n_rays;
+		this->n_network_concat_elements = n_network_concat_elements;
+		this->n_network_output_elements = n_network_output_elements;
 	};
 };
 

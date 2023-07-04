@@ -32,17 +32,8 @@ void Renderer::prepare_for_rendering(
     bool always_copy_new_props
 ) {
     cudaStream_t stream = ctx.stream;
-    auto& render_ws = ctx.render_ws;
 
-    if (render_ws.n_rays != n_rays) {
-        render_ws.enlarge(
-            stream,
-            n_rays,
-            ctx.batch_size,
-            ctx.network.get_concat_buffer_width(),
-            ctx.network.get_padded_output_width()
-        );
-    }
+    enlarge_render_workspace_if_needed(ctx, nerfs, n_rays);
 
     auto& scene_ws = ctx.scene_ws;
     const uint32_t n_nerfs = nerfs.size();
@@ -102,6 +93,41 @@ void Renderer::prepare_for_rendering(
                 cudaMemcpyHostToDevice,
                 stream
             )
+        );
+    }
+}
+
+void Renderer::enlarge_render_workspace_if_needed(
+    Renderer::Context& ctx,
+    const std::vector<NeRF*>& nerfs,
+    const uint32_t& n_rays
+) {
+    auto& render_ws = ctx.render_ws;
+
+    size_t concat_buffer_width = 0;
+    size_t padded_output_width = 0;
+
+    // need to find the largest network sizes of all nerfs
+    for (auto& nerf : nerfs) {
+        auto& proxy = nerf->proxy;
+        if (!proxy->can_render) {
+            continue;
+        }
+
+        concat_buffer_width = std::max(concat_buffer_width, nerf->network.get_concat_buffer_width());
+        padded_output_width = std::max(padded_output_width, nerf->network.get_padded_output_width());
+    }
+
+    if (render_ws.n_rays != n_rays ||
+        render_ws.n_network_concat_elements != concat_buffer_width ||
+        render_ws.n_network_output_elements != padded_output_width)
+    {
+        render_ws.enlarge(
+            ctx.stream,
+            n_rays,
+            ctx.batch_size,
+            concat_buffer_width,
+            padded_output_width
         );
     }
 }
@@ -368,7 +394,7 @@ void Renderer::perform_task(
             // query the NeRF network for the samples
 
             // the data always flows to net_concat[1] and net_output[1], sorry for all the ternaries and conditionals
-            ctx.network.inference(
+            nerf->network.inference(
                 stream,
                 nerf->params,
                 mini_network_batch,

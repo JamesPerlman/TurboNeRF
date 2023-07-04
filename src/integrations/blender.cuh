@@ -4,7 +4,6 @@
 #include <glad/glad.h>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 
 #include "../controllers/nerf-rendering-controller.h"
@@ -13,6 +12,9 @@
 #include "../models/nerf-proxy.cuh"
 #include "../models/render-request.cuh"
 #include "../render-targets/cpu-render-buffer.cuh"
+// #include "../services/file-manager.cuh"
+#include "../services/nerf-manager.cuh"
+#include "../utils/observable.cuh"
 #include "../utils/queues.h"
 #include "../common.h"
 
@@ -23,9 +25,7 @@ class BlenderBridge
      /** EVENT OBSERVERS & HELPERS **/
     public:
     
-    // TODO: This could be abstracted to a base class
-
-    enum class ObservableEvent {
+    enum class Event {
         OnUpdateOccupancyGrid,
         OnPreviewStart,
         OnPreviewProgress,
@@ -47,33 +47,22 @@ class BlenderBridge
     };
 
     using EventCallbackParam = std::map<std::string, std::any>;
-    using EventCallback = std::function<void(EventCallbackParam)>;
 
-    struct EventObserver {
-        uint32_t id;
-        ObservableEvent event;        
-
-        EventCallback callback;
-
-        EventObserver(uint32_t id, ObservableEvent event, EventCallback callback)
-            : id(id)
-            , event(event)
-            , callback(callback)
-        {};
-    };
+    Observable<Event, EventCallbackParam> event_bus;
 
     // be careful when accessing these
     std::shared_ptr<NeRFRenderingController> previewer = nullptr;
     std::shared_ptr<NeRFRenderingController> renderer = nullptr;
-    std::shared_ptr<NeRFTrainingController> trainer = nullptr;
+
+    // one training controller per NeRFProxy
+    std::vector<NeRFTrainingController> trainers;
 
     /** PRIVATE PROPERTIES */
     private:
+
+    NeRFManager _nerf_manager;
     CPURenderBuffer _preview_target;
-    CPURenderBuffer _render_target;
-    std::vector<EventObserver> _event_observers;
-    uint32_t _event_observer_id = 0;
-    std::mutex _event_dispatch_mutex;
+    CPURenderBuffer _render_target;    
 
     TwoItemQueue _render_queue;
     DebounceQueue _draw_queue;
@@ -85,14 +74,14 @@ class BlenderBridge
     bool _is_training = false;
     bool _is_rendering = false;
     bool _is_previewing = false;
-    bool _needs_reset_training = false;
-    bool _needs_clear_training = false;
 
     float _preview_progress = 0.0f;
     float _render_progress = 0.0f;
 
     GLuint _render_tex_id = 0;
-    
+
+    std::vector<uint32_t> _nerf_manager_observers;
+
     public:
 
     BlenderBridge()
@@ -100,121 +89,82 @@ class BlenderBridge
         , renderer(new NeRFRenderingController(RenderPattern::LinearChunks))
         , _render_queue()
         , _draw_queue(1)
+        , _nerf_manager()
     {
         if (!gladLoadGL()) {
             throw std::runtime_error("Failed to load OpenGL with glad.");
         };
+
+        trainers.resize(NeRFManager::n_max_nerfs());
     };
 
-   /**
-    * EVENT OBSEREVR METHODS
-    */
-
-    uint32_t add_observer(ObservableEvent event, EventCallback callback) {
-        std::lock_guard lock(_event_dispatch_mutex);
-        uint32_t id = _event_observer_id++;
-        _event_observers.emplace_back(id, event, callback);
-        return id;
+    // just forward these to the bus for now
+    uint32_t add_observer(Event event, std::function<void(EventCallbackParam)> callback) {
+        return event_bus.add_observer(event, callback);
     }
 
     void remove_observer(uint32_t id) {
-        std::lock_guard lock(_event_dispatch_mutex);
-        // first find the index of the observer with find_if
-        auto it = std::find_if(_event_observers.begin(), _event_observers.end(), [id](const EventObserver& observer) {
-            return observer.id == id;
-        });
-        // if it's invalid, early return
-        if (it == _event_observers.end()) {
-            return;
-        }
-
-        // remove the observer
-        _event_observers.erase(it);
-
-        // if the number of observers is 0, reset the event observer id
-        if (_event_observers.size() == 0) {
-            _event_observer_id = 0;
-        }
-
-        // otherwise set the event observer id to the max id + 1
-        else {
-            _event_observer_id = 1 + std::max_element(
-                _event_observers.begin(),
-                _event_observers.end(),
-                [](const EventObserver& a, const EventObserver& b) {
-                    return a.id < b.id;
-                }
-            )->id;
-        }
+        event_bus.remove_observer(id);
     }
 
     private:
-    void log_event(ObservableEvent event) {
+    void log_event(Event event) {
         
         switch (event) {
-            case ObservableEvent::OnUpdateOccupancyGrid:
+            case Event::OnUpdateOccupancyGrid:
                 printf("OnUpdateOccupancyGrid\n");
                 break;
-            case ObservableEvent::OnPreviewStart:
+            case Event::OnPreviewStart:
                 printf("OnPreviewStart\n");
                 break;
-            case ObservableEvent::OnPreviewProgress:
+            case Event::OnPreviewProgress:
                 printf("OnPreviewProgress\n");
                 break;
-            case ObservableEvent::OnPreviewComplete:
+            case Event::OnPreviewComplete:
                 printf("OnPreviewComplete\n");
                 break;
-            case ObservableEvent::OnPreviewCancel:
+            case Event::OnPreviewCancel:
                 printf("OnPreviewCancel\n");
                 break;
-            case ObservableEvent::OnRenderStart:
+            case Event::OnRenderStart:
                 printf("OnRenderStart\n");
                 break;
-            case ObservableEvent::OnRenderProgress:
+            case Event::OnRenderProgress:
                 printf("OnRenderProgress\n");
                 break;
-            case ObservableEvent::OnRenderComplete:
+            case Event::OnRenderComplete:
                 printf("OnRenderComplete\n");
                 break;
-            case ObservableEvent::OnRenderCancel:
+            case Event::OnRenderCancel:
                 printf("OnRenderCancel\n");
                 break;
-            case ObservableEvent::OnRequestRedraw:
+            case Event::OnRequestRedraw:
                 printf("OnRequestRedraw\n");
                 break;
-            case ObservableEvent::OnTrainingImageLoaded:
+            case Event::OnTrainingImageLoaded:
                 printf("OnTrainingImageLoaded\n");
                 break;
-            case ObservableEvent::OnTrainingImagesLoadComplete:
+            case Event::OnTrainingImagesLoadComplete:
                 printf("OnTrainingImagesLoadComplete\n");
                 break;
-            case ObservableEvent::OnTrainingImagesLoadStart:
+            case Event::OnTrainingImagesLoadStart:
                 printf("OnTrainingImagesLoadStart\n");
                 break;
-            case ObservableEvent::OnTrainingImagesUnloaded:
+            case Event::OnTrainingImagesUnloaded:
                 printf("OnTrainingImagesUnloaded\n");
                 break;
-            case ObservableEvent::OnTrainingReset:
+            case Event::OnTrainingReset:
                 printf("OnTrainingReset\n");
                 break;
-            case ObservableEvent::OnTrainingStart:
+            case Event::OnTrainingStart:
                 printf("OnTrainingStart\n");
                 break;
-            case ObservableEvent::OnTrainingStop:
+            case Event::OnTrainingStop:
                 printf("OnTrainingStop\n");
                 break;
-            case ObservableEvent::OnTrainingStep:
+            case Event::OnTrainingStep:
                 printf("OnTrainingStep\n");
                 break;
-        }
-    }
-
-    void dispatch(ObservableEvent event, std::map<std::string, std::any> data = {}) {
-        std::lock_guard lock(_event_dispatch_mutex);
-        for (auto& observer : _event_observers) {
-            if (observer.event == event) {
-                observer.callback(data);
-            }
         }
     }
 
@@ -228,42 +178,71 @@ class BlenderBridge
      */
     private:
 
+    // this is needed for certain actions to work while training
+    bool is_waiting_for_some_work() {
+        for (int i = 0; i < _nerf_manager.n_proxies(); ++i) {
+            auto proxy = _nerf_manager.proxy_for_id(i);
+            if (proxy->should_reset || proxy->should_destroy || proxy->should_free_training_data) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void runloop_worker() {
         
-        // potential TODO here - the dispatch() calls will slow down the run loop depending on how many observers there are, and what the callbacks do
-        // so we may want to add them to a queue and dispatch them in another thread.  Although this can become problematic too.
+        // potential TODO here - the event_bus.dispatch() calls will slow down the run loop depending on how many observers there are, and what the callbacks do
+        // so we may want to add them to a queue and event_bus.dispatch them in another thread.  Although this can become problematic too.
         // in general this loop is horrible.  it is robust to poor thread management but there must be a more beautiful architecture.
 
         do {
-            // check if we need to train a step
-            if (trainer != nullptr && _is_training) {
-                // train a single step
-                auto metrics = trainer->train_step();
-                auto training_step = trainer->get_training_step();
-                if (training_step % 16 == 0) {
-                    auto occ_metrics = trainer->update_occupancy_grid(training_step);
-                    dispatch(ObservableEvent::OnUpdateOccupancyGrid, occ_metrics.as_map());
+            for (int i = 0; i < _nerf_manager.n_proxies(); ++i) {
+                auto proxy = _nerf_manager.proxy_for_id(i);
+                
+                if (!proxy->is_valid) {
+                    continue;
                 }
-                dispatch(ObservableEvent::OnTrainingStep, metrics.as_map());
-            }
-            
-            // check if we need to reset training
-            if (_needs_reset_training) {
-                _needs_reset_training = false;
-                if (trainer != nullptr) {
-                    trainer->reset_training_data();
-                    dispatch(ObservableEvent::OnTrainingReset);
+                
+                auto trainer = trainer_for_proxy(proxy);
+                
+                // check if we need to train a step
+                if (_is_training && proxy->should_train && proxy->can_train()) {
+                    // train a single step
+                    auto metrics = trainer->train_step();
+                    auto training_step = proxy->training_step;
+                    if (training_step % 16 == 0) {
+                        auto occ_metrics = trainer->update_occupancy_grid(training_step);
+                        event_bus.dispatch(Event::OnUpdateOccupancyGrid, occ_metrics.as_map());
+                    }
+                    event_bus.dispatch(Event::OnTrainingStep, metrics.as_map());
                 }
-            }
-            
+                
+                // check if we need to reset training
+                if (proxy->should_reset) {
+                    proxy->should_reset = false;
+                    if (proxy->can_train()) {
+                        trainer->reset_training();
+                        event_bus.dispatch(Event::OnTrainingReset);
+                    }
+                }
 
-            // check if we need to clear training data
-            if (_needs_clear_training) {
-                _needs_clear_training = false;
-                if (trainer != nullptr) {
-                    trainer->clear_training_data();
-                    trainer.reset();
-                    dispatch(ObservableEvent::OnTrainingImagesUnloaded);
+                // check if we need to delete the nerf
+                if (proxy->should_destroy) {
+                    proxy->should_destroy = false;
+                    if (proxy->can_train()) {
+                        trainer->teardown();
+                        _nerf_manager.destroy(proxy);
+                    }
+                }
+
+                // check if we need to unload training data
+                if (proxy->should_free_training_data) {
+                    proxy->should_free_training_data = false;
+                    if (proxy->can_train()) {
+                        proxy->free_training_data();
+                        trainer->teardown();
+                        event_bus.dispatch(Event::OnTrainingImagesUnloaded);
+                    }
                 }
             }
 
@@ -271,7 +250,7 @@ class BlenderBridge
             _render_queue.work();
             _render_queue.wait();
             
-        } while (_keep_runloop_alive || _needs_reset_training || _needs_clear_training);
+        } while (_keep_runloop_alive || is_waiting_for_some_work());
     }
 
     void start_runloop(bool keep_alive) {
@@ -302,77 +281,132 @@ class BlenderBridge
         }
     }
 
+    /** NERF MANAGER -> TRAINERS SYNCHRONIZATION **/
+
+    NeRFTrainingController* trainer_for_proxy(const NeRFProxy* proxy) {
+        for (int i = 0; i < _nerf_manager.n_proxies(); ++i) {
+            if (proxy == _nerf_manager.proxy_for_id(i)) {
+                auto& trainer = trainers[i];
+                return &trainer;
+            }
+        }
+        throw std::runtime_error("No trainer found for proxy with id " + std::to_string(proxy->id));
+    }
+
     /** TRAINING **/
     public:
+    
+    /** NERF OBJECT CREATION / CLONING / DESTRUCTION **/
 
-    uint32_t get_training_step() const {
-        if (trainer == nullptr) {
-            return 0;
+    NeRFProxy* get_nerf(int id) {
+        return _nerf_manager.proxy_for_id(id);
+    }
+
+    std::vector<NeRFProxy*> get_nerfs() {
+        std::vector<NeRFProxy*> proxies;
+        for (int i = 0; i < _nerf_manager.n_proxies(); ++i) {
+            auto proxy = _nerf_manager.proxy_for_id(i);
+            if (proxy != nullptr && proxy->is_valid) {
+                proxies.push_back(proxy);
+            }
         }
-        return trainer->get_training_step();
+        return proxies;
+    }
+    
+    NeRFProxy* create_nerf(const Dataset& dataset) {
+        auto proxy = _nerf_manager.create();
+        proxy->attach_dataset(dataset);
+        auto trainer = trainer_for_proxy(proxy);
+        trainer->proxy = proxy;
+        trainer->setup_data();
+        return proxy;
     }
 
-    bool can_load_images() const {
-        return trainer != nullptr && !trainer->is_image_data_loaded();
+    NeRFProxy* clone_nerf(const NeRFProxy* proxy) {
+        auto clone = _nerf_manager.clone(proxy);
+        auto trainer = trainer_for_proxy(clone);
+        trainer->proxy = clone;
+        trainer->setup_data();
+        return clone;
     }
 
-    bool is_image_data_loaded() const {
-        return trainer != nullptr && trainer->is_image_data_loaded();
+    void destroy_nerf(NeRFProxy* proxy) {
+        auto trainer = trainer_for_proxy(proxy);
+        trainer->teardown();
+        _nerf_manager.destroy(proxy);
     }
 
-    bool is_ready_to_train() const {
-        return trainer != nullptr && trainer->is_ready_to_train();
+    bool can_any_nerf_train() {
+        for (int i = 0; i < _nerf_manager.n_proxies(); ++i) {
+            NeRFProxy* proxy = _nerf_manager.proxy_for_id(i);
+            if (proxy == nullptr) {
+                continue;
+            }
+            
+            if (proxy->can_train()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // detect if any nerfs should train
+    bool should_any_nerf_train() {
+        for (int i = 0; i < _nerf_manager.n_proxies(); ++i) {
+            NeRFProxy* proxy = _nerf_manager.proxy_for_id(i);
+            if (proxy->should_train && proxy->can_train()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     bool is_training() const {
         return _is_training;
     }
 
-    void load_training_images(
-        NeRFProxy* proxy,
-        const uint32_t& batch_size = NeRFConstants::batch_size
-    ) {
-        if (trainer == nullptr) {
-            trainer.reset(new NeRFTrainingController(proxy, batch_size));
+    void load_training_images(NeRFProxy* proxy) {
+        auto trainer = trainer_for_proxy(proxy);
+    
+        _img_load_future = std::async(
+            std::launch::async,
+            [this, trainer, proxy]() {
+                this->event_bus.dispatch(
+                    Event::OnTrainingImagesLoadStart,
+                    {{ "n_total", proxy->dataset->images.size() }}
+                );
 
-            _img_load_future = std::async(
-                std::launch::async,
-                [this, proxy]() {
-                    this->dispatch(
-                        ObservableEvent::OnTrainingImagesLoadStart,
-                        {{ "n_total", proxy->dataset->images.size() }}
-                    );
+                trainer->load_images(
+                    [this](int n_loaded, int n_total) {
+                        std::map<std::string, std::any> data{
+                            {"n_loaded", n_loaded},
+                            {"n_total", n_total}
+                        };
+                        this->event_bus.dispatch(Event::OnTrainingImageLoaded, data);
+                    }
+                );
 
-                    printf("setting up data\n");
-
-                    trainer->setup_data();
-                    printf("loading images\n");
-                    trainer->load_images(
-                        [this](int n_loaded, int n_total) {
-                            std::map<std::string, std::any> data{
-                                {"n_loaded", n_loaded},
-                                {"n_total", n_total}
-                            };
-                            this->dispatch(ObservableEvent::OnTrainingImageLoaded, data);
-                        }
-                    );
-                    
-                    this->dispatch(ObservableEvent::OnTrainingImagesLoadComplete);
-                }
-            );
-        }
+                proxy->should_train = true;
+                
+                this->event_bus.dispatch(Event::OnTrainingImagesLoadComplete);
+            }
+        );
     }
 
-    void unload_training_images() {
-        if (trainer == nullptr) {
+    void unload_training_images(NeRFProxy* proxy) {
+        if (!proxy->can_train()) {
             return;
         }
 
-        _needs_clear_training = true;
+        proxy->should_train = false;
+        proxy->should_free_training_data = true;
 
-        stop_training();
-        cancel_preview();
-        cancel_render();
+        if (!should_any_nerf_train()) {
+            stop_training();
+        }
+
         start_runloop(false);
     }
 
@@ -384,9 +418,9 @@ class BlenderBridge
         _is_training = true;
         cancel_preview();
         start_runloop(true);
-        dispatch(ObservableEvent::OnTrainingStart);
+        event_bus.dispatch(Event::OnTrainingStart);
     }
-
+    
     void stop_training() {
         if (!_is_training) {
             return;
@@ -394,15 +428,35 @@ class BlenderBridge
 
         _is_training = false;
         stop_runloop();
-        dispatch(ObservableEvent::OnTrainingStop);
+        event_bus.dispatch(Event::OnTrainingStop);
     }
 
-    void reset_training() {
-        if (trainer == nullptr) {
+    void enable_training(NeRFProxy* proxy) {
+        if (proxy->should_train) {
             return;
         }
 
-        _needs_reset_training = true;
+        proxy->should_train = true;
+
+        // start_training();
+    }
+
+    void disable_training(NeRFProxy* proxy) {
+        if (!proxy->should_train) {
+            return;
+        }
+
+        proxy->should_train = false;
+
+        if (!should_any_nerf_train()) {
+            stop_training();
+        }
+    }
+
+    void reset_training(NeRFProxy* proxy) {
+        if (!proxy->can_train()) {
+            return;
+        }
 
         cancel_preview();
         start_runloop(false);
@@ -455,23 +509,23 @@ class BlenderBridge
                 [this]() {
                     this->_render_progress = 1.0f;
                     this->_render_target.synchronize();
-                    this->dispatch(ObservableEvent::OnRenderComplete);
+                    this->event_bus.dispatch(Event::OnRenderComplete);
                     this->_is_rendering = false;
                 },
                 // on_progress
                 [this](float progress) {
                     this->_render_progress = progress;
                     this->_render_target.synchronize();
-                    this->dispatch(ObservableEvent::OnRenderProgress);
+                    this->event_bus.dispatch(Event::OnRenderProgress);
                 },
                 // on_cancel
                 [this]() {
-                    this->dispatch(ObservableEvent::OnRenderCancel);
+                    this->event_bus.dispatch(Event::OnRenderCancel);
                     this->_is_rendering = false;
                 }
             );
 
-            this->dispatch(ObservableEvent::OnRenderStart);
+            this->event_bus.dispatch(Event::OnRenderStart);
             this->_render_target.clear();
             this->renderer->submit(request);
         });
@@ -528,22 +582,22 @@ class BlenderBridge
                 // on_complete
                 [this]() {
                     this->_is_previewing = false;
-                    this->dispatch(ObservableEvent::OnPreviewComplete);
+                    this->event_bus.dispatch(Event::OnPreviewComplete);
                 },
                 // on_progress
                 [this](float progress) {
                     this->_preview_progress = progress;
-                    this->dispatch(ObservableEvent::OnPreviewProgress);
+                    this->event_bus.dispatch(Event::OnPreviewProgress);
                 },
                 // on_cancel
                 [this]() {
                     this->_is_previewing = false;
-                    this->dispatch(ObservableEvent::OnPreviewCancel);
+                    this->event_bus.dispatch(Event::OnPreviewCancel);
                 }
             );
 
             this->_is_previewing = true;
-            this->dispatch(ObservableEvent::OnPreviewStart);
+            this->event_bus.dispatch(Event::OnPreviewStart);
             this->previewer->submit(request);
         });
 
@@ -558,7 +612,7 @@ class BlenderBridge
 
         _draw_queue.push([this]() {
             this->_preview_target.synchronize();
-            this->dispatch(ObservableEvent::OnRequestRedraw);
+            this->event_bus.dispatch(Event::OnRequestRedraw);
         });
         _draw_queue.work();
     }

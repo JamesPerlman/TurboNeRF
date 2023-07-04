@@ -34,6 +34,8 @@ struct Dataset {
 
 	void load_images(ImageLoadCallback post_load_image = {});
 	void unload_images();
+	
+	bool is_loaded_cpu() const;
 
 	nlohmann::json to_json() const;
 	Dataset copy() const;

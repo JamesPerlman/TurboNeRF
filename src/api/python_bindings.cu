@@ -60,6 +60,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     m.doc() = "TurboNeRF Python Bindings";
     m.attr("__version__") = "0.0.14";
+    m.attr("__build__") = 12;
 
     /**
      * Global functions
@@ -247,6 +248,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("attach_dataset", &NeRFProxy::attach_dataset)
         .def("detach_dataset", &NeRFProxy::detach_dataset)
         .def("is_dirty", &NeRFProxy::is_dirty)
+        .def("can_train", &NeRFProxy::can_train)
+        .def("is_image_data_loaded", &NeRFProxy::is_image_data_loaded)
         .def_property(UPDATABLE(NeRFProxy, BoundingBox, render_bbox))
         .def_property(UPDATABLE(NeRFProxy, BoundingBox, training_bbox))
         .def_property(UPDATABLE(NeRFProxy, Transform4f, transform))
@@ -254,8 +257,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readwrite("is_dataset_dirty", &NeRFProxy::is_dataset_dirty)
         .def_readonly("dataset", &NeRFProxy::dataset)
         .def_readonly("can_render", &NeRFProxy::can_render)
-        .def_readonly("can_train", &NeRFProxy::can_train)
         .def_readonly("training_step", &NeRFProxy::training_step)
+        .def_readonly("id", &NeRFProxy::id)
     ;
 
     py::enum_<RenderPattern>(m, "RenderPattern")
@@ -392,27 +395,24 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     py::class_<NeRFTrainingController, std::shared_ptr<NeRFTrainingController>>(m, "Trainer")
         .def(
-            py::init<
-                NeRFProxy*,
-                const uint32_t&
-            >(),
-            py::arg("nerf"),
-            py::arg("batch_size")
+            py::init<NeRFProxy*>(),
+            py::arg("nerf")
         )
         .def(
             "setup_data",
             &NeRFTrainingController::setup_data,
+            py::arg("batch_size"),
             "Call this once before starting training."
         )
         .def(
-            "clear_data",
-            &NeRFTrainingController::reset_training_data,
-            "Call this to clear the training data."
+            "teardown",
+            &NeRFTrainingController::teardown,
+            "Call this before destroying the controller."
         )
         .def(
-            "clear_training_data",
-            &NeRFTrainingController::clear_training_data,
-            "Call this before destroying the controller."
+            "reset_training",
+            &NeRFTrainingController::reset_training,
+            "Call this to clear the training data."
         )
         .def(
             "load_images",
@@ -441,13 +441,11 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             &NeRFTrainingController::update_occupancy_grid,
             py::arg("training_step")
         )
-        .def("get_training_step", &NeRFTrainingController::get_training_step)
         .def("train_step", &NeRFTrainingController::train_step)
-        .def("is_ready_to_train", &NeRFTrainingController::is_ready_to_train)
-        .def("is_image_data_loaded", &NeRFTrainingController::is_image_data_loaded)
         .def_readwrite("alpha_selection_threshold", &NeRFTrainingController::alpha_selection_threshold)
         .def_readwrite("alpha_selection_probability", &NeRFTrainingController::alpha_selection_probability)
         .def_readwrite("min_step_size", &NeRFTrainingController::min_step_size)
+        .def_readwrite("nerf", &NeRFTrainingController::proxy)
     ;
 
     /**
@@ -461,50 +459,52 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     // TODO: This is a large module.  Consider defining it in a separate file.
 
-    py::enum_<BlenderBridge::ObservableEvent>(m, "BlenderBridgeEvent")
-        .value("OnUpdateOccupancyGrid", BlenderBridge::ObservableEvent::OnUpdateOccupancyGrid)
-        .value("OnPreviewStart", BlenderBridge::ObservableEvent::OnPreviewStart)
-        .value("OnPreviewProgress", BlenderBridge::ObservableEvent::OnPreviewProgress)
-        .value("OnPreviewComplete", BlenderBridge::ObservableEvent::OnPreviewComplete)
-        .value("OnPreviewCancel", BlenderBridge::ObservableEvent::OnPreviewCancel)
-        .value("OnRenderStart", BlenderBridge::ObservableEvent::OnRenderStart)
-        .value("OnRenderProgress", BlenderBridge::ObservableEvent::OnRenderProgress)
-        .value("OnRenderComplete", BlenderBridge::ObservableEvent::OnRenderComplete)
-        .value("OnRenderCancel", BlenderBridge::ObservableEvent::OnRenderCancel)
-        .value("OnRequestRedraw", BlenderBridge::ObservableEvent::OnRequestRedraw)
-        .value("OnTrainingImageLoaded", BlenderBridge::ObservableEvent::OnTrainingImageLoaded)
-        .value("OnTrainingImagesLoadComplete", BlenderBridge::ObservableEvent::OnTrainingImagesLoadComplete)
-        .value("OnTrainingImagesLoadStart", BlenderBridge::ObservableEvent::OnTrainingImagesLoadStart)
-        .value("OnTrainingImagesUnloaded", BlenderBridge::ObservableEvent::OnTrainingImagesUnloaded)
-        .value("OnTrainingReset", BlenderBridge::ObservableEvent::OnTrainingReset)
-        .value("OnTrainingStart", BlenderBridge::ObservableEvent::OnTrainingStart)
-        .value("OnTrainingStop", BlenderBridge::ObservableEvent::OnTrainingStop)
-        .value("OnTrainingStep", BlenderBridge::ObservableEvent::OnTrainingStep)
+    py::enum_<BlenderBridge::Event>(m, "BlenderBridgeEvent")
+        .value("OnUpdateOccupancyGrid", BlenderBridge::Event::OnUpdateOccupancyGrid)
+        .value("OnPreviewStart", BlenderBridge::Event::OnPreviewStart)
+        .value("OnPreviewProgress", BlenderBridge::Event::OnPreviewProgress)
+        .value("OnPreviewComplete", BlenderBridge::Event::OnPreviewComplete)
+        .value("OnPreviewCancel", BlenderBridge::Event::OnPreviewCancel)
+        .value("OnRenderStart", BlenderBridge::Event::OnRenderStart)
+        .value("OnRenderProgress", BlenderBridge::Event::OnRenderProgress)
+        .value("OnRenderComplete", BlenderBridge::Event::OnRenderComplete)
+        .value("OnRenderCancel", BlenderBridge::Event::OnRenderCancel)
+        .value("OnRequestRedraw", BlenderBridge::Event::OnRequestRedraw)
+        .value("OnTrainingImageLoaded", BlenderBridge::Event::OnTrainingImageLoaded)
+        .value("OnTrainingImagesLoadComplete", BlenderBridge::Event::OnTrainingImagesLoadComplete)
+        .value("OnTrainingImagesLoadStart", BlenderBridge::Event::OnTrainingImagesLoadStart)
+        .value("OnTrainingImagesUnloaded", BlenderBridge::Event::OnTrainingImagesUnloaded)
+        .value("OnTrainingReset", BlenderBridge::Event::OnTrainingReset)
+        .value("OnTrainingStart", BlenderBridge::Event::OnTrainingStart)
+        .value("OnTrainingStop", BlenderBridge::Event::OnTrainingStop)
+        .value("OnTrainingStep", BlenderBridge::Event::OnTrainingStep)
     ;
 
     py::class_<BlenderBridge>(m, "BlenderBridge")
         .def(py::init<>())
         // properties
-        .def_readonly("trainer", &BlenderBridge::trainer)
+        .def_readonly("trainers", &BlenderBridge::trainers)
         .def_readonly("previewer", &BlenderBridge::previewer)
         .def_readonly("renderer", &BlenderBridge::renderer)
         // training
-        .def("can_load_images", &BlenderBridge::can_load_images)
-        .def("is_image_data_loaded", &BlenderBridge::is_image_data_loaded)
-        .def("is_ready_to_train", &BlenderBridge::is_ready_to_train)
-        .def("is_training", &BlenderBridge::is_training)
-        .def("get_training_step", &BlenderBridge::get_training_step)
+        .def("get_nerf", &BlenderBridge::get_nerf, py::arg("nerf_id"), py::return_value_policy::reference)
+        .def("get_nerfs", &BlenderBridge::get_nerfs, py::return_value_policy::reference)
+        .def("create_nerf", &BlenderBridge::create_nerf, py::arg("dataset"), py::return_value_policy::reference)
+        .def("clone_nerf", &BlenderBridge::clone_nerf, py::arg("nerf"), py::return_value_policy::reference)
+        .def("destroy_nerf", &BlenderBridge::destroy_nerf, py::arg("nerf"))
         .def(
             "load_training_images",
             &BlenderBridge::load_training_images,
-            py::arg("proxy"),
-            py::arg("batch_size")
+            py::arg("nerf")
         )
-        .def("unload_training_images", &BlenderBridge::unload_training_images)
+        .def("can_any_nerf_train", &BlenderBridge::can_any_nerf_train)
+        .def("is_training", &BlenderBridge::is_training)
         .def("start_training", &BlenderBridge::start_training)
         .def("stop_training", &BlenderBridge::stop_training)
-        .def("reset_training", &BlenderBridge::reset_training)
-        .def("wait_for_runloop_to_stop", &BlenderBridge::wait_for_runloop_to_stop)
+        .def("enable_training", &BlenderBridge::enable_training, py::arg("nerf"))
+        .def("disable_training", &BlenderBridge::disable_training, py::arg("nerf"))
+        .def("reset_training", &BlenderBridge::reset_training, py::arg("nerf"))
+        .def("unload_training_images", &BlenderBridge::unload_training_images)
         // rendering (final)
         .def("is_rendering", &BlenderBridge::is_rendering)
         .def("get_render_progress", &BlenderBridge::get_render_progress)
@@ -559,8 +559,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         // event observers
         .def(
             "add_observer",
-            [](BlenderBridge& bb, BlenderBridge::ObservableEvent event, py::function callback) -> uint32_t {
-                return bb.add_observer(event, [callback](BlenderBridge::EventCallbackParam e) {
+            [](BlenderBridge& bb, BlenderBridge::Event event, py::function callback) -> uint32_t {
+                return bb.event_bus.add_observer(event, [callback](BlenderBridge::EventCallbackParam e) {
                     py::gil_scoped_acquire acquire;
                     callback(cpp_map_to_py_dict(e));
                 });
@@ -570,7 +570,9 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         )
         .def(
             "remove_observer",
-            &BlenderBridge::remove_observer,
+            [](BlenderBridge& bb, uint32_t id) {
+                bb.event_bus.remove_observer(id);
+            },
             py::arg("id")
         )
     ;

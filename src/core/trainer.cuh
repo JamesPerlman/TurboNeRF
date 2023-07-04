@@ -26,7 +26,6 @@ public:
 		TrainingWorkspace workspace;
 		Dataset* dataset;
 		NeRF* nerf;
-		NerfNetwork network;
 		uint32_t batch_size;
 		uint32_t n_rays_in_batch;
 		uint32_t n_samples_in_batch;
@@ -42,14 +41,12 @@ public:
 			TrainingWorkspace workspace,
 			Dataset* dataset,
 			NeRF* nerf,
-			NerfNetwork network,
 			uint32_t batch_size
 		)
 			: stream(stream)
 			, workspace(std::move(workspace))
 			, dataset(dataset)
 			, nerf(nerf)
-			, network(std::move(network))
 			, batch_size(batch_size)
 			, n_rays_in_batch(std::move(batch_size))
 			, n_samples_in_batch(0)

@@ -26,14 +26,13 @@ using json = nlohmann::json;
 
 // Constructor
 
-NerfNetwork::NerfNetwork(const int& device_id, const int& aabb_scale)
+NerfNetwork::NerfNetwork(const int& device_id)
 	: workspace(device_id)
 {
-	
-	// this creates the density network
-	update_aabb_scale_if_needed(aabb_scale);
-
 	// These network configurations were adapted from nerfstudio
+
+	// we need the density network in order to call this constructor, pass dummy aabb for now
+	update_aabb_scale_if_needed(1); 
 	
 	// Create the Direction Encoding
 	json direction_encoding_config = {
@@ -64,6 +63,7 @@ NerfNetwork::NerfNetwork(const int& device_id, const int& aabb_scale)
 	);
 }
 
+// this creates (or recreates) the density network if needed
 void NerfNetwork::update_aabb_scale_if_needed(const int& aabb_scale) {
 	// there is no way to change the aabb_scale after the network is created
 	// so as a workaround we just recreate the network if the aabb_scale changes
@@ -114,12 +114,17 @@ void NerfNetwork::update_aabb_scale_if_needed(const int& aabb_scale) {
 }
 
 // initialize params and gradients for the networks (I have no idea if this is correct)
-void NerfNetwork::setup_data(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
+void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
 
+	// initialize params
+	if (params_ws.n_density_params == density_network->n_params() && params_ws.n_color_params == color_network->n_params()) {
+		// params are already initialized
+		return;
+	}
+	
 	size_t rng_seed = 72791;
 	pcg32 rng(rng_seed);
 
-	// initialize params
 	params_ws.enlarge(
 		stream,
 		density_network->n_params(),
@@ -163,7 +168,14 @@ void NerfNetwork::setup_data(const cudaStream_t& stream, NetworkParamsWorkspace&
 	optimizer->allocate(n_params, {{n_grid_params, 1}});
 
 	// flag for training enabled
-	can_train = true;
+	_can_train = true;
+}
+
+void NerfNetwork::free_training_data() {
+	optimizer.reset();
+	// TODO: free gradients
+
+	_can_train = false;
 }
 
 void NerfNetwork::set_params(NetworkParamsWorkspace& params_ws) {
@@ -204,6 +216,8 @@ float NerfNetwork::train(
 	optimizer->set_learning_rate(1e-2f / (1.0f + NeRFConstants::learning_rate_decay * (float)step));
 
 	update_aabb_scale_if_needed(aabb_scale);
+
+	update_params_if_needed(stream, params_ws);
 
 	set_params(params_ws);
 
