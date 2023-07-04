@@ -155,6 +155,7 @@ set(HEADERS
 	src/utils/common-network-kernels.cuh
 	src/utils/gpu-image.cuh
 	src/utils/nerf-constants.cuh
+	src/utils/observable.cuh
 	src/utils/occupancy-grid-kernels.cuh
 	src/utils/parallel-utils.cuh
 	src/utils/queues.h
