@@ -119,7 +119,7 @@ void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkPar
 	_can_train = true;
 
 	// initialize params
-	if (params_ws.n_density_params != density_network->n_params() || params_ws.n_color_params != color_network->n_params()) {
+	if (params_ws.n_density_params == density_network->n_params() && params_ws.n_color_params == color_network->n_params()) {
 		// params are already initialized
 		return;
 	}
@@ -209,8 +209,6 @@ float NerfNetwork::train(
 	network_precision_t* output_buffer
 ) {
 
-	optimizer->set_learning_rate(1e-2f / (1.0f + NeRFConstants::learning_rate_decay * (float)step));
-
 	update_aabb_scale_if_needed(aabb_scale);
 
 	update_params_if_needed(stream, params_ws);
@@ -218,6 +216,8 @@ float NerfNetwork::train(
 	set_params(params_ws);
 
 	enlarge_workspace_if_needed(stream, batch_size);
+
+	optimizer->set_learning_rate(1e-2f / (1.0f + NeRFConstants::learning_rate_decay * (float)step));
 
 	// Forward
 	auto fwd_ctx = forward(
