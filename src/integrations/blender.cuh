@@ -182,6 +182,10 @@ class BlenderBridge
     bool is_waiting_for_some_work() {
         for (int i = 0; i < _nerf_manager.n_proxies(); ++i) {
             auto proxy = _nerf_manager.proxy_for_id(i);
+            if (!proxy->is_valid) {
+                continue;
+            }
+
             if (proxy->should_reset || proxy->should_destroy || proxy->should_free_training_data) {
                 return true;
             }
@@ -231,15 +235,14 @@ class BlenderBridge
                     proxy->should_destroy = false;
                     if (proxy->can_train()) {
                         trainer->teardown();
-                        _nerf_manager.destroy(proxy);
                     }
+                    _nerf_manager.destroy(proxy);
                 }
 
                 // check if we need to unload training data
                 if (proxy->should_free_training_data) {
                     proxy->should_free_training_data = false;
                     if (proxy->can_train()) {
-                        proxy->free_training_data();
                         trainer->teardown();
                         event_bus.dispatch(Event::OnTrainingImagesUnloaded);
                     }
@@ -250,6 +253,7 @@ class BlenderBridge
             _render_queue.work();
             _render_queue.wait();
             
+            // this is potentially leaky if a runloop is started and is_waiting_for_some_work doesn't return the most up-to-date value
         } while (_keep_runloop_alive || is_waiting_for_some_work());
     }
 
@@ -318,7 +322,6 @@ class BlenderBridge
         proxy->attach_dataset(dataset);
         auto trainer = trainer_for_proxy(proxy);
         trainer->proxy = proxy;
-        trainer->setup_data();
         return proxy;
     }
 
@@ -331,9 +334,8 @@ class BlenderBridge
     }
 
     void destroy_nerf(NeRFProxy* proxy) {
-        auto trainer = trainer_for_proxy(proxy);
-        trainer->teardown();
-        _nerf_manager.destroy(proxy);
+        proxy->should_destroy = true;
+        start_runloop(false);
     }
 
     bool can_any_nerf_train() {
@@ -377,6 +379,8 @@ class BlenderBridge
                     Event::OnTrainingImagesLoadStart,
                     {{ "n_total", proxy->dataset->images.size() }}
                 );
+
+                trainer->setup_data();
 
                 trainer->load_images(
                     [this](int n_loaded, int n_total) {

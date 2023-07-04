@@ -116,8 +116,10 @@ void NerfNetwork::update_aabb_scale_if_needed(const int& aabb_scale) {
 // initialize params and gradients for the networks (I have no idea if this is correct)
 void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
 
+	_can_train = true;
+
 	// initialize params
-	if (params_ws.n_density_params == density_network->n_params() && params_ws.n_color_params == color_network->n_params()) {
+	if (params_ws.n_density_params != density_network->n_params() || params_ws.n_color_params != color_network->n_params()) {
 		// params are already initialized
 		return;
 	}
@@ -149,8 +151,6 @@ void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkPar
 		params_ws.color_network_params_hp,
 		params_ws.color_network_params_fp
 	);
-
-	// initialize optimizers
 	
 	json optimizer_config = {
 		{"otype", "Adam"},
@@ -166,14 +166,10 @@ void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkPar
 	size_t n_params = density_network->n_params() + color_network->n_params();
 	uint32_t n_grid_params = density_network->encoding()->n_params();
 	optimizer->allocate(n_params, {{n_grid_params, 1}});
-
-	// flag for training enabled
-	_can_train = true;
 }
 
 void NerfNetwork::free_training_data() {
-	optimizer.reset();
-	// TODO: free gradients
+	// TODO: free gradients, optimizer
 
 	_can_train = false;
 }

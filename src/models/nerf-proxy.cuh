@@ -97,12 +97,6 @@ struct NeRFProxy {
         }
     }
 
-    void free_training_data() {
-        for (auto& nerf : nerfs) {
-            nerf.network.free_training_data();
-        }
-    }
-
     void attach_dataset(const Dataset& dataset) {
         this->dataset = dataset;
         this->render_bbox = dataset.bounding_box;

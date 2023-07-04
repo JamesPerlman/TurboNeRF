@@ -91,18 +91,18 @@ void NeRFTrainingController::setup_data(uint32_t batch_size) {
 
 // this should be called before destroying the training controller
 void NeRFTrainingController::teardown() {
-	proxy = nullptr;
+	for (auto& ctx : this->contexts) {
+		ctx.workspace.free_allocations();
+		ctx.nerf->network.free_training_data();
+		ctx.nerf->dataset_ws.free_allocations();
+		ctx.nerf->is_image_data_loaded = false;
 
-	// TODO: for all contexts
-	auto& ctx = contexts[0];
-	ctx.workspace.free_allocations();
-	ctx.nerf->network.free_training_data();
+		// destroy contexts
+		ctx.destroy();
 
-	// destroy contexts
-	ctx.destroy();
-
-	ctx.n_rays_in_batch = ctx.batch_size;
-	ctx.n_samples_in_batch = 0;
+		ctx.n_rays_in_batch = ctx.batch_size;
+		ctx.n_samples_in_batch = 0;
+	}
 }
 
 void NeRFTrainingController::reset_training() {
@@ -178,7 +178,7 @@ void NeRFTrainingController::load_images(
 
 	ctx.nerf->is_image_data_loaded = true;
 
-	// signal that we need to updqte the dataset
+	// signal that we need to update the dataset
 	proxy->is_dataset_dirty = true;
 }
 
