@@ -26,6 +26,7 @@ class BlenderBridge
     public:
     
     enum class Event {
+        OnDestroyNeRF,
         OnUpdateOccupancyGrid,
         OnPreviewStart,
         OnPreviewProgress,
@@ -108,65 +109,34 @@ class BlenderBridge
     }
 
     private:
+
+    #define HANDLE_EVENT(event_name) case Event::event_name: printf(#event_name "\n"); break
+
     void log_event(Event event) {
-        
         switch (event) {
-            case Event::OnUpdateOccupancyGrid:
-                printf("OnUpdateOccupancyGrid\n");
-                break;
-            case Event::OnPreviewStart:
-                printf("OnPreviewStart\n");
-                break;
-            case Event::OnPreviewProgress:
-                printf("OnPreviewProgress\n");
-                break;
-            case Event::OnPreviewComplete:
-                printf("OnPreviewComplete\n");
-                break;
-            case Event::OnPreviewCancel:
-                printf("OnPreviewCancel\n");
-                break;
-            case Event::OnRenderStart:
-                printf("OnRenderStart\n");
-                break;
-            case Event::OnRenderProgress:
-                printf("OnRenderProgress\n");
-                break;
-            case Event::OnRenderComplete:
-                printf("OnRenderComplete\n");
-                break;
-            case Event::OnRenderCancel:
-                printf("OnRenderCancel\n");
-                break;
-            case Event::OnRequestRedraw:
-                printf("OnRequestRedraw\n");
-                break;
-            case Event::OnTrainingImageLoaded:
-                printf("OnTrainingImageLoaded\n");
-                break;
-            case Event::OnTrainingImagesLoadComplete:
-                printf("OnTrainingImagesLoadComplete\n");
-                break;
-            case Event::OnTrainingImagesLoadStart:
-                printf("OnTrainingImagesLoadStart\n");
-                break;
-            case Event::OnTrainingImagesUnloaded:
-                printf("OnTrainingImagesUnloaded\n");
-                break;
-            case Event::OnTrainingReset:
-                printf("OnTrainingReset\n");
-                break;
-            case Event::OnTrainingStart:
-                printf("OnTrainingStart\n");
-                break;
-            case Event::OnTrainingStop:
-                printf("OnTrainingStop\n");
-                break;
-            case Event::OnTrainingStep:
-                printf("OnTrainingStep\n");
-                break;
+            HANDLE_EVENT(OnDestroyNeRF);
+            HANDLE_EVENT(OnUpdateOccupancyGrid);
+            HANDLE_EVENT(OnPreviewStart);
+            HANDLE_EVENT(OnPreviewProgress);
+            HANDLE_EVENT(OnPreviewComplete);
+            HANDLE_EVENT(OnPreviewCancel);
+            HANDLE_EVENT(OnRenderStart);
+            HANDLE_EVENT(OnRenderProgress);
+            HANDLE_EVENT(OnRenderComplete);
+            HANDLE_EVENT(OnRenderCancel);
+            HANDLE_EVENT(OnRequestRedraw);
+            HANDLE_EVENT(OnTrainingImageLoaded);
+            HANDLE_EVENT(OnTrainingImagesLoadComplete);
+            HANDLE_EVENT(OnTrainingImagesLoadStart);
+            HANDLE_EVENT(OnTrainingImagesUnloaded);
+            HANDLE_EVENT(OnTrainingReset);
+            HANDLE_EVENT(OnTrainingStart);
+            HANDLE_EVENT(OnTrainingStop);
+            HANDLE_EVENT(OnTrainingStep);
         }
     }
+
+    #undef HANDLE_EVENT
 
     /**
      * THE RUN LOOP
@@ -214,11 +184,17 @@ class BlenderBridge
                     // train a single step
                     auto metrics = trainer->train_step();
                     auto training_step = proxy->training_step;
+                    
                     if (training_step % 16 == 0) {
                         auto occ_metrics = trainer->update_occupancy_grid(training_step);
-                        event_bus.dispatch(Event::OnUpdateOccupancyGrid, occ_metrics.as_map());
+                        auto occ_args = occ_metrics.as_map();
+                        occ_args["id"] = proxy->id;
+                        event_bus.dispatch(Event::OnUpdateOccupancyGrid, occ_args);
                     }
-                    event_bus.dispatch(Event::OnTrainingStep, metrics.as_map());
+
+                    auto metrics_args = metrics.as_map();
+                    metrics_args["id"] = proxy->id;
+                    event_bus.dispatch(Event::OnTrainingStep, metrics_args);
                 }
                 
                 // check if we need to reset training
@@ -226,7 +202,7 @@ class BlenderBridge
                     proxy->should_reset = false;
                     if (proxy->can_train()) {
                         trainer->reset_training();
-                        event_bus.dispatch(Event::OnTrainingReset);
+                        event_bus.dispatch(Event::OnTrainingReset, {{"id", proxy->id}});
                     }
                 }
 
@@ -236,7 +212,9 @@ class BlenderBridge
                     if (proxy->can_train()) {
                         trainer->teardown();
                     }
+                    auto proxy_id = proxy->id;
                     _nerf_manager.destroy(proxy);
+                    event_bus.dispatch(Event::OnDestroyNeRF, {{"id", proxy_id}});
                 }
 
                 // check if we need to unload training data
@@ -244,7 +222,7 @@ class BlenderBridge
                     proxy->should_free_training_data = false;
                     if (proxy->can_train()) {
                         trainer->teardown();
-                        event_bus.dispatch(Event::OnTrainingImagesUnloaded);
+                        event_bus.dispatch(Event::OnTrainingImagesUnloaded, {{"id", proxy->id}});
                     }
                 }
             }
@@ -285,6 +263,9 @@ class BlenderBridge
         }
     }
 
+    /** TRAINING **/
+    public:
+
     /** NERF MANAGER -> TRAINERS SYNCHRONIZATION **/
 
     NeRFTrainingController* trainer_for_proxy(const NeRFProxy* proxy) {
@@ -296,9 +277,6 @@ class BlenderBridge
         }
         throw std::runtime_error("No trainer found for proxy with id " + std::to_string(proxy->id));
     }
-
-    /** TRAINING **/
-    public:
     
     /** NERF OBJECT CREATION / CLONING / DESTRUCTION **/
 
@@ -377,24 +355,30 @@ class BlenderBridge
             [this, trainer, proxy]() {
                 this->event_bus.dispatch(
                     Event::OnTrainingImagesLoadStart,
-                    {{ "n_total", proxy->dataset->images.size() }}
+                    {
+                        {"id", proxy->id},
+                        {"n_total", proxy->dataset->images.size()}
+                    }
                 );
 
                 trainer->setup_data();
 
                 trainer->load_images(
-                    [this](int n_loaded, int n_total) {
+                    [this, proxy](int n_loaded, int n_total) {
                         std::map<std::string, std::any> data{
+                            {"id", proxy->id},
                             {"n_loaded", n_loaded},
                             {"n_total", n_total}
                         };
-                        this->event_bus.dispatch(Event::OnTrainingImageLoaded, data);
+                        this->event_bus.dispatch(
+                            Event::OnTrainingImageLoaded,
+                            data);
                     }
                 );
 
                 proxy->should_train = true;
                 
-                this->event_bus.dispatch(Event::OnTrainingImagesLoadComplete);
+                this->event_bus.dispatch(Event::OnTrainingImagesLoadComplete, {{"id", proxy->id}});
             }
         );
     }

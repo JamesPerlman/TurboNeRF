@@ -60,7 +60,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     m.doc() = "TurboNeRF Python Bindings";
     m.attr("__version__") = "0.0.14";
-    m.attr("__build__") = 3;
+    m.attr("__build__") = 0;
 
     /**
      * Global functions
@@ -460,6 +460,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     // TODO: This is a large module.  Consider defining it in a separate file.
 
     py::enum_<BlenderBridge::Event>(m, "BlenderBridgeEvent")
+        .value("OnDestroyNeRF", BlenderBridge::Event::OnDestroyNeRF)
         .value("OnUpdateOccupancyGrid", BlenderBridge::Event::OnUpdateOccupancyGrid)
         .value("OnPreviewStart", BlenderBridge::Event::OnPreviewStart)
         .value("OnPreviewProgress", BlenderBridge::Event::OnPreviewProgress)
@@ -483,10 +484,10 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
     py::class_<BlenderBridge>(m, "BlenderBridge")
         .def(py::init<>())
         // properties
-        .def_readonly("trainers", &BlenderBridge::trainers)
         .def_readonly("previewer", &BlenderBridge::previewer)
         .def_readonly("renderer", &BlenderBridge::renderer)
         // training
+        .def("get_trainer_for_nerf", &BlenderBridge::trainer_for_proxy, py::arg("nerf"), py::return_value_policy::reference)
         .def("get_nerf", &BlenderBridge::get_nerf, py::arg("nerf_id"), py::return_value_policy::reference)
         .def("get_nerfs", &BlenderBridge::get_nerfs, py::return_value_policy::reference)
         .def("create_nerf", &BlenderBridge::create_nerf, py::arg("dataset"), py::return_value_policy::reference)
