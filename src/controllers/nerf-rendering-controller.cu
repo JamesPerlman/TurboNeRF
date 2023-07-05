@@ -56,12 +56,26 @@ void NeRFRenderingController::submit(
 
     ctx.min_step_size = min_step_size;
 
-    std::vector<NeRF*> nerfs;
+    std::vector<NeRFProxy*> proxies;
+    proxies.reserve(request->proxies.size());
+
     for (auto& proxy : request->proxies) {
         if (proxy->can_render) {
             proxy->update_dataset_if_necessary(ctx.stream);
-            nerfs.push_back(&proxy->nerfs[device_id]);
+            proxies.push_back(proxy);
         }
+    }
+
+    proxies.shrink_to_fit();
+
+    // this is not great but it will work for now...
+    request->proxies = proxies;
+
+    std::vector<NeRF*> nerfs;
+    nerfs.reserve(proxies.size());
+
+    for (auto& proxy : proxies) {
+        nerfs.push_back(&proxy->nerfs[device_id]);
     }
 
     // TODO: Allow NeRFs and Datasets to be rendered independently
