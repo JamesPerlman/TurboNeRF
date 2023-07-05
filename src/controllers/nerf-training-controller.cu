@@ -99,10 +99,9 @@ void NeRFTrainingController::teardown() {
 
 		// destroy contexts
 		ctx.destroy();
-
-		ctx.n_rays_in_batch = ctx.batch_size;
-		ctx.n_samples_in_batch = 0;
 	}
+
+	this->contexts.clear();
 }
 
 void NeRFTrainingController::reset_training() {
