@@ -61,7 +61,11 @@ public:
 	}
 	
 	// allocators/initializers
-	__host__ void initialize(const cudaStream_t& stream, const bool& use_full_precision_values) {
+	__host__ void initialize_if_needed(const cudaStream_t& stream, const bool& use_full_precision_values) {
+		if (workspace.n_total_elements == n_levels * volume_i && workspace.n_bitfield_elements == volume_i) {
+			return;
+		}
+
 		workspace.enlarge(
 			stream,
 			n_levels,
@@ -72,6 +76,13 @@ public:
 		density = workspace.values;
 		bitfield = workspace.bitfield;
 		bitcounts = workspace.bitcounts;
+
+		
+		// Initialize occupancy grid bitfield (all bits set to 1)
+		set_bitfield(stream, 0b11111111);
+		
+		// Density can be set to zero, but probably doesn't need to be set at all
+		set_density(stream, 0);
 	}
 
 	// pointer getters

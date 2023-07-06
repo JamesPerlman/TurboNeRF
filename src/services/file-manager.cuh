@@ -166,7 +166,7 @@ struct FileManager {
         // prep occupancy grid
         auto& occ_grid = nerf.occupancy_grid;
         occ_grid.set_aabb_scale(data.aabb_scale);
-        occ_grid.initialize(stream, false);
+        occ_grid.initialize_if_needed(stream, false);
         
         // copy to GPU
         CUDA_CHECK_THROW(

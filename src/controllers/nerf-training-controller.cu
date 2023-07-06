@@ -54,14 +54,7 @@ void NeRFTrainingController::setup_data(uint32_t batch_size) {
 
 	ctx.nerf->occupancy_grid.set_aabb_scale(ctx.nerf->proxy->training_bbox.get().size());
 	
-	// TODO: we should not initialize an occupancy grid if one already exists (aka if we loaded the nerf from a file)
-	ctx.nerf->occupancy_grid.initialize(ctx.stream, true);
-
-	// Initialize occupancy grid bitfield (all bits set to 1)
-	ctx.nerf->occupancy_grid.set_bitfield(ctx.stream, 0b11111111);
-	
-	// Density can be set to zero, but probably doesn't need to be set at all
-	ctx.nerf->occupancy_grid.set_density(ctx.stream, 0);
+	ctx.nerf->occupancy_grid.initialize_if_needed(ctx.stream, true);
 	
 	// This allocates memory for all the elements we need during training
 	ctx.workspace.enlarge(
