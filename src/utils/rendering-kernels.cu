@@ -82,7 +82,7 @@ __global__ void prepare_for_linear_raymarching_kernel(
 
 		// we need to transform the ray into the NeRF's local space
 		float3 o = itrans * float3{ o_x, o_y, o_z };
-		float3 d = normalized(itrans.mmul_ul3x3(float3{ d_x, d_y, d_z }));
+		float3 d = itrans.mmul_ul3x3(float3{ d_x, d_y, d_z });
 		float3 id = float3{ 1.0f / d.x, 1.0f / d.y, 1.0f / d.z };
 
 		float _tmin;
@@ -401,7 +401,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			const float inv_aabb_size = 1.0f / bbox.size();
 
 			const float3 o = itrans * float3{o_x, o_y, o_z};
-			const float3 d = normalized(itrans.mmul_ul3x3(float3{d_x, d_y, d_z}));
+			const float3 d = itrans.mmul_ul3x3(float3{d_x, d_y, d_z});
 			const float3 id{ 1.0f / d.x, 1.0f / d.y, 1.0f / d.z };
 
 			/**
@@ -478,9 +478,10 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			network_pos[sample_offset_1] = nearest_inv_aabb_size * nearest_pos_y + 0.5f;
 			network_pos[sample_offset_2] = nearest_inv_aabb_size * nearest_pos_z + 0.5f;
 
-			network_dir[sample_offset_0] = 0.5f * nearest_dir_x + 0.5f;
-			network_dir[sample_offset_1] = 0.5f * nearest_dir_y + 0.5f;
-			network_dir[sample_offset_2] = 0.5f * nearest_dir_z + 0.5f;
+			const float3 normalized_dir = normalized(float3{nearest_dir_x, nearest_dir_y, nearest_dir_z});
+			network_dir[sample_offset_0] = 0.5f * normalized_dir.x + 0.5f;
+			network_dir[sample_offset_1] = 0.5f * normalized_dir.y + 0.5f;
+			network_dir[sample_offset_2] = 0.5f * normalized_dir.z + 0.5f;
 
 			network_dt[sample_offset_0] = nearest_inv_aabb_size * nearest_dt;
 
