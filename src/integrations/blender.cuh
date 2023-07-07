@@ -344,6 +344,10 @@ class BlenderBridge
         return _is_training;
     }
 
+    bool can_load_training_images(const NeRFProxy* proxy) const {
+        return proxy->dataset.has_value() && proxy->dataset->images.size() > 0;
+    }
+
     void load_training_images(NeRFProxy* proxy) {
         auto trainer = trainer_for_proxy(proxy);
     
