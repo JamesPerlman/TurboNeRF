@@ -60,7 +60,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     m.doc() = "TurboNeRF Python Bindings";
     m.attr("__version__") = "0.0.14";
-    m.attr("__build__") = 0;
+    m.attr("__build__") = 1;
 
     /**
      * Global functions
@@ -502,6 +502,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("is_training", &BlenderBridge::is_training)
         .def("start_training", &BlenderBridge::start_training)
         .def("stop_training", &BlenderBridge::stop_training)
+        .def("is_training_enabled", &BlenderBridge::is_training_enabled, py::arg("nerf"))
         .def("enable_training", &BlenderBridge::enable_training, py::arg("nerf"))
         .def("disable_training", &BlenderBridge::disable_training, py::arg("nerf"))
         .def("reset_training", &BlenderBridge::reset_training, py::arg("nerf"))

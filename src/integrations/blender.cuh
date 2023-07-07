@@ -320,7 +320,7 @@ class BlenderBridge
                 continue;
             }
             
-            if (proxy->can_train()) {
+            if (proxy->can_train() && proxy->should_train) {
                 return true;
             }
         }
@@ -414,6 +414,10 @@ class BlenderBridge
         _is_training = false;
         stop_runloop();
         event_bus.dispatch(Event::OnTrainingStop);
+    }
+
+    bool is_training_enabled(const NeRFProxy* proxy) const {
+        return proxy->should_train;
     }
 
     void enable_training(NeRFProxy* proxy) {
