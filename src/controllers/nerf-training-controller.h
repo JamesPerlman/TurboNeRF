@@ -83,9 +83,6 @@ private:
 	std::vector<Trainer::Context> contexts;
 	Trainer trainer;
 
-	bool _is_image_data_loaded = false;
-	bool _is_training_memory_allocated = false;
-
 	void update_dataset_if_necessary();
     std::vector<size_t> get_cuda_memory_allocated() const;
 };
