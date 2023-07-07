@@ -443,6 +443,8 @@ class BlenderBridge
             return;
         }
 
+        proxy->should_reset = true;
+
         cancel_preview();
         start_runloop(false);
     }
