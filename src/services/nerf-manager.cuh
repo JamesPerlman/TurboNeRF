@@ -86,7 +86,7 @@ public:
 		return proxy;
 	}
 
-	NeRFProxy* clone(const NeRFProxy* proxy) {
+	NeRFProxy* clone(NeRFProxy* proxy) {
 		auto item = find_first_unused_proxy();
 		int index = item.first;
 		NeRFProxy* new_proxy = item.second;
@@ -111,6 +111,12 @@ public:
 		new_proxy->is_valid = true;
 		new_proxy->can_render = true;
 
+		if (proxy->clone_source == nullptr) {
+			new_proxy->clone_source = proxy;
+		} else {
+			new_proxy->clone_source = proxy->clone_source;
+		}
+
 		return new_proxy;
 	}
 
@@ -120,7 +126,6 @@ public:
 		
 		proxy->is_valid = false;
 		proxy->can_render = false;
-		proxy->clone_source = nullptr;
 
 		if (proxy->dataset.has_value()) {
 			proxy->dataset->unload_images();
@@ -128,18 +133,19 @@ public:
 		}
 
 		// need to check for duplicates before clearing nerfs
-		size_t n_nerfs_with_this_id = 0;
+		size_t n_clones = 0;
 		
 		for (int i = 0; i < _proxies.size(); ++i) {
 			const auto& other_proxy = _proxies[i];
-			if (other_proxy.is_valid && other_proxy.id == proxy->id) {
-				++n_nerfs_with_this_id;
+			if (other_proxy.is_valid && proxy->clone_source == &other_proxy) {
+				++n_clones;
 			}
 		}
 
 		proxy->id = -1;
+		proxy->clone_source = nullptr;
 
-		if (n_nerfs_with_this_id == 0) {
+		if (n_clones == 0) {
 			proxy->free_device_memory();
 		}
 	}

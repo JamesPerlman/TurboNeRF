@@ -299,7 +299,7 @@ class BlenderBridge
         return proxy;
     }
 
-    NeRFProxy* clone_nerf(const NeRFProxy* proxy) {
+    NeRFProxy* clone_nerf(NeRFProxy* proxy) {
         auto clone = _nerf_manager.clone(proxy);
         auto trainer = trainer_for_proxy(clone);
         trainer->proxy = clone;
@@ -308,6 +308,7 @@ class BlenderBridge
     }
 
     void destroy_nerf(NeRFProxy* proxy) {
+        cancel_preview();
         proxy->should_destroy = true;
         start_runloop(false);
     }
