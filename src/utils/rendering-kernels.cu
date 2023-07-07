@@ -404,6 +404,10 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 			const float3 d = itrans.mmul_ul3x3(float3{d_x, d_y, d_z});
 			const float3 id{ 1.0f / d.x, 1.0f / d.y, 1.0f / d.z };
 
+			// these are used to calculate the localized dt value
+			// this is the length of the direction vector, which has already been scaled by the inverse transform
+			const float dt_scale = l2_norm(d); 
+
 			/**
 			 * this nerf will be active if its grid is occupied at the current t value
 			 * we can only march each ray by one step using this technique
@@ -464,7 +468,7 @@ __global__ void march_rays_and_generate_network_inputs_kernel(
 				nearest_inv_aabb_size = inv_aabb_size;
 				nearest_pos_x = x; nearest_pos_y = y; nearest_pos_z = z;
 				nearest_dir_x = d.x; nearest_dir_y = d.y; nearest_dir_z = d.z;
-				nearest_dt = dt;
+				nearest_dt = dt_scale * dt;
 			}
 		} // closing bracket of loop: for (int n = 0; n < n_nerfs; ++n)
 

@@ -80,6 +80,12 @@ inline NRC_HOST_DEVICE float2 operator*(const float2& a, const float2& b)
     return {a.x * b.x, a.y * b.y};
 }
 
+// element-wise multiplication float3 * float3
+inline NRC_HOST_DEVICE float3 operator*(const float3& a, const float3& b)
+{
+    return {a.x * b.x, a.y * b.y, a.z * b.z};
+}
+
 // element-wise subtraction float2 - float2
 inline NRC_HOST_DEVICE float2 operator-(const float2& a, const float2& b)
 {
