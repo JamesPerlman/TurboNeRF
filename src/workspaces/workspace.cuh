@@ -44,7 +44,7 @@ public:
     }
 
     // free all allocations
-    void free_allocations() {
+    virtual void free_allocations() {
         CUDA_CHECK_THROW(cudaSetDevice(device_id));
         // this is not super robust, and does not cover the edge case where one allocation fails
         // in this case, even the freed allocations will stay in the _allocations vector
