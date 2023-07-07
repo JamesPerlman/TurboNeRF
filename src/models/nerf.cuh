@@ -28,7 +28,7 @@ struct NeRF {
     NeRF(const int& device_id, NeRFProxy* proxy);
 
     void free_device_memory();
-    
+    void free_training_data();
 };
 
 TURBO_NAMESPACE_END

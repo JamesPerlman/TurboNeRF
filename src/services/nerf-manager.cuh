@@ -124,30 +124,37 @@ public:
 
 	void destroy(NeRFProxy* proxy) {
 		
+		// need to check for duplicates before clearing nerfs
+		bool has_clones = proxy_has_clones(proxy);
+
+		proxy->id = -1;
 		proxy->is_valid = false;
 		proxy->can_render = false;
+		proxy->clone_source = nullptr;
 
 		if (proxy->dataset.has_value()) {
 			proxy->dataset->unload_images();
 			proxy->dataset.reset();
 		}
 
-		// need to check for duplicates before clearing nerfs
-		size_t n_clones = 0;
-		
-		for (int i = 0; i < _proxies.size(); ++i) {
-			const auto& other_proxy = _proxies[i];
-			if (other_proxy.is_valid && proxy->clone_source == &other_proxy) {
-				++n_clones;
-			}
-		}
-
-		proxy->id = -1;
-		proxy->clone_source = nullptr;
-
-		if (n_clones == 0) {
+		if (!has_clones) {
 			proxy->free_device_memory();
 		}
+	}
+
+	bool proxy_has_clones(const NeRFProxy* proxy) {
+		for (int i = 0; i < _proxies.size(); ++i) {
+			const auto& other_proxy = _proxies[i];
+			
+			if (!other_proxy.is_valid) {
+				continue;
+			}
+
+			if (proxy->clone_source == &other_proxy || other_proxy.clone_source == proxy) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// copy between GPUs?	

@@ -19,4 +19,10 @@ void NeRF::free_device_memory() {
     occupancy_grid.free_device_memory();
 }
 
+void NeRF::free_training_data() {
+    network.free_training_data();
+    dataset_ws.free_allocations();
+    is_image_data_loaded = false;
+}
+
 TURBO_NAMESPACE_END

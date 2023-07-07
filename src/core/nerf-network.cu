@@ -170,7 +170,6 @@ void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkPar
 
 void NerfNetwork::free_training_data() {
 	// TODO: free gradients, optimizer
-
 	_can_train = false;
 }
 
