@@ -209,9 +209,7 @@ class BlenderBridge
                 // check if we need to delete the nerf
                 if (proxy->should_destroy) {
                     proxy->should_destroy = false;
-                    if (proxy->can_train()) {
-                        trainer->teardown();
-                    }
+                    trainer->teardown();
                     auto proxy_id = proxy->id;
                     _nerf_manager.destroy(proxy);
                     event_bus.dispatch(Event::OnDestroyNeRF, {{"id", proxy_id}});
@@ -220,10 +218,8 @@ class BlenderBridge
                 // check if we need to unload training data
                 if (proxy->should_free_training_data) {
                     proxy->should_free_training_data = false;
-                    if (proxy->can_train()) {
-                        trainer->teardown();
-                        event_bus.dispatch(Event::OnTrainingImagesUnloaded, {{"id", proxy->id}});
-                    }
+                    trainer->teardown();
+                    event_bus.dispatch(Event::OnTrainingImagesUnloaded, {{"id", proxy->id}});
                 }
             }
 
