@@ -60,7 +60,7 @@ void NeRFRenderingController::submit(
     proxies.reserve(request->proxies.size());
 
     for (auto& proxy : request->proxies) {
-        if (proxy->can_render) {
+        if (proxy->can_render && proxy->is_visible && !proxy->should_destroy) {
             proxy->update_dataset_if_necessary(ctx.stream);
             proxies.push_back(proxy);
         }
