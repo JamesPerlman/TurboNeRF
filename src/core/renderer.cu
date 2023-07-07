@@ -309,10 +309,6 @@ void Renderer::perform_task(
             render_ws.network_dt
         );
 
-        CHECK_DATA(ray_t, float, scene_ws.ray_t[active_buf_idx], n_rays, stream);
-        CHECK_DATA(training_bboxes, BoundingBox, scene_ws.training_bboxes, n_nerfs, stream);
-        CHECK_DATA(render_bboxes, BoundingBox, scene_ws.render_bboxes, n_nerfs, stream);
-
         /**
          * Next we compact the network inputs for the active rays of each NeRF
          * Then we will query each respective NeRF network and composite the samples into the output buffer
