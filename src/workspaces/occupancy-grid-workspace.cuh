@@ -34,6 +34,14 @@ struct OccupancyGridWorkspace: Workspace {
             bitcounts = allocate<uint8_t>(stream, n_bitfield_elements);
         }
     }
+
+    void free_allocations() override {
+
+        n_bitfield_elements = 0;
+        n_total_elements = 0;
+
+        Workspace::free_allocations();
+    }
 };
 
 TURBO_NAMESPACE_END

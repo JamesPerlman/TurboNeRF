@@ -52,6 +52,16 @@ struct NetworkParamsWorkspace: Workspace {
         color_network_params_hp = params_hp + n_density_params;
         color_network_gradients_hp = gradients_hp + n_density_params;
     }
+
+    // override free_allocations
+    void free_allocations() override {
+
+        n_density_params = 0;
+        n_color_params = 0;
+        n_total_params = 0;
+        
+        Workspace::free_allocations();
+    }
 };
 
 TURBO_NAMESPACE_END
