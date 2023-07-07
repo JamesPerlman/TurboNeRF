@@ -110,7 +110,7 @@ struct NeRFProxy {
     }
 
     bool can_train() const {
-        if (!is_valid) {
+        if (!is_valid || !dataset.has_value()) {
             return false;
         }
 
