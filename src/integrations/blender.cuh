@@ -209,10 +209,7 @@ class BlenderBridge
                 // check if we need to delete the nerf
                 if (proxy->should_destroy) {
                     proxy->should_destroy = false;
-                    if (proxy->can_train()) {
-                        trainer->teardown();
-                    }
-
+                    trainer->teardown();
                     auto proxy_id = proxy->id;
                     _nerf_manager.destroy(proxy);
                     event_bus.dispatch(Event::OnDestroyNeRF, {{"id", proxy_id}});

@@ -84,6 +84,10 @@ void NeRFTrainingController::setup_data(uint32_t batch_size) {
 
 // this should be called before destroying the training controller
 void NeRFTrainingController::teardown() {
+	if (!proxy->can_train()) {
+		return;
+	}
+
 	for (auto& ctx : this->contexts) {
 		ctx.workspace.free_allocations();
 		ctx.nerf->free_training_data();

@@ -124,7 +124,7 @@ struct NeRFProxy {
     }
 
     bool is_image_data_loaded() const {
-        if (!is_valid) {
+        if (!can_train()) {
             return false;
         }
 
