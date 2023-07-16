@@ -100,6 +100,7 @@ Extreme gratitude to open source projects that will allow this project to reach 
 * [glad](https://github.com/Dav1dde/glad)  
 * [cuda-cmake-github-actions](https://github.com/ptheywood/cuda-cmake-github-actions)  
 * [pure-torch-ngp](https://github.com/cheind/pure-torch-ngp)
+* [torch_efficient_distloss](https://github.com/sunset1995/torch_efficient_distloss)
 
 
 ## CITATIONS
