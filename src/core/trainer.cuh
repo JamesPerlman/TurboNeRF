@@ -21,50 +21,50 @@ TURBO_NAMESPACE_BEGIN
 struct Trainer {
 public:
 
-	struct Context {
-		const cudaStream_t& stream;
-		TrainingWorkspace workspace;
-		Dataset* dataset;
-		NeRF* nerf;
-		uint32_t batch_size;
-		uint32_t n_rays_in_batch;
-		uint32_t n_samples_in_batch;
-		float alpha_selection_threshold = 1.0f;
-		float alpha_selection_probability = 1.0f;
-		float min_step_size = NeRFConstants::min_step_size;
+    struct Context {
+        const cudaStream_t& stream;
+        TrainingWorkspace workspace;
+        Dataset* dataset;
+        NeRF* nerf;
+        uint32_t batch_size;
+        uint32_t n_rays_in_batch;
+        uint32_t n_samples_in_batch;
+        float alpha_selection_threshold = 1.0f;
+        float alpha_selection_probability = 1.0f;
+        float min_step_size = NeRFConstants::min_step_size;
 
-		curandGenerator_t rng;
-		unsigned long long rng_offset = 0;
+        curandGenerator_t rng;
+        unsigned long long rng_offset = 0;
 
-		Context(
-			const cudaStream_t& stream,
-			TrainingWorkspace workspace,
-			Dataset* dataset,
-			NeRF* nerf,
-			uint32_t batch_size
-		)
-			: stream(stream)
-			, workspace(std::move(workspace))
-			, dataset(dataset)
-			, nerf(nerf)
-			, batch_size(batch_size)
-			, n_rays_in_batch(std::move(batch_size))
-			, n_samples_in_batch(0)
-		{
-			CURAND_ASSERT_SUCCESS(curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_PHILOX4_32_10));
-			CURAND_ASSERT_SUCCESS(curandGenerateSeeds(rng));
+        Context(
+            const cudaStream_t& stream,
+            TrainingWorkspace workspace,
+            Dataset* dataset,
+            NeRF* nerf,
+            uint32_t batch_size
+        )
+            : stream(stream)
+            , workspace(std::move(workspace))
+            , dataset(dataset)
+            , nerf(nerf)
+            , batch_size(batch_size)
+            , n_rays_in_batch(std::move(batch_size))
+            , n_samples_in_batch(0)
+        {
+            CURAND_ASSERT_SUCCESS(curandCreateGenerator(&rng, CURAND_RNG_PSEUDO_PHILOX4_32_10));
+            CURAND_ASSERT_SUCCESS(curandGenerateSeeds(rng));
 
-		};
-		
-		void destroy() {
-			CURAND_ASSERT_SUCCESS(curandDestroyGenerator(rng));
-		};
-	};
+        };
+        
+        void destroy() {
+            CURAND_ASSERT_SUCCESS(curandDestroyGenerator(rng));
+        };
+    };
 
-	// public methods
-	float train_step(Context& ctx, const uint32_t& training_step);
-	uint32_t update_occupancy_grid(Context& ctx, const uint32_t& training_step);
-	void generate_next_training_batch(Context& ctx);
+    // public methods
+    float train_step(Context& ctx, const uint32_t& training_step);
+    uint32_t update_occupancy_grid(Context& ctx, const uint32_t& training_step);
+    void generate_next_training_batch(Context& ctx);
 };
 
 TURBO_NAMESPACE_END

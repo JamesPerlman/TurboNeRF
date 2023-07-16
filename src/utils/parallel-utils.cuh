@@ -29,15 +29,15 @@ TURBO_NAMESPACE_BEGIN
  */
 template <typename T>
 inline __host__ int find_last_lt_presorted(
-	const cudaStream_t& stream,
+    const cudaStream_t& stream,
     const thrust::device_ptr<T>& data_begin_ptr,
-	const size_t& n_elements,
+    const size_t& n_elements,
     const T& max_value
 ) {
-	auto exec_policy = MAKE_EXEC_POLICY(stream);
+    auto exec_policy = MAKE_EXEC_POLICY(stream);
 
-	auto iter_begin_reverse = thrust::make_reverse_iterator(data_begin_ptr);
-	auto iter_end_reverse = thrust::make_reverse_iterator(data_begin_ptr + n_elements);
+    auto iter_begin_reverse = thrust::make_reverse_iterator(data_begin_ptr);
+    auto iter_end_reverse = thrust::make_reverse_iterator(data_begin_ptr + n_elements);
 
     // find the last element in the vector that is less than the maximum value
     auto last = thrust::find_if(

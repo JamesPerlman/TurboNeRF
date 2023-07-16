@@ -22,68 +22,68 @@ TURBO_NAMESPACE_BEGIN
 
 struct NeRFTrainingController {
 
-	struct TrainingMetrics {
-		uint32_t step;
-		uint32_t n_rays;
-		uint32_t n_samples;
-		float loss;
+    struct TrainingMetrics {
+        uint32_t step;
+        uint32_t n_rays;
+        uint32_t n_samples;
+        float loss;
 
-		std::map<std::string, std::any> as_map() const {
-			return {
-				{"step", step},
-				{"n_rays", n_rays},
-				{"n_samples", n_samples},
-				{"loss", loss}
-			};
-		}
-	};
+        std::map<std::string, std::any> as_map() const {
+            return {
+                {"step", step},
+                {"n_rays", n_rays},
+                {"n_samples", n_samples},
+                {"loss", loss}
+            };
+        }
+    };
 
-	struct OccupancyGridMetrics {
-		uint32_t n_occupied;
-		uint32_t n_total;
+    struct OccupancyGridMetrics {
+        uint32_t n_occupied;
+        uint32_t n_total;
 
-		std::map<std::string, std::any> as_map() const {
-			return {
-				{"n_occupied", n_occupied},
-				{"n_total", n_total}
-			};
-		}
-	};
+        std::map<std::string, std::any> as_map() const {
+            return {
+                {"n_occupied", n_occupied},
+                {"n_total", n_total}
+            };
+        }
+    };
 
-	// constructor
-	NeRFTrainingController(
-		NeRFProxy* proxy
-	);
+    // constructor
+    NeRFTrainingController(
+        NeRFProxy* proxy
+    );
 
-	NeRFTrainingController() = default;
+    NeRFTrainingController() = default;
 
-	// public methods
-	void setup_data(uint32_t batch_size = NeRFConstants::batch_size);
+    // public methods
+    void setup_data(uint32_t batch_size = NeRFConstants::batch_size);
 
-	void teardown();
+    void teardown();
 
-	void reset_training();
-	
-	void load_images(std::function<void(int, int)> on_image_loaded = {});
-	
-	TrainingMetrics train_step();
+    void reset_training();
+    
+    void load_images(std::function<void(int, int)> on_image_loaded = {});
+    
+    TrainingMetrics train_step();
 
-	OccupancyGridMetrics update_occupancy_grid(const uint32_t& training_step);
+    OccupancyGridMetrics update_occupancy_grid(const uint32_t& training_step);
 
-	// training settings
-	// TODO: put these in their own struct?
-	float alpha_selection_threshold = 1.0f;
-	float alpha_selection_probability = 1.0f;
-	float min_step_size = NeRFConstants::min_step_size;
-	
-	NeRFProxy* proxy;
+    // training settings
+    // TODO: put these in their own struct?
+    float alpha_selection_threshold = 1.0f;
+    float alpha_selection_probability = 1.0f;
+    float min_step_size = NeRFConstants::min_step_size;
+    
+    NeRFProxy* proxy;
 
 private:
-	// private properties
-	std::vector<Trainer::Context> contexts;
-	Trainer trainer;
+    // private properties
+    std::vector<Trainer::Context> contexts;
+    Trainer trainer;
 
-	void update_dataset_if_necessary();
+    void update_dataset_if_necessary();
     std::vector<size_t> get_cuda_memory_allocated() const;
 };
 

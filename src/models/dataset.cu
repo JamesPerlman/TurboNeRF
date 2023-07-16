@@ -28,7 +28,7 @@ void Dataset::load_transforms() {
     json json_data;
     input_file >> json_data;
 
-	uint32_t n_frames = json_data["frames"].size();
+    uint32_t n_frames = json_data["frames"].size();
 
     cameras.reserve(n_frames);
     images.reserve(n_frames);

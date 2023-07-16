@@ -16,11 +16,11 @@ __global__ void buffer_to_stbi_uc(
     stbi_uc* __restrict__ output,
     const float scale
 ) {
-	const uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t idx = blockDim.x * blockIdx.x + threadIdx.x;
 
-	if (idx < n_elements) {
-		output[idx] = (stbi_uc)((float)input[idx] / scale * 255.0f);
-	}
+    if (idx < n_elements) {
+        output[idx] = (stbi_uc)((float)input[idx] / scale * 255.0f);
+    }
 }
 
 template <typename T>
@@ -55,9 +55,9 @@ void save_buffer_to_image(
     const float& scale
 ) {
     const uint32_t n_pixels = width * height;
-	const uint32_t n_elements = n_pixels * channels;
+    const uint32_t n_elements = n_pixels * channels;
 
-	tcnn::GPUMemory<stbi_uc> img_gpu(n_elements);
+    tcnn::GPUMemory<stbi_uc> img_gpu(n_elements);
     tcnn::GPUMemory<float> data_float(n_elements);
 
     std::vector<stbi_uc> img_cpu(n_elements);
@@ -79,7 +79,7 @@ void save_buffer_to_image(
         }
     }
 
-	stbi_write_png(filename.c_str(), width, height, channels, img_cpu.data(), width * sizeof(stbi_uc) * channels);
+    stbi_write_png(filename.c_str(), width, height, channels, img_cpu.data(), width * sizeof(stbi_uc) * channels);
 }
 
 std::vector<float> save_buffer_to_memory(

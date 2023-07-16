@@ -151,12 +151,12 @@ struct FileManager {
         );
 
         // need to copy half-precision params too
-		copy_and_cast<tcnn::network_precision_t, float>(
-			stream,
-			n_params,
-			nerf.params.params_hp,
-			nerf.params.params_fp
-		);
+        copy_and_cast<tcnn::network_precision_t, float>(
+            stream,
+            n_params,
+            nerf.params.params_hp,
+            nerf.params.params_fp
+        );
 
         // load occupancy grid bitfield
         std::vector<uint8_t> occ_grid_bits(data.n_occ_grid_bits);
@@ -182,8 +182,8 @@ struct FileManager {
         // synchronize stream
         CUDA_CHECK_THROW(cudaStreamSynchronize(stream));
 
-		proxy->is_valid = true;
-	    proxy->can_render = true;
+        proxy->is_valid = true;
+        proxy->can_render = true;
     }
 };
 

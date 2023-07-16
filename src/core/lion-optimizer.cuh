@@ -90,119 +90,119 @@ __global__ void lion_step(
 template <typename T>
 class LionOptimizer : public Optimizer<T> {
 public:
-	LionOptimizer(const json& params) {
-		update_hyperparams(params);
-	}
+    LionOptimizer(const json& params) {
+        update_hyperparams(params);
+    }
 
-	void allocate(uint32_t n_weights, const std::vector<std::pair<uint32_t, uint32_t>>& layer_sizes) override {
-		m_n_weights = n_weights;
+    void allocate(uint32_t n_weights, const std::vector<std::pair<uint32_t, uint32_t>>& layer_sizes) override {
+        m_n_weights = n_weights;
         m_n_hashgrid_weights = layer_sizes[0].first;
 
-		m_first_moments.resize(m_n_weights);
-		m_first_moments.memset(0);
-	}
+        m_first_moments.resize(m_n_weights);
+        m_first_moments.memset(0);
+    }
 
-	void step(cudaStream_t stream, float loss_scale, float* weights_full_precision, T* weights, const T* gradients) override {
-		++m_current_step;
+    void step(cudaStream_t stream, float loss_scale, float* weights_full_precision, T* weights, const T* gradients) override {
+        ++m_current_step;
 
-		linear_kernel(lion_step<T>, 0, stream,
-			m_n_weights,
+        linear_kernel(lion_step<T>, 0, stream,
+            m_n_weights,
             m_n_hashgrid_weights,
-			loss_scale,
-			m_base_learning_rate,
-			m_beta1,
-			m_beta2,
-			m_weight_decay,
-			weights_full_precision,
-			weights,
-			gradients,
-			m_first_moments.data()
-		);
-	}
+            loss_scale,
+            m_base_learning_rate,
+            m_beta1,
+            m_beta2,
+            m_weight_decay,
+            weights_full_precision,
+            weights,
+            gradients,
+            m_first_moments.data()
+        );
+    }
 
-	float learning_rate() const override {
-		return m_base_learning_rate;
-	}
+    float learning_rate() const override {
+        return m_base_learning_rate;
+    }
 
-	void set_learning_rate(float val) override {
-		m_base_learning_rate = val;
-	}
+    void set_learning_rate(float val) override {
+        m_base_learning_rate = val;
+    }
 
-	uint32_t step() const override {
-		return m_current_step;
-	}
+    uint32_t step() const override {
+        return m_current_step;
+    }
 
-	uint32_t n_weights() const override {
-		return m_n_weights;
-	}
+    uint32_t n_weights() const override {
+        return m_n_weights;
+    }
 
-	T* custom_weights() const override {
-		return nullptr;
-	}
+    T* custom_weights() const override {
+        return nullptr;
+    }
 
-	uint32_t n_nested() const override {
-		return 0;
-	}
+    uint32_t n_nested() const override {
+        return 0;
+    }
 
-	void update_hyperparams(const json& params) override {
-		if (params.contains("beta1")) {
-			m_beta1 = params["beta1"];
-		}
+    void update_hyperparams(const json& params) override {
+        if (params.contains("beta1")) {
+            m_beta1 = params["beta1"];
+        }
 
-		if (params.contains("beta2")) {
-			m_beta2 = params["beta2"];
-		}
+        if (params.contains("beta2")) {
+            m_beta2 = params["beta2"];
+        }
 
-		if (params.contains("weight_decay")) {
-			m_weight_decay = params["weight_decay"];
-		}
+        if (params.contains("weight_decay")) {
+            m_weight_decay = params["weight_decay"];
+        }
 
-		if (params.contains("learning_rate")) {
-			m_base_learning_rate = params["learning_rate"];
-		}
+        if (params.contains("learning_rate")) {
+            m_base_learning_rate = params["learning_rate"];
+        }
 
-	}
+    }
 
-	json hyperparams() const override {
-		return {
-			{"otype", "Lion"},
-			{"beta1", m_beta1},
-			{"beta2", m_beta2},
-			{"weight_decay", m_weight_decay},
-			{"learning_rate", m_base_learning_rate},
-		};
-	}
+    json hyperparams() const override {
+        return {
+            {"otype", "Lion"},
+            {"beta1", m_beta1},
+            {"beta2", m_beta2},
+            {"weight_decay", m_weight_decay},
+            {"learning_rate", m_base_learning_rate},
+        };
+    }
 
-	json serialize() const override {
-		json data;
-		data["current_step"] = m_current_step;
-		data["base_learning_rate"] = m_base_learning_rate;
-		data["first_moments_binary"] = m_first_moments;
-		return data;
-	}
+    json serialize() const override {
+        json data;
+        data["current_step"] = m_current_step;
+        data["base_learning_rate"] = m_base_learning_rate;
+        data["first_moments_binary"] = m_first_moments;
+        return data;
+    }
 
-	void deserialize(const json& data) override {
-		m_first_moments = data["first_moments_binary"];
-		m_current_step = data["current_step"];
-		m_base_learning_rate = data["base_learning_rate"];
-	}
+    void deserialize(const json& data) override {
+        m_first_moments = data["first_moments_binary"];
+        m_current_step = data["current_step"];
+        m_base_learning_rate = data["base_learning_rate"];
+    }
 
 private:
-	uint32_t m_n_weights;
+    uint32_t m_n_weights;
     uint32_t m_n_hashgrid_weights;
 
-	GPUMemory<float> m_first_moments;
+    GPUMemory<float> m_first_moments;
 
-	uint32_t m_current_step = 0;
+    uint32_t m_current_step = 0;
 
-	// Hyperparameters
+    // Hyperparameters
     // From https://arxiv.org/pdf/2302.06675.pdf#page=13
     // Page 13-14, "Hyperparameter Tuning"
 
-	float m_base_learning_rate = 1e-4f;
+    float m_base_learning_rate = 1e-4f;
     float m_weight_decay = 0.0f;
-	float m_beta1 = 0.9f;
-	float m_beta2 = 0.99f;
+    float m_beta1 = 0.9f;
+    float m_beta2 = 0.99f;
 };
 
 TCNN_NAMESPACE_END

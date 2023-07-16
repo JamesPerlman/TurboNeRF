@@ -61,26 +61,26 @@ inline __device__ void fill_ray_buffers(
 
     const Ray global_ray = cam->global_ray_at_pixel_xy((float)pix_idx_x, (float)pix_idx_y);
     
-	const float3 global_ori = global_ray.o;
-	const float3 global_dir = global_ray.d;
+    const float3 global_ori = global_ray.o;
+    const float3 global_dir = global_ray.d;
 
-	const float dir_x = global_dir.x;
-	const float dir_y = global_dir.y;
-	const float dir_z = global_dir.z;
-	
+    const float dir_x = global_dir.x;
+    const float dir_y = global_dir.y;
+    const float dir_z = global_dir.z;
+    
     // assign ray properties
 
-	pos[i_offset_0] = global_ori.x;
-	pos[i_offset_1] = global_ori.y;
-	pos[i_offset_2] = global_ori.z;
-	
-	dir[i_offset_0] = dir_x;
-	dir[i_offset_1] = dir_y;
-	dir[i_offset_2] = dir_z;
+    pos[i_offset_0] = global_ori.x;
+    pos[i_offset_1] = global_ori.y;
+    pos[i_offset_2] = global_ori.z;
+    
+    dir[i_offset_0] = dir_x;
+    dir[i_offset_1] = dir_y;
+    dir[i_offset_2] = dir_z;
 
     t_max[i] = cam->far - cam->near;
     index[i] = i;
-	alive[i] = true;
+    alive[i] = true;
 };
 
 TURBO_NAMESPACE_END

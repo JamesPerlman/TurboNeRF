@@ -81,7 +81,7 @@ void NeRFRenderingController::submit(
     // TODO: Allow NeRFs and Datasets to be rendered independently
     if (nerfs.size() == 0) {
         request->on_complete();
-		return;
+        return;
     }
     
     this->request = request;

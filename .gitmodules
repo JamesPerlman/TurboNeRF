@@ -1,6 +1,6 @@
 [submodule "includes/tiny-cuda-nn"]
-	path = includes/tiny-cuda-nn
-	url = https://github.com/NVLabs/tiny-cuda-nn.git
+    path = includes/tiny-cuda-nn
+    url = https://github.com/NVLabs/tiny-cuda-nn.git
 [submodule "includes/pybind11"]
-	path = includes/pybind11
-	url = git@github.com:pybind/pybind11.git
+    path = includes/pybind11
+    url = git@github.com:pybind/pybind11.git

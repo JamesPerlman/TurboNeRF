@@ -32,7 +32,7 @@ struct NeRFProxy {
     bool can_render = false;
     bool is_dataset_dirty = true;
     bool is_visible = true;
-	uint32_t training_step = 0;
+    uint32_t training_step = 0;
 
     // runloop flags (these are only used by the Blender bridge)
     // TODO: move these to a separate struct (maybe a wrapper?)
@@ -100,7 +100,7 @@ struct NeRFProxy {
     void attach_dataset(const Dataset& dataset) {
         this->dataset = dataset;
         this->render_bbox = dataset.bounding_box;
-		this->training_bbox = dataset.bounding_box;
+        this->training_bbox = dataset.bounding_box;
         this->is_dataset_dirty = true;
     }
 

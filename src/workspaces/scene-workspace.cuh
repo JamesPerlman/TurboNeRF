@@ -18,7 +18,7 @@ struct SceneWorkspace: Workspace {
 
     uint32_t n_nerfs = 0;
 
-	Camera* camera;
+    Camera* camera;
     BoundingBox* render_bboxes;
     BoundingBox* training_bboxes;
     OccupancyGrid* occupancy_grids;
