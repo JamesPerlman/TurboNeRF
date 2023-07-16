@@ -357,7 +357,9 @@ __global__ void march_and_generate_network_positions_kernel(
 	// output buffers
 	float* __restrict__ out_pos_xyz,
 	float* __restrict__ out_dir_xyz,
-	float* __restrict__ out_dt
+	float* __restrict__ out_dt,
+	float* __restrict__ out_m_norm,
+	float* __restrict__ out_dt_norm
 ) {
 	// get thread index
 	const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -394,6 +396,9 @@ __global__ void march_and_generate_network_positions_kernel(
 
 	float t = in_ray_t[i];
 
+	const float t_min = t;
+	float t_max = t;
+
 	uint32_t n_steps_taken = 0;
 
 	while (n_steps_taken < n_steps) {
@@ -405,6 +410,9 @@ __global__ void march_and_generate_network_positions_kernel(
 		const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
 
 		if (!bbox->contains(x, y, z)) {
+			out_m_norm[sample_offset + n_steps_taken] = t + 0.5f * dt;
+			out_dt_norm[sample_offset + n_steps_taken] = dt;
+
 			assign_normalized_ray_sample(
 				batch_size, sample_offset, n_steps_taken,
 				x, y, z,
@@ -422,7 +430,11 @@ __global__ void march_and_generate_network_positions_kernel(
 
 		if (grid->is_occupied_at(grid_level, x, y, z)) {
 
+			out_m_norm[sample_offset + n_steps_taken] = t + 0.5f * dt;
+			out_dt_norm[sample_offset + n_steps_taken] = dt;
+
 			t += dt;
+			t_max = t;
 
 			assign_normalized_ray_sample(
 				batch_size, sample_offset, n_steps_taken,
@@ -445,6 +457,13 @@ __global__ void march_and_generate_network_positions_kernel(
 				grid_level
 			);
 		}
+	}
+
+	// normalize t_mids
+	const float t_span = t_max - t_min;
+	for (uint32_t i = 0; i < n_steps_taken; ++i) {
+		out_m_norm[sample_offset + i] = tcnn::clamp((out_m_norm[sample_offset + i] - t_min) / t_span, 0.0f, 1.0f);
+		out_dt_norm[sample_offset + i] /= t_span;
 	}
 }
 

@@ -45,6 +45,8 @@ struct NerfNetwork {
 		float* pos_batch,
 		float* dir_batch,
 		float* dt_batch,
+		float* m_norm_batch,
+		float* dt_norm_batch,
 		float* target_rgba,
 		tcnn::network_precision_t* concat_buffer,
 		tcnn::network_precision_t* output_buffer
@@ -111,12 +113,6 @@ private:
 		tcnn::network_precision_t* output_buffer
 	);
 
-	float calculate_loss(
-		const cudaStream_t& stream,
-		const uint32_t& batch_size,
-		const uint32_t& n_rays
-	);
-
 	void optimizer_step(
 		const cudaStream_t& stream,
 		NetworkParamsWorkspace& params_ws
@@ -130,7 +126,7 @@ private:
 		const uint32_t& n_samples
 	);
 
-	void fused_custom_forward_backward(
+	float fused_reconstruction_loss_forward_backward(
 		const cudaStream_t& stream,
 		const uint32_t& batch_size,
 		const uint32_t& n_rays,
@@ -146,6 +142,17 @@ private:
 
 		tcnn::network_precision_t* concat_buffer,
 		tcnn::network_precision_t* output_buffer
+	);
+
+	float mipNeRF360_distortion_loss_forward_backward(
+		const cudaStream_t& stream,
+		const uint32_t& batch_size,
+		const uint32_t& n_rays,
+		const uint32_t* ray_steps,
+		const uint32_t* ray_offset,
+		const float* m_norm_batch,
+		const float* dt_norm_batch,
+		const tcnn::network_precision_t* concat_buffer
 	);
 	
 	void enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size);

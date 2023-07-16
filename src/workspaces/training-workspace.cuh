@@ -58,10 +58,11 @@ struct TrainingWorkspace: Workspace {
 
 	// sample buffers
 	int* sample_index; // indices of samples (for compaction)
-	bool* sample_visible; // is visible
 	float* sample_pos;
-    float* sample_dt;
 	float* sample_dir;
+    float* sample_dt;
+	float* sample_m_norm;
+	float* sample_dt_norm;
 
 	// primitives
 	uint32_t n_samples_per_batch;
@@ -102,9 +103,10 @@ struct TrainingWorkspace: Workspace {
 
 		sample_index	= allocate<int>(stream, batch_size);
 		sample_pos		= allocate<float>(stream, 3 * batch_size);
-		sample_dt		= allocate<float>(stream, batch_size);
 		sample_dir		= allocate<float>(stream, 3 * batch_size);
-		sample_visible	= allocate<bool>(stream, batch_size);
+		sample_dt		= allocate<float>(stream, batch_size);
+		sample_m_norm	= allocate<float>(stream, batch_size);
+		sample_dt_norm  = allocate<float>(stream, batch_size);
 
 		network_concat	= allocate<tcnn::network_precision_t>(stream, n_network_concat_elements * batch_size);
 		network_output	= allocate<tcnn::network_precision_t>(stream, n_network_output_elements * batch_size);

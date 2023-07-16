@@ -203,6 +203,8 @@ float NerfNetwork::train(
 	float* pos_batch,
 	float* dir_batch,
 	float* dt_batch,
+	float* m_norm_batch,
+	float* dt_norm_batch,
 	float* target_rgba,
 	network_precision_t* concat_buffer,
 	network_precision_t* output_buffer
@@ -229,7 +231,18 @@ float NerfNetwork::train(
 	);
 
 	// custom kernels
-	fused_custom_forward_backward(
+	float distortion_loss = mipNeRF360_distortion_loss_forward_backward(
+		stream,
+		batch_size,
+		n_rays,
+		ray_steps,
+		ray_offset,
+		m_norm_batch,
+		dt_norm_batch,
+		concat_buffer
+	);
+
+	float reconstruction_loss = fused_reconstruction_loss_forward_backward(
 		stream,
 		batch_size,
 		n_rays,
@@ -256,11 +269,7 @@ float NerfNetwork::train(
 	// Optimizer
 	optimizer_step(stream, params_ws);
 
-	return calculate_loss(
-		stream,
-		batch_size,
-		n_rays
-	);
+	return distortion_loss + reconstruction_loss;
 }
 
 void NerfNetwork::inference(
@@ -436,24 +445,7 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
 	return fwd_ctx;
 }
 
-float NerfNetwork::calculate_loss(
-	const cudaStream_t& stream,
-	const uint32_t& batch_size,
-	const uint32_t& n_rays
-) {
-	// Add all loss values together
-	thrust::device_ptr<float> loss_buffer_ptr(workspace.loss_buf);
-
-	return (1.0f / (float)n_rays) * thrust::reduce(
-		MAKE_EXEC_POLICY(stream),
-		loss_buffer_ptr,
-		loss_buffer_ptr + 4 * batch_size,
-		0.0f,
-		thrust::plus<float>()
-	);
-}
-
-void NerfNetwork::fused_custom_forward_backward(
+float NerfNetwork::fused_reconstruction_loss_forward_backward(
 	const cudaStream_t& stream,
 	const uint32_t& batch_size,
 	const uint32_t& n_rays,
@@ -471,7 +463,7 @@ void NerfNetwork::fused_custom_forward_backward(
 	network_precision_t* output_buffer
 ) {
 	// zero out previous gradients
-	CUDA_CHECK_THROW(cudaMemsetAsync(workspace.grad_dL_ddensity, 0, batch_size * sizeof(float), stream));
+	CUDA_CHECK_THROW(cudaMemsetAsync(workspace.grad_dLrecon_ddensity, 0, batch_size * sizeof(float), stream));
 	CUDA_CHECK_THROW(
 		cudaMemsetAsync(
 			workspace.color_network_dL_doutput,
@@ -482,7 +474,7 @@ void NerfNetwork::fused_custom_forward_backward(
 	);
 
 	// perform custom fused forward/backward operations
-	fused_custom_forward_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+	fused_reconstruction_forward_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
 		n_rays,
 		batch_size,
 		1.0f / (float)n_rays,
@@ -494,9 +486,83 @@ void NerfNetwork::fused_custom_forward_backward(
 		concat_buffer,
 		output_buffer,
 		dt_batch,
-		workspace.loss_buf,
-		workspace.grad_dL_ddensity,
+		workspace.ray_recon_loss,
+		workspace.grad_dLrecon_ddensity,
 		workspace.color_network_dL_doutput
+	);
+
+	// return the sum of all losses
+	thrust::device_ptr<float> loss_buffer_ptr(workspace.ray_recon_loss);
+
+	return (1.0f / (float)n_rays) * thrust::reduce(
+		MAKE_EXEC_POLICY(stream),
+		loss_buffer_ptr,
+		loss_buffer_ptr + 4 * batch_size,
+		0.0f,
+		thrust::plus<float>()
+	);
+}
+
+float NerfNetwork::mipNeRF360_distortion_loss_forward_backward(
+	const cudaStream_t& stream,
+	const uint32_t& batch_size,
+	const uint32_t& n_rays,
+	const uint32_t* ray_steps,
+	const uint32_t* ray_offset,
+	const float* m_norm_batch,
+	const float* dt_norm_batch,
+	const tcnn::network_precision_t* concat_buffer
+) {
+	// zero out previous gradients
+	CUDA_CHECK_THROW(cudaMemsetAsync(workspace.grad_dLdist_ddensity, 0, batch_size * sizeof(float), stream));
+
+	mipNeRF360_distortion_loss_forward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+		n_rays,
+		batch_size,
+		ray_steps,
+		ray_offset,
+		concat_buffer,
+		m_norm_batch,
+		dt_norm_batch,
+		workspace.ray_dtw2_cs,
+		workspace.ray_w_cs,
+		workspace.ray_wm_cs,
+		workspace.ray_wm_w_cs1_cs,
+		workspace.ray_w_wm_cs1_cs,
+		workspace.ray_dist_loss,
+		workspace.sample_w_cs,
+		workspace.sample_wm_cs
+	);
+
+	mipNeRF360_distortion_loss_backward_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
+		n_rays,
+		batch_size,
+		ray_steps,
+		ray_offset,
+		concat_buffer,
+		workspace.ray_dtw2_cs,
+		workspace.ray_w_cs,
+		workspace.ray_wm_cs,
+		workspace.ray_wm_w_cs1_cs,
+		workspace.ray_w_wm_cs1_cs,
+		workspace.ray_dist_loss,
+		m_norm_batch,
+		dt_norm_batch,
+		workspace.sample_w_cs,
+		workspace.sample_wm_cs,
+		workspace.grad_dLdist_ddensity
+	);
+
+	// return the sum of all loss values
+
+	thrust::device_ptr<float> loss_buffer_ptr(workspace.ray_dist_loss);
+
+	return (1.0 / (float)n_rays) * thrust::reduce(
+		MAKE_EXEC_POLICY(stream),
+		loss_buffer_ptr,
+		loss_buffer_ptr + n_rays,
+		0.0f,
+		thrust::plus<float>()
 	);
 }
 
@@ -550,14 +616,23 @@ void NerfNetwork::backward(
 		MatrixLayout::RowMajor
 	);
 
-	// We need to add dL/ddensity to dL/doutput before backpropagating
+	// We need to scale dL/ddensity and add it to dL/doutput before backpropagating
 	copy_gradients_kernel<1, true><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
 		n_samples,
 		batch_size,
 		LOSS_SCALE,
-		workspace.grad_dL_ddensity,
+		workspace.grad_dLrecon_ddensity,
 		density_network_dL_doutput_matrix.data()
 	);
+
+	// We also need to copy the distortion loss
+	// copy_gradients_kernel<1, true><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+	// 	n_samples,
+	// 	batch_size,
+	// 	LOSS_SCALE,
+	// 	workspace.grad_dLdist_ddensity,
+	// 	density_network_dL_doutput_matrix.data()
+	// );
 
 	density_network->backward(
 		stream,

@@ -14,6 +14,8 @@ namespace NeRFConstants {
 
     constexpr float occupancy_decay = 0.95f;
 
+    constexpr float mipNeRF360_distortion_loss_lambda = 0.01f;
+
 	// This is adapted from the instant-NGP paper.  See page 15 on "Updating occupancy grids"
 	// For some reason, the way the paper says it does not work for this implementation.
 	// It seems to work with a threshold of 0.01, when the paper says to multiply by min_step_size.

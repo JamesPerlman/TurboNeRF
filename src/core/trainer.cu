@@ -206,7 +206,9 @@ void Trainer::generate_next_training_batch(
 		// output buffers
 		ctx.workspace.sample_pos,
 		ctx.workspace.sample_dir,
-		ctx.workspace.sample_dt
+		ctx.workspace.sample_dt,
+		ctx.workspace.sample_m_norm,
+		ctx.workspace.sample_dt_norm
 	);
 }
 
@@ -323,6 +325,8 @@ float Trainer::train_step(
 		ctx.workspace.sample_pos,
 		ctx.workspace.sample_dir,
 		ctx.workspace.sample_dt,
+		ctx.workspace.sample_m_norm,
+		ctx.workspace.sample_dt_norm,
 		ctx.workspace.pix_rgba,
 		ctx.workspace.network_concat,
 		ctx.workspace.network_output
