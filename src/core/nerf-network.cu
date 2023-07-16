@@ -626,13 +626,13 @@ void NerfNetwork::backward(
 	);
 
 	// We also need to copy the distortion loss
-	// copy_gradients_kernel<1, true><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
-	// 	n_samples,
-	// 	batch_size,
-	// 	LOSS_SCALE,
-	// 	workspace.grad_dLdist_ddensity,
-	// 	density_network_dL_doutput_matrix.data()
-	// );
+	copy_gradients_kernel<1, true><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+		n_samples,
+		batch_size,
+		LOSS_SCALE,
+		workspace.grad_dLdist_ddensity,
+		density_network_dL_doutput_matrix.data()
+	);
 
 	density_network->backward(
 		stream,
