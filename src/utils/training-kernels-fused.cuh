@@ -43,6 +43,18 @@ __global__ void mipNeRF360_distortion_loss_forward_kernel(
         return;
     }
 
+    const uint32_t n_samples = ray_steps[ray_idx];
+
+    if (n_samples == 0) {
+        ray_dist_loss_buf[ray_idx] = 0.0f;
+        ray_w_cs_buf[ray_idx] = 0.0f;
+        ray_wm_cs_buf[ray_idx] = 0.0f;
+        ray_dtw2_cs_buf[ray_idx] = 0.0f;
+        ray_wm_w_cs1_cs_buf[ray_idx] = 0.0f;
+        ray_w_wm_cs1_cs_buf[ray_idx] = 0.0f;
+        return;
+    }
+
     const uint32_t sample_offset = ray_offset[ray_idx];
 
     const tcnn::network_precision_t* density = sample_density_buf + sample_offset;
@@ -65,8 +77,6 @@ __global__ void mipNeRF360_distortion_loss_forward_kernel(
     float loss_bi_0 = 0.0f;
     float loss_bi_1 = 0.0f;
     float loss_uni = 0.0f;
-
-    const uint32_t n_samples = ray_steps[ray_idx];
 
     for (uint32_t i = 0; i < n_samples; ++i) {
         const float dt_i = dt[i];
@@ -98,10 +108,14 @@ __global__ void mipNeRF360_distortion_loss_forward_kernel(
         prev_wm_cs = cumsum_wm;
 
         trans *= (1.0f - alpha_i);
+        
+        if (trans < NeRFConstants::min_transmittance) {
+            break;
+        }
     }
 
-    const float k = NeRFConstants::mipNeRF360_distortion_loss_lambda;
-    ray_dist_loss_buf[ray_idx] = k * ((1.0 / 3.0) * loss_uni + 2.0 * (loss_bi_0 - loss_bi_1)) / (float)n_samples;
+    const float k = NeRFConstants::mipNeRF360_distortion_loss_lambda / (float)n_samples;
+    ray_dist_loss_buf[ray_idx] = k * ((1.0 / 3.0) * loss_uni + 2.0 * (loss_bi_0 - loss_bi_1));
     ray_w_cs_buf[ray_idx] = cumsum_w;
     ray_wm_cs_buf[ray_idx] = cumsum_wm;
     ray_dtw2_cs_buf[ray_idx] = cumsum_dtw2;
@@ -145,6 +159,12 @@ __global__ void mipNeRF360_distortion_loss_backward_kernel(
         return;
     }
 
+    const uint32_t n_samples = ray_steps[ray_idx];
+    
+    if (n_samples == 0) {
+        return;
+    }
+
     const uint32_t sample_offset = ray_offset[ray_idx];
 
     const tcnn::network_precision_t* density = sample_density_buf + sample_offset;
@@ -165,7 +185,6 @@ __global__ void mipNeRF360_distortion_loss_backward_kernel(
     float prev_w_cs = 0.0f;
     float prev_wm_cs = 0.0f;
 
-    const uint32_t n_samples = ray_steps[ray_idx];
     const float n_samples_f = (float)n_samples;
 
     const float k = NeRFConstants::mipNeRF360_distortion_loss_lambda / n_samples_f;
@@ -205,6 +224,10 @@ __global__ void mipNeRF360_distortion_loss_backward_kernel(
         prev_wm_cs = wm_cs_i;
 
         trans *= (1.0f - alpha_i);
+
+        if (trans < NeRFConstants::min_transmittance) {
+            break;
+        }
     }
 }
 

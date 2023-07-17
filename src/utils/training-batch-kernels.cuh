@@ -460,7 +460,7 @@ __global__ void march_and_generate_network_positions_kernel(
     }
 
     // normalize t_mids
-    const float t_span = t_max - t_min;
+    const float t_span = std::max(t_max - t_min, 1e-6f);
     for (uint32_t i = 0; i < n_steps_taken; ++i) {
         out_m_norm[sample_offset + i] = tcnn::clamp((out_m_norm[sample_offset + i] - t_min) / t_span, 0.0f, 1.0f);
         out_dt_norm[sample_offset + i] /= t_span;
