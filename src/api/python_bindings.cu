@@ -445,6 +445,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readwrite("alpha_selection_threshold", &NeRFTrainingController::alpha_selection_threshold)
         .def_readwrite("alpha_selection_probability", &NeRFTrainingController::alpha_selection_probability)
         .def_readwrite("min_step_size", &NeRFTrainingController::min_step_size)
+        .def_readwrite("use_distortion_loss", &NeRFTrainingController::use_distortion_loss)
         .def_readwrite("nerf", &NeRFTrainingController::proxy)
     ;
 

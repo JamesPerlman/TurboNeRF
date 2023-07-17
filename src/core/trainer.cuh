@@ -32,6 +32,7 @@ public:
         float alpha_selection_threshold = 1.0f;
         float alpha_selection_probability = 1.0f;
         float min_step_size = NeRFConstants::min_step_size;
+        bool use_distortion_loss = false;
 
         curandGenerator_t rng;
         unsigned long long rng_offset = 0;

@@ -113,7 +113,7 @@ void NerfNetwork::update_aabb_scale_if_needed(const int& aabb_scale) {
     this->aabb_scale = aabb_scale;
 }
 
-// initialize params and gradients for the networks (I have no idea if this is correct)
+// initialize params and gradients for the networks
 void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws) {
 
     _can_train = true;
@@ -207,7 +207,8 @@ float NerfNetwork::train(
     float* dt_norm_batch,
     float* target_rgba,
     network_precision_t* concat_buffer,
-    network_precision_t* output_buffer
+    network_precision_t* output_buffer,
+    const Settings& settings
 ) {
 
     update_aabb_scale_if_needed(aabb_scale);
@@ -231,16 +232,19 @@ float NerfNetwork::train(
     );
 
     // custom kernels
-    float distortion_loss = mipNeRF360_distortion_loss_forward_backward(
-        stream,
-        batch_size,
-        n_rays,
-        ray_steps,
-        ray_offset,
-        m_norm_batch,
-        dt_norm_batch,
-        concat_buffer
-    );
+    float distortion_loss = 0.0f;
+    if (settings.use_distortion_loss) {
+        distortion_loss = mipNeRF360_distortion_loss_forward_backward(
+            stream,
+            batch_size,
+            n_rays,
+            ray_steps,
+            ray_offset,
+            m_norm_batch,
+            dt_norm_batch,
+            concat_buffer
+        );
+    }
 
     float reconstruction_loss = fused_reconstruction_loss_forward_backward(
         stream,
@@ -263,7 +267,8 @@ float NerfNetwork::train(
         fwd_ctx,
         batch_size,
         n_rays,
-        n_samples
+        n_samples,
+        settings
     );
 
     // Optimizer
@@ -571,7 +576,8 @@ void NerfNetwork::backward(
     const std::unique_ptr<NerfNetwork::ForwardContext>& fwd_ctx,
     const uint32_t& batch_size,
     const uint32_t& n_rays,
-    const uint32_t& n_samples
+    const uint32_t& n_samples,
+    const NerfNetwork::Settings& settings
 ) {
     
     // Backpropagate through the color network
@@ -625,14 +631,16 @@ void NerfNetwork::backward(
         density_network_dL_doutput_matrix.data()
     );
 
-    // We also need to copy the distortion loss
-    copy_gradients_kernel<1, true><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
-        n_samples,
-        batch_size,
-        LOSS_SCALE,
-        workspace.grad_dLdist_ddensity,
-        density_network_dL_doutput_matrix.data()
-    );
+    // We also may need to copy the distortion loss
+    if (settings.use_distortion_loss) {
+        copy_gradients_kernel<1, true><<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+            n_samples,
+            batch_size,
+            LOSS_SCALE,
+            workspace.grad_dLdist_ddensity,
+            density_network_dL_doutput_matrix.data()
+        );
+    }
 
     density_network->backward(
         stream,

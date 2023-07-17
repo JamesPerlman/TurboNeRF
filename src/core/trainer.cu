@@ -311,6 +311,9 @@ float Trainer::train_step(
     // Generate training batch
     generate_next_training_batch(ctx);
 
+    NerfNetwork::Settings settings;
+    settings.use_distortion_loss = ctx.use_distortion_loss;
+
     const float loss = ctx.nerf->network.train(
         ctx.stream,
         ctx.nerf->params,

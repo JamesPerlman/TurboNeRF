@@ -183,6 +183,7 @@ NeRFTrainingController::TrainingMetrics NeRFTrainingController::train_step() {
     ctx.alpha_selection_probability = alpha_selection_probability;
     ctx.alpha_selection_threshold = alpha_selection_threshold;
     ctx.min_step_size = min_step_size;
+    ctx.use_distortion_loss = use_distortion_loss;
 
     proxy->update_dataset_if_necessary(ctx.stream);
     

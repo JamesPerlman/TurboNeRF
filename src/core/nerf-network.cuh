@@ -15,6 +15,10 @@
 TURBO_NAMESPACE_BEGIN
 
 struct NerfNetwork {
+
+    struct Settings {
+        bool use_distortion_loss = false;
+    };
     
     NetworkWorkspace workspace;
 
@@ -49,7 +53,8 @@ struct NerfNetwork {
         float* dt_norm_batch,
         float* target_rgba,
         tcnn::network_precision_t* concat_buffer,
-        tcnn::network_precision_t* output_buffer
+        tcnn::network_precision_t* output_buffer,
+        const Settings& settings = Settings()
     );
 
     void inference(
@@ -123,7 +128,8 @@ private:
         const std::unique_ptr<NerfNetwork::ForwardContext>& fwd_ctx,
         const uint32_t& batch_size,
         const uint32_t& n_rays,
-        const uint32_t& n_samples
+        const uint32_t& n_samples,
+        const Settings& settings
     );
 
     float fused_reconstruction_loss_forward_backward(
