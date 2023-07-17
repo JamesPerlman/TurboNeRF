@@ -332,7 +332,8 @@ float Trainer::train_step(
         ctx.workspace.sample_dt_norm,
         ctx.workspace.pix_rgba,
         ctx.workspace.network_concat,
-        ctx.workspace.network_output
+        ctx.workspace.network_output,
+        settings
     );
 
     return loss;
