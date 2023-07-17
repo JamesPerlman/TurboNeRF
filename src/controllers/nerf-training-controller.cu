@@ -96,6 +96,11 @@ void NeRFTrainingController::teardown() {
     }
 
     this->contexts.clear();
+
+    alpha_selection_probability = 1.0f;
+    alpha_selection_threshold = 1.0f;
+    min_step_size = NeRFConstants::min_step_size;
+    use_distortion_loss = false;
 }
 
 void NeRFTrainingController::reset_training() {
