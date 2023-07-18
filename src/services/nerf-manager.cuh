@@ -100,6 +100,7 @@ public:
         new_proxy->render_bbox = proxy->render_bbox;
         new_proxy->training_bbox = proxy->training_bbox;
         new_proxy->transform = proxy->transform;
+        new_proxy->n_appearances = proxy->n_appearances;
         new_proxy->id = index;
 
         DeviceManager::foreach_device([&](const int& device_id, const cudaStream_t& stream) {
