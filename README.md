@@ -107,13 +107,81 @@ Extreme gratitude to open source projects that will allow this project to reach 
 
 Next-level respect to the researchers much of this codebase is based off.  Thank you for making your research public.  This would not have been possible without you.  
 
-Mildenhall, Ben, et al. "NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis." arXiv, 2020.  doi:10.48550/arxiv.2003.08934 - (https://arxiv.org/abs/2003.08934)  
-Müller, Thomas, et al. "Instant neural graphics primitives with a multiresolution hash encoding." *ACM Trans. Graph.*, 41(4), 102:1-102:15 - https://doi.org/10.1145/3528223.3530127  
-Max, Nelson. "Optical Models for Direct Volume Rendering." IEEE Transactions on Visualization and Computer Graphics (1995) - https://courses.cs.duke.edu/spring03/cps296.8/papers/max95opticalModelsForDirectVolumeRendering.pdf  
-Müller, T. (2021). tiny-cuda-nn (Version 1.7) [Computer software]. https://github.com/NVlabs/tiny-cuda-nn  
-Fawzi, A., Balog, M., Huang, A. et al. Discovering faster matrix multiplication algorithms with reinforcement learning. Nature 610, 47–53 (2022). https://doi.org/10.1038/s41586-022-05172-4  
-Alman, Josh, and Virginia Vassilevska Williams. "A Refined Laser Method and Faster Matrix Multiplication." arXiv, 2020, doi:10.48550/arxiv.2010.05846.  https://arxiv.org/abs/2010.05846  
-Sabour, Sara, et al. "RobustNeRF: Ignoring Distractors with Robust Losses." arXiv, 2023, arXiv:2302.00833.  https://arxiv.org/abs/2302.00833  
+[NeRF: Neural Radiance Fields](https://www.matthewtancik.com/nerf)
+```
+@inproceedings{mildenhall2020nerf,
+ title={NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis},
+ author={Ben Mildenhall and Pratul P. Srinivasan and Matthew Tancik and Jonathan T. Barron and Ravi Ramamoorthi and Ren Ng},
+ year={2020},
+ booktitle={ECCV},
+}
+```
+
+[Instant Neural Graphics Primitives with a Multiresolution Hash Encoding](https://nvlabs.github.io/instant-ngp/)
+```
+@article{mueller2022instant,
+    author = {Thomas M\"uller and Alex Evans and Christoph Schied and Alexander Keller},
+    title = {Instant Neural Graphics Primitives with a Multiresolution Hash Encoding},
+    journal = {ACM Trans. Graph.},
+    issue_date = {July 2022},
+    volume = {41},
+    number = {4},
+    month = jul,
+    year = {2022},
+    pages = {102:1--102:15},
+    articleno = {102},
+    numpages = {15},
+    url = {https://doi.org/10.1145/3528223.3530127},
+    doi = {10.1145/3528223.3530127},
+    publisher = {ACM},
+    address = {New York, NY, USA}
+}
+```
+
+[NeRF in the Wild](https://nerf-w.github.io/)
+```
+@inproceedings{martinbrualla2020nerfw,
+    author = {Martin-Brualla, Ricardo
+            and Radwan, Noha
+            and Sajjadi, Mehdi S. M.
+            and Barron, Jonathan T.
+            and Dosovitskiy, Alexey
+            and Duckworth, Daniel},
+    title = {{NeRF in the Wild: Neural Radiance Fields for
+            Unconstrained Photo Collections}},
+    booktitle = {CVPR},
+    year={2021}
+}
+```
+
+[Mip-NeRF 360](https://jonbarron.info/mipnerf360/)
+```
+@article{barron2022mipnerf360,
+    title={Mip-NeRF 360: Unbounded Anti-Aliased Neural Radiance Fields},
+    author={Jonathan T. Barron and Ben Mildenhall and 
+            Dor Verbin and Pratul P. Srinivasan and Peter Hedman},
+    journal={CVPR},
+    year={2022}
+}
+```
+
+[tiny-cuda-nn](https://github.com/NVlabs/tiny-cuda-nn)  
+```
+@software{Muller_tiny-cuda-nn_2021,
+    author = {Müller, Thomas},
+    license = {BSD-3-Clause},
+    month = apr,
+    title = {{tiny-cuda-nn}},
+    url = {https://github.com/NVlabs/tiny-cuda-nn},
+    version = {1.7},
+    year = {2021}
+}
+```
+
+Max, Nelson. *Optical Models for Direct Volume Rendering.* IEEE Transactions on Visualization and Computer Graphics (1995) - https://courses.cs.duke.edu/spring03/cps296.8/papers/max95opticalModelsForDirectVolumeRendering.pdf  
+Fawzi, A., Balog, M., Huang, A. et al. *Discovering faster matrix multiplication algorithms with reinforcement learning.* Nature 610, 47–53 (2022) - https://doi.org/10.1038/s41586-022-05172-4  
+Alman, Josh, and Virginia Vassilevska Williams. *A Refined Laser Method and Faster Matrix Multiplication.* arXiv, 2020, doi:10.48550/arxiv.2010.05846 - https://arxiv.org/abs/2010.05846  
+Sabour, Sara, et al. *RobustNeRF: Ignoring Distractors with Robust Losses.* arXiv, 2023, arXiv:2302.00833 - https://arxiv.org/abs/2302.00833  
 
 ## SUPPORTERS
 
