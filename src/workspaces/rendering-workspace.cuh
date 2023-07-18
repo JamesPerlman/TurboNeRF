@@ -28,6 +28,7 @@ struct RenderingWorkspace: Workspace {
     int* ray_idx[2]; 
     
     // samples
+    uint32_t* appearance_ids;
     float* network_pos[2];
     float* network_dir[2];
     float* network_dt;
@@ -85,6 +86,8 @@ struct RenderingWorkspace: Workspace {
         ray_trans[1]    = allocate<float>(stream, n_rays);
 
         // samples
+        appearance_ids  = allocate<uint32_t>(stream, batch_size);
+        
         network_pos[0]  = allocate<float>(stream, 3 * batch_size);
         network_pos[1]  = allocate<float>(stream, 3 * batch_size);
 

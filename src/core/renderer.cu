@@ -129,6 +129,16 @@ void Renderer::enlarge_render_workspace_if_needed(
             concat_buffer_width,
             padded_output_width
         );
+
+        // TODO: allow changes in appearance embeddings.  for now we just use ID = 0
+        CUDA_CHECK_THROW(
+            cudaMemsetAsync(
+                render_ws.appearance_ids,
+                0,
+                render_ws.batch_size * sizeof(uint32_t),
+                ctx.stream
+            )
+        );
     }
 }
 
@@ -393,8 +403,10 @@ void Renderer::perform_task(
             nerf->network.inference(
                 stream,
                 nerf->params,
+                n_nerf_samples,
                 mini_network_batch,
                 (int)proxy->training_bbox.get().size(),
+                render_ws.appearance_ids,
                 network_pos,
                 network_dir,
                 render_ws.net_concat[compacted ? 0 : 1],

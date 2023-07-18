@@ -27,30 +27,25 @@ struct TrainingWorkspace: Workspace {
 
     float* random_float;
 
-    uint32_t* ray_step;
-    uint32_t* ray_offset;
 
     // ground-truth pixel color components
     float* pix_rgba;
 
-    // accumulated ray sample color components
-    float* ray_rgba;
+    // ray properties
+    float* ray_rgba; // accumulated ray color
+
+    uint32_t* ray_img_id; // used for appearance embedding
+    uint32_t* ray_step;
+    uint32_t* ray_offset;
     
-    // ray origin components
     float* ray_origin;
-
-    // ray direction components
     float* ray_dir;
-
-    // ray t components
     float* ray_t;
     float* ray_t_max;
-
-    // ray alive is basically just a check for if the ray hits the bounding box
-    bool* ray_alive;
-
-    // ray_index is used for compaction while generating a training batch
-    int* ray_index;
+    
+    bool* ray_alive; // boolean value representing if the ray hits the bbox
+    
+    int* ray_index; // used for compaction while generating a training batch
 
     // normalized network input
     tcnn::network_precision_t* network_concat;
@@ -58,6 +53,7 @@ struct TrainingWorkspace: Workspace {
 
     // sample buffers
     int* sample_index; // indices of samples (for compaction)
+    uint32_t* sample_img_id;
     float* sample_pos;
     float* sample_dir;
     float* sample_dt;
@@ -92,6 +88,7 @@ struct TrainingWorkspace: Workspace {
         pix_rgba        = allocate<float>(stream, 4 * batch_size);
         ray_rgba        = allocate<float>(stream, 4 * batch_size);
 
+        ray_img_id      = allocate<uint32_t>(stream, batch_size);
         ray_step        = allocate<uint32_t>(stream, batch_size);
         ray_offset      = allocate<uint32_t>(stream, batch_size);
         ray_origin      = allocate<float>(stream, 3 * batch_size);
@@ -102,6 +99,7 @@ struct TrainingWorkspace: Workspace {
         ray_index       = allocate<int>(stream, batch_size);
 
         sample_index    = allocate<int>(stream, batch_size);
+        sample_img_id   = allocate<uint32_t>(stream, batch_size);
         sample_pos      = allocate<float>(stream, 3 * batch_size);
         sample_dir      = allocate<float>(stream, 3 * batch_size);
         sample_dt       = allocate<float>(stream, batch_size);

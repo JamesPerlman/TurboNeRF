@@ -103,6 +103,7 @@ set(HEADERS
 
     # core
     src/core/adam-optimizer.cuh
+    src/core/embedding.cuh
     src/core/lion-optimizer.cuh
     src/core/nerf-network.cuh
     src/core/occupancy-grid.cuh

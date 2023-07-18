@@ -23,8 +23,13 @@ struct NetworkParamsWorkspace: Workspace {
     tcnn::network_precision_t* color_network_params_hp;
     tcnn::network_precision_t* color_network_gradients_hp;
 
+    float* appearance_embedding_params_fp;
+    tcnn::network_precision_t* appearance_embedding_params_hp;
+    tcnn::network_precision_t* appearance_embedding_gradients_hp;
+
     uint32_t n_density_params;
     uint32_t n_color_params;
+    uint32_t n_appearance_embedding_params;
 
     uint32_t n_total_params;
 
@@ -32,13 +37,14 @@ struct NetworkParamsWorkspace: Workspace {
     void enlarge(
         const cudaStream_t& stream,
         const uint32_t& n_density_network_params,
-        const uint32_t& n_color_network_params
+        const uint32_t& n_color_network_params,
+        const uint32_t& n_appearance_embedding_params
     ) {
         free_allocations();
 
         n_density_params = n_density_network_params;
         n_color_params = n_color_network_params;
-        n_total_params = n_density_params + n_color_params;
+        n_total_params = n_density_params + n_color_params + n_appearance_embedding_params;
 
         params_fp = allocate<float>(stream, n_total_params);
         params_hp = allocate<tcnn::network_precision_t>(stream, n_total_params);
@@ -51,6 +57,10 @@ struct NetworkParamsWorkspace: Workspace {
         color_network_params_fp = params_fp + n_density_params;
         color_network_params_hp = params_hp + n_density_params;
         color_network_gradients_hp = gradients_hp + n_density_params;
+
+        appearance_embedding_params_fp = color_network_params_fp + n_color_params;
+        appearance_embedding_params_hp = color_network_params_hp + n_color_params;
+        appearance_embedding_gradients_hp = color_network_gradients_hp + n_color_params;
     }
 
     // override free_allocations

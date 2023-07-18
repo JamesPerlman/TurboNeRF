@@ -75,6 +75,7 @@ void Trainer::generate_next_training_batch(
 
         // output buffers
         ctx.workspace.pix_rgba,
+        ctx.workspace.ray_img_id,
         ctx.workspace.ray_origin,
         ctx.workspace.ray_dir,
         ctx.workspace.ray_t,
@@ -193,6 +194,7 @@ void Trainer::generate_next_training_batch(
         cone_angle,
 
         // input buffers
+        ctx.workspace.ray_img_id,
         ctx.workspace.ray_origin,
         ctx.workspace.ray_dir,
         ctx.workspace.ray_t,
@@ -204,6 +206,7 @@ void Trainer::generate_next_training_batch(
         ctx.workspace.ray_step,
 
         // output buffers
+        ctx.workspace.sample_img_id,
         ctx.workspace.sample_pos,
         ctx.workspace.sample_dir,
         ctx.workspace.sample_dt,
@@ -263,8 +266,10 @@ uint32_t Trainer::update_occupancy_grid(Trainer::Context& ctx, const uint32_t& t
             ctx.nerf->network.inference(
                 ctx.stream,
                 ctx.nerf->params,
+                n_cells_to_update,
                 batch_size,
                 aabb_size,
+                ctx.workspace.sample_img_id,
                 ctx.workspace.sample_pos,
                 nullptr,
                 ctx.workspace.network_concat,
@@ -325,6 +330,7 @@ float Trainer::train_step(
         ctx.workspace.random_float + ctx.workspace.batch_size,
         ctx.workspace.ray_step,
         ctx.workspace.ray_offset,
+        ctx.workspace.sample_img_id,
         ctx.workspace.sample_pos,
         ctx.workspace.sample_dir,
         ctx.workspace.sample_dt,

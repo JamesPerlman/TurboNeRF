@@ -94,6 +94,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
 
     // output buffers
     float* __restrict__ pix_rgba,
+    uint32_t* __restrict__ ray_img_id,
     float* __restrict__ ori_xyz,
     float* __restrict__ dir_xyz,
     float* __restrict__ ray_t,
@@ -103,7 +104,7 @@ __global__ void initialize_training_rays_and_pixels_kernel(
     uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n_rays) return;
     
-    const size_t image_idx = (size_t)((float)i / n_rays_per_image);
+    const uint32_t image_idx = (uint32_t)((float)i / n_rays_per_image);
     const float local_pixel_idx_f = (float)n_pixels_per_image * random[i];
     const float img_width_f = (float)image_dimensions.x;
 
@@ -180,6 +181,8 @@ __global__ void initialize_training_rays_and_pixels_kernel(
     ray_t[i] = t;
     ray_t_max[i] = t_max;
     ray_alive[i] = true;
+
+    ray_img_id[i] = image_idx;
 }
 
 __global__ void deactivate_rays_with_alpha_threshold_kernel(
@@ -300,8 +303,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
 
 inline __device__ void assign_normalized_ray_sample(
     const uint32_t& batch_size,
-    const uint32_t& sample_offset,
-    const uint32_t& n_steps_taken,
+    const uint32_t& sample_id,
     const float& x, const float& y, const float& z,
     const float& dir_x, const float& dir_y, const float& dir_z,
     const float& dt,
@@ -311,7 +313,7 @@ inline __device__ void assign_normalized_ray_sample(
     float* __restrict__ out_dt
 ) {
     
-    const uint32_t step_offset_0 = sample_offset + n_steps_taken;
+    const uint32_t step_offset_0 = sample_id;
     const uint32_t step_offset_1 = step_offset_0 + batch_size;
     const uint32_t step_offset_2 = step_offset_1 + batch_size;
 
@@ -344,6 +346,7 @@ __global__ void march_and_generate_network_positions_kernel(
     const float cone_angle,
     
     // input buffers
+    const uint32_t* __restrict__ ray_img_id,
     const float* __restrict__ in_ori_xyz,
     const float* __restrict__ in_dir_xyz,
     const float* __restrict__ in_ray_t,
@@ -355,6 +358,7 @@ __global__ void march_and_generate_network_positions_kernel(
     uint32_t* __restrict__ n_ray_steps,
 
     // output buffers
+    uint32_t* __restrict__ out_img_id,
     float* __restrict__ out_pos_xyz,
     float* __restrict__ out_dir_xyz,
     float* __restrict__ out_dt,
@@ -373,6 +377,8 @@ __global__ void march_and_generate_network_positions_kernel(
     const uint32_t n_steps = n_ray_steps[i];
 
     const uint32_t sample_offset = ray_offset[i];
+
+    const uint32_t img_id = ray_img_id[i];
 
     // References to input buffers
 
@@ -409,12 +415,15 @@ __global__ void march_and_generate_network_positions_kernel(
 
         const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
 
+        const uint32_t sample_id = sample_offset + n_steps_taken;
+
         if (!bbox->contains(x, y, z)) {
-            out_m_norm[sample_offset + n_steps_taken] = t + 0.5f * dt;
-            out_dt_norm[sample_offset + n_steps_taken] = dt;
+            out_m_norm[sample_id] = t + 0.5f * dt;
+            out_dt_norm[sample_id] = dt;
+            out_img_id[sample_id] = img_id;
 
             assign_normalized_ray_sample(
-                batch_size, sample_offset, n_steps_taken,
+                batch_size, sample_id,
                 x, y, z,
                 d_x, d_y, d_z,
                 dt, inv_aabb_size,
@@ -430,14 +439,15 @@ __global__ void march_and_generate_network_positions_kernel(
 
         if (grid->is_occupied_at(grid_level, x, y, z)) {
 
-            out_m_norm[sample_offset + n_steps_taken] = t + 0.5f * dt;
-            out_dt_norm[sample_offset + n_steps_taken] = dt;
+            out_m_norm[sample_id] = t + 0.5f * dt;
+            out_dt_norm[sample_id] = dt;
+            out_img_id[sample_id] = img_id;
 
             t += dt;
             t_max = t;
 
             assign_normalized_ray_sample(
-                batch_size, sample_offset, n_steps_taken,
+                batch_size, sample_id,
                 x, y, z,
                 d_x, d_y, d_z,
                 dt, inv_aabb_size,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2022, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted
  * provided that the following conditions are met:
@@ -22,7 +22,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/** @file   adam.h
+/** @file   adam-optimizer.cuh
  *  @author Thomas Müller, NVIDIA
  *  @author Modified by James Perlman on 2023-02-15, copied from tiny-cuda-nn
  *  @brief  Implementation of the adam optimizer according to the Instant-NGP paper.

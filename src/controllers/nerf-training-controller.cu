@@ -52,6 +52,8 @@ void NeRFTrainingController::setup_data(uint32_t batch_size) {
     // we only prepare the first NeRF (for the first device) - the rest we will copy data to
     auto& ctx = contexts[0];
 
+    ctx.nerf->network.update_appearance_embedding_if_needed(ctx.dataset->images.size());
+
     ctx.nerf->occupancy_grid.set_aabb_scale(ctx.nerf->proxy->training_bbox.get().size());
     
     ctx.nerf->occupancy_grid.initialize_if_needed(ctx.stream, true);

@@ -137,7 +137,8 @@ struct FileManager {
 
         // prep NeRF params
         auto& nerf = proxy->nerfs[0];
-        nerf.params.enlarge(stream, data.n_density_params, data.n_color_params);
+        // TODO: fix appearance embeddings
+        nerf.params.enlarge(stream, data.n_density_params, data.n_color_params, 0);
         
         // copy to GPU
         CUDA_CHECK_THROW(

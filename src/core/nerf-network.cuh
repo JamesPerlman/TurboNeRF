@@ -7,10 +7,12 @@
 #include <tiny-cuda-nn/network.h>
 #include <tiny-cuda-nn/network_with_input_encoding.h>
 
+#include "../common.h"
 #include "../core/adam-optimizer.cuh"
+#include "../core/embedding.cuh"
+#include "../utils/nerf-constants.cuh"
 #include "../workspaces/network-workspace.cuh"
 #include "../workspaces/network-params-workspace.cuh"
-#include "../common.h"
 
 TURBO_NAMESPACE_BEGIN
 
@@ -26,11 +28,18 @@ struct NerfNetwork {
     std::shared_ptr<tcnn::NetworkWithInputEncoding<tcnn::network_precision_t>> density_network;
     std::shared_ptr<tcnn::Network<tcnn::network_precision_t>> color_network;
     std::shared_ptr<tcnn::NGPAdamOptimizer<tcnn::network_precision_t>> optimizer;
+    std::shared_ptr<Embedding<turbo::network_precision_t>> appearance_embedding;
     
-    NerfNetwork(const int& device_id);
+    NerfNetwork(const int& device_id) : workspace(device_id) {};
+    
+    void update_appearance_embedding_if_needed(
+        const uint32_t& n_appearances,
+        const uint32_t& appearance_embedding_dim = NeRFConstants::n_appearance_embedding_dims
+    );
 
     void update_params_if_needed(const cudaStream_t& stream, NetworkParamsWorkspace& params_ws);
 
+    void free_device_memory();
     void free_training_data();
     
     void set_params(NetworkParamsWorkspace& params_ws);
@@ -46,6 +55,7 @@ struct NerfNetwork {
         const float* random_rgb,
         uint32_t* ray_steps,
         uint32_t* ray_offset,
+        uint32_t* appearance_id_batch,
         float* pos_batch,
         float* dir_batch,
         float* dt_batch,
@@ -60,8 +70,10 @@ struct NerfNetwork {
     void inference(
         const cudaStream_t& stream,
         NetworkParamsWorkspace& params_ws,
+        const uint32_t& n_samples,
         const uint32_t& batch_size,
         const int& aabb_scale,
+        uint32_t* appearance_id_batch,
         float* pos_batch,
         float* dir_batch,
         tcnn::network_precision_t* concat_buffer,
@@ -97,6 +109,9 @@ private:
 
         tcnn::GPUMatrix<float, tcnn::MatrixLayout::RowMajor> direction_encoding_input_matrix;
         tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> direction_encoding_output_matrix;
+
+        tcnn::GPUMatrix<uint32_t, tcnn::MatrixLayout::RowMajor> appearance_embedding_input_matrix;
+        tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> appearance_embedding_output_matrix;
         
         tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> color_network_input_matrix;
         tcnn::GPUMatrix<tcnn::network_precision_t, tcnn::MatrixLayout::RowMajor> color_network_output_matrix;
@@ -112,6 +127,9 @@ private:
     std::unique_ptr<ForwardContext> forward(
         const cudaStream_t& stream,
         const uint32_t& batch_size,
+        const uint32_t& n_rays,
+        const uint32_t& n_samples,
+        uint32_t* appearance_id_batch,
         float* pos_batch,
         float* dir_batch,
         tcnn::network_precision_t* concat_buffer,

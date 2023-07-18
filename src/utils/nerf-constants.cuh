@@ -27,4 +27,6 @@ namespace NeRFConstants {
 
     // the maximum number of nerfs that can be rendered simultaneously
     constexpr uint32_t n_max_nerfs = 2<<10;
+
+    constexpr uint32_t n_appearance_embedding_dims = 16;
 }

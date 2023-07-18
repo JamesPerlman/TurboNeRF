@@ -17,6 +17,7 @@ void NeRF::free_device_memory() {
     dataset_ws.free_allocations();
     params.free_allocations();
     occupancy_grid.free_device_memory();
+    network.free_device_memory();
 }
 
 void NeRF::free_training_data() {

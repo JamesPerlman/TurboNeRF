@@ -24,15 +24,22 @@ using json = nlohmann::json;
     constexpr float LOSS_SCALE = 1.0f;
 #endif
 
-// Constructor
-
-NerfNetwork::NerfNetwork(const int& device_id)
-    : workspace(device_id)
-{
+void NerfNetwork::update_appearance_embedding_if_needed(
+    const uint32_t& n_appearances,
+    const uint32_t& appearance_embedding_dim
+) {
     // These network configurations were adapted from nerfstudio
 
-    // we need the density network in order to call this constructor, pass dummy aabb for now
-    update_aabb_scale_if_needed(1); 
+    // we need the density network in order to create the color network
+    update_aabb_scale_if_needed(std::max(1, this->aabb_scale)); 
+
+    // Create the Appearance Embedding
+    appearance_embedding.reset(
+        new Embedding<network_precision_t>(
+            n_appearances,
+            appearance_embedding_dim
+        )
+    );
     
     // Create the Direction Encoding
     json direction_encoding_config = {
@@ -45,8 +52,11 @@ NerfNetwork::NerfNetwork(const int& device_id)
     );
 
     // Create the Color MLP
+    const uint32_t n_dir_enc_dims = direction_encoding->padded_output_width();
+    const uint32_t n_density_dims = density_network->padded_output_width();
+    const uint32_t n_embedding_dims = appearance_embedding->padded_output_width();
 
-    uint32_t color_network_in_dim = direction_encoding->padded_output_width() + density_network->padded_output_width();
+    const uint32_t n_color_input_dims = n_dir_enc_dims + n_density_dims + n_embedding_dims;
 
     const json color_network_config = {
         {"otype", "FullyFusedMLP"},
@@ -54,7 +64,7 @@ NerfNetwork::NerfNetwork(const int& device_id)
         {"output_activation", "Sigmoid"},
         {"n_neurons", 64},
         {"n_hidden_layers", 2},
-        {"n_input_dims", color_network_in_dim},
+        {"n_input_dims", n_color_input_dims},
         {"n_output_dims", 3},
     };
 
@@ -119,7 +129,7 @@ void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkPar
     _can_train = true;
 
     // initialize params
-    if (params_ws.n_density_params == density_network->n_params() && params_ws.n_color_params == color_network->n_params()) {
+    if (params_ws.n_total_params == density_network->n_params() + color_network->n_params() + appearance_embedding->n_params()) {
         // params are already initialized
         return;
     }
@@ -130,11 +140,14 @@ void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkPar
     params_ws.enlarge(
         stream,
         density_network->n_params(),
-        color_network->n_params()
+        color_network->n_params(),
+        appearance_embedding->n_params()
     );
     
     density_network->initialize_params(rng, params_ws.density_network_params_fp);
     color_network->initialize_params(rng, params_ws.color_network_params_fp);
+    appearance_embedding->initialize_params(rng, params_ws.appearance_embedding_params_fp);
+
 
     // initialize_params only initializes full precision params, need to copy to half precision
 
@@ -151,6 +164,13 @@ void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkPar
         params_ws.color_network_params_hp,
         params_ws.color_network_params_fp
     );
+
+    copy_and_cast<network_precision_t, float>(
+        stream,
+        appearance_embedding->n_params(),
+        params_ws.appearance_embedding_params_hp,
+        params_ws.appearance_embedding_params_fp
+    );
     
     json optimizer_config = {
         {"otype", "Adam"},
@@ -166,6 +186,10 @@ void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkPar
     size_t n_params = density_network->n_params() + color_network->n_params();
     uint32_t n_grid_params = density_network->encoding()->n_params();
     optimizer->allocate(n_params, {{n_grid_params, 1}});
+}
+
+void NerfNetwork::free_device_memory() {
+    workspace.free_allocations();
 }
 
 void NerfNetwork::free_training_data() {
@@ -187,6 +211,12 @@ void NerfNetwork::set_params(NetworkParamsWorkspace& params_ws) {
         params_ws.color_network_params_hp,
         params_ws.color_network_gradients_hp
     );
+
+    appearance_embedding->set_params(
+        params_ws.appearance_embedding_params_hp,
+        params_ws.appearance_embedding_params_hp,
+        params_ws.appearance_embedding_gradients_hp
+    );
 }
 
 float NerfNetwork::train(
@@ -200,6 +230,7 @@ float NerfNetwork::train(
     const float* random_rgb,
     uint32_t* ray_steps,
     uint32_t* ray_offset,
+    uint32_t* appearance_id_batch,
     float* pos_batch,
     float* dir_batch,
     float* dt_batch,
@@ -225,6 +256,9 @@ float NerfNetwork::train(
     auto fwd_ctx = forward(
         stream,
         batch_size,
+        n_rays,
+        n_samples,
+        appearance_id_batch,
         pos_batch,
         dir_batch,
         concat_buffer,
@@ -280,8 +314,10 @@ float NerfNetwork::train(
 void NerfNetwork::inference(
     const cudaStream_t& stream,
     NetworkParamsWorkspace& params_ws,
+    const uint32_t& n_samples,
     const uint32_t& batch_size,
     const int& aabb_scale,
+    uint32_t* appearance_id_batch,
     float* pos_batch,
     float* dir_batch,
     // density network output must have space available for (color_network->input_width() * batch_size) elements of type network_precision_t
@@ -340,6 +376,30 @@ void NerfNetwork::inference(
             direction_encoding_output_matrix
         );
 
+        // Inference (appearance embedding)
+        network_precision_t* appearance_embedding_output = direction_encoding_output + direction_encoding->padded_output_width() * batch_size;
+
+        GPUMatrixDynamic appearance_embedding_input_matrix(
+            appearance_id_batch,
+            appearance_embedding->input_width(),
+            batch_size,
+            MatrixLayout::RowMajor
+        );
+
+        GPUMatrixDynamic appearance_embedding_output_matrix(
+            appearance_embedding_output,
+            appearance_embedding->padded_output_width(),
+            batch_size,
+            MatrixLayout::RowMajor
+        );
+
+        appearance_embedding->inference_mixed_precision(
+            stream,
+            n_samples,
+            appearance_embedding_input_matrix,
+            appearance_embedding_output_matrix
+        );
+
         // Inference (color network)
         GPUMatrixDynamic color_network_input_matrix(
             concat_buffer,
@@ -366,6 +426,9 @@ void NerfNetwork::inference(
 std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
     const cudaStream_t& stream,
     const uint32_t& batch_size,
+    const uint32_t& n_rays,
+    const uint32_t& n_samples,
+    uint32_t* appearance_id_batch,
     float* pos_batch,
     float* dir_batch,
     network_precision_t* concat_buffer,
@@ -421,6 +484,32 @@ std::unique_ptr<NerfNetwork::ForwardContext> NerfNetwork::forward(
         stream,
         fwd_ctx->direction_encoding_input_matrix,
         &fwd_ctx->direction_encoding_output_matrix
+    );
+
+    // Apply appearance embedding (appearance_id_batch)
+
+    network_precision_t* appearance_embedding_output = direction_encoding_output + direction_encoding->padded_output_width() * batch_size;
+
+    fwd_ctx->appearance_embedding_input_matrix = GPUMatrixDynamic(
+        appearance_id_batch,
+        appearance_embedding->input_width(),
+        batch_size,
+        MatrixLayout::RowMajor
+    );
+
+    fwd_ctx->appearance_embedding_output_matrix = GPUMatrixDynamic(
+        appearance_embedding_output,
+        appearance_embedding->padded_output_width(),
+        batch_size,
+        MatrixLayout::RowMajor
+    );
+
+    appearance_embedding->forward(
+        stream,
+        n_samples,
+        fwd_ctx->appearance_embedding_input_matrix,
+        &fwd_ctx->appearance_embedding_output_matrix,
+        false
     );
 
     // Perform the forward pass on the color network
@@ -581,6 +670,8 @@ void NerfNetwork::backward(
 ) {
     
     // Backpropagate through the color network
+
+    // color network's dL_doutput was computed by the reconstruction backward kernel
     GPUMatrixDynamic color_network_dL_doutput_matrix(
         workspace.color_network_dL_doutput,
         color_network->padded_output_width(),
@@ -604,17 +695,39 @@ void NerfNetwork::backward(
         &color_network_dL_dinput_matrix
     );
 
-    // Backpropagate through the density network
-    GPUMatrixDynamic density_network_dL_dinput_matrix(
-        workspace.density_network_dL_dinput,
-        density_network->input_width(),
+    // Backpropagate through the appearance embedding
+
+    // zero out previous gradients
+    CUDA_CHECK_THROW(cudaMemsetAsync(workspace.appearance_embedding_dL_dinput, 0, appearance_embedding->n_params() * sizeof(float), stream));
+
+    // appearance embedding's dL_doutput exists at the end part of the color network's dL_dinput
+    uint32_t appearance_embedding_offset = (color_network->input_width() - appearance_embedding->padded_output_width()) * batch_size;
+    GPUMatrixDynamic appearance_embedding_dL_doutput_matrix(
+        workspace.color_network_dL_dinput + appearance_embedding_offset,
+        appearance_embedding->padded_output_width(),
         batch_size,
         MatrixLayout::RowMajor
     );
 
-    // Construct a dL_dinput matrix of the correct size
-    // color_network_dL_dinput_matrix is too large since it is the concatenation of density's outputs and encoded directions
+    GPUMatrixDynamic appearance_embedding_dL_dinput_matrix(
+        workspace.appearance_embedding_dL_dinput,
+        appearance_embedding->input_width(),
+        appearance_embedding->n_embeddings(),
+        MatrixLayout::RowMajor
+    );
 
+    appearance_embedding->backward(
+        stream,
+        n_samples,
+        fwd_ctx->appearance_embedding_input_matrix,
+        appearance_embedding_dL_doutput_matrix,
+        appearance_embedding_dL_dinput_matrix,
+        LOSS_SCALE
+    );
+
+    // Backpropagate through the density network
+
+    // density network's dL_doutput is the beginning part of the color network's dL_dinput
     GPUMatrixDynamic density_network_dL_doutput_matrix(
         color_network_dL_dinput_matrix.data(),
         density_network->padded_output_width(),
@@ -647,8 +760,7 @@ void NerfNetwork::backward(
         *fwd_ctx->density_ctx,
         fwd_ctx->density_network_input_matrix,
         fwd_ctx->density_network_output_matrix,
-        density_network_dL_doutput_matrix,
-        &density_network_dL_dinput_matrix
+        density_network_dL_doutput_matrix
     );
 
 }
@@ -667,11 +779,7 @@ void NerfNetwork::optimizer_step(const cudaStream_t& stream, NetworkParamsWorksp
 
 // Only enlarge buffers needed for inference
 void NerfNetwork::enlarge_workspace_if_needed(const cudaStream_t& stream, const uint32_t& batch_size) {
-    if (batch_size <= this->batch_size) {
-        return;
-    }
-
-    workspace.enlarge(
+    workspace.enlarge_if_needed(
         stream,
         batch_size,
         density_network->input_width(),
@@ -679,7 +787,8 @@ void NerfNetwork::enlarge_workspace_if_needed(const cudaStream_t& stream, const 
         direction_encoding->input_width(),
         direction_encoding->padded_output_width(),
         color_network->input_width(),
-        color_network->padded_output_width()
+        color_network->padded_output_width(),
+        appearance_embedding->n_params()
     );
 
     this->batch_size = batch_size;
