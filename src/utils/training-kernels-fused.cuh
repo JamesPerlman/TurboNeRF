@@ -108,10 +108,6 @@ __global__ void mipNeRF360_distortion_loss_forward_kernel(
         prev_wm_cs = cumsum_wm;
 
         trans *= (1.0f - alpha_i);
-        
-        if (trans < NeRFConstants::min_transmittance) {
-            break;
-        }
     }
 
     const float k = NeRFConstants::mipNeRF360_distortion_loss_lambda / (float)n_samples;
@@ -224,10 +220,6 @@ __global__ void mipNeRF360_distortion_loss_backward_kernel(
         prev_wm_cs = wm_cs_i;
 
         trans *= (1.0f - alpha_i);
-
-        if (trans < NeRFConstants::min_transmittance) {
-            break;
-        }
     }
 }
 
