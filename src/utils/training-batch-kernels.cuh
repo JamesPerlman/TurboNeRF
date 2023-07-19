@@ -359,6 +359,7 @@ __global__ void march_and_generate_network_positions_kernel(
 
     // output buffers
     uint32_t* __restrict__ out_img_id,
+    float* __restrict__ out_t,
     float* __restrict__ out_pos_xyz,
     float* __restrict__ out_dir_xyz,
     float* __restrict__ out_dt,
@@ -418,6 +419,7 @@ __global__ void march_and_generate_network_positions_kernel(
         const uint32_t sample_id = sample_offset + n_steps_taken;
 
         if (!bbox->contains(x, y, z)) {
+            out_t[sample_id] = t;
             out_m_norm[sample_id] = t + 0.5f * dt;
             out_dt_norm[sample_id] = dt;
             out_img_id[sample_id] = img_id;
@@ -438,7 +440,7 @@ __global__ void march_and_generate_network_positions_kernel(
         const int grid_level = grid->get_grid_level_at(x, y, z, dt);
 
         if (grid->is_occupied_at(grid_level, x, y, z)) {
-
+            out_t[sample_id] = t;
             out_m_norm[sample_id] = t + 0.5f * dt;
             out_dt_norm[sample_id] = dt;
             out_img_id[sample_id] = img_id;

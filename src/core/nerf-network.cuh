@@ -56,6 +56,7 @@ struct NerfNetwork {
         uint32_t* ray_steps,
         uint32_t* ray_offset,
         uint32_t* appearance_id_batch,
+        float* t_batch,
         float* pos_batch,
         float* dir_batch,
         float* dt_batch,
@@ -147,6 +148,7 @@ private:
         const uint32_t& batch_size,
         const uint32_t& n_rays,
         const uint32_t& n_samples,
+        const float* t_batch,
         const Settings& settings
     );
 

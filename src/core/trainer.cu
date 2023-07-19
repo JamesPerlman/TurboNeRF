@@ -207,6 +207,7 @@ void Trainer::generate_next_training_batch(
 
         // output buffers
         ctx.workspace.sample_img_id,
+        ctx.workspace.sample_t,
         ctx.workspace.sample_pos,
         ctx.workspace.sample_dir,
         ctx.workspace.sample_dt,
@@ -331,6 +332,7 @@ float Trainer::train_step(
         ctx.workspace.ray_step,
         ctx.workspace.ray_offset,
         ctx.workspace.sample_img_id,
+        ctx.workspace.sample_t,
         ctx.workspace.sample_pos,
         ctx.workspace.sample_dir,
         ctx.workspace.sample_dt,

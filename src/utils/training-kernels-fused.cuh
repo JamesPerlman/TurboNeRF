@@ -497,4 +497,21 @@ __global__ void fused_reconstruction_forward_backward_kernel(
     );
 }
 
+__global__ void apply_gradient_distance_scaling_kernel(
+    const uint32_t n_samples,
+    const float* __restrict__ sample_t,
+    tcnn::network_precision_t* __restrict__ sample_grad
+) {
+    const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n_samples) {
+        return;
+    }
+    const float t = sample_t[i];
+    if (t >= 1.0f) {
+        return;
+    }
+
+    sample_grad[i] *= (tcnn::network_precision_t)(t * t);
+}
+
 TURBO_NAMESPACE_END

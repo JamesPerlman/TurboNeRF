@@ -231,6 +231,7 @@ float NerfNetwork::train(
     uint32_t* ray_steps,
     uint32_t* ray_offset,
     uint32_t* appearance_id_batch,
+    float* t_batch,
     float* pos_batch,
     float* dir_batch,
     float* dt_batch,
@@ -302,6 +303,7 @@ float NerfNetwork::train(
         batch_size,
         n_rays,
         n_samples,
+        t_batch,
         settings
     );
 
@@ -666,6 +668,7 @@ void NerfNetwork::backward(
     const uint32_t& batch_size,
     const uint32_t& n_rays,
     const uint32_t& n_samples,
+    const float* t_batch,
     const NerfNetwork::Settings& settings
 ) {
     
@@ -754,6 +757,12 @@ void NerfNetwork::backward(
             density_network_dL_doutput_matrix.data()
         );
     }
+
+    apply_gradient_distance_scaling_kernel<<<n_blocks_linear(n_samples), n_threads_linear, 0, stream>>>(
+        n_samples,
+        t_batch,
+        density_network_dL_doutput_matrix.data()
+    );
 
     density_network->backward(
         stream,

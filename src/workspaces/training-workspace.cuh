@@ -54,6 +54,7 @@ struct TrainingWorkspace: Workspace {
     // sample buffers
     int* sample_index; // indices of samples (for compaction)
     uint32_t* sample_img_id;
+    float* sample_t;
     float* sample_pos;
     float* sample_dir;
     float* sample_dt;
@@ -100,6 +101,7 @@ struct TrainingWorkspace: Workspace {
 
         sample_index    = allocate<int>(stream, batch_size);
         sample_img_id   = allocate<uint32_t>(stream, batch_size);
+        sample_t        = allocate<float>(stream, batch_size);
         sample_pos      = allocate<float>(stream, 3 * batch_size);
         sample_dir      = allocate<float>(stream, 3 * batch_size);
         sample_dt       = allocate<float>(stream, batch_size);
