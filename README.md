@@ -178,6 +178,21 @@ Next-level respect to the researchers much of this codebase is based off.  Thank
 }
 ```
 
+[gradient-scaling](https://gradient-scaling.github.io)
+```
+@inproceedings {10.2312:sr.20231122,
+    booktitle = {Eurographics Symposium on Rendering},
+    editor = {Ritschel, Tobias and Weidlich, Andrea},
+    title = {{Floaters No More: Radiance Field Gradient Scaling for Improved Near-Camera Training}},
+    author = {Philip, Julien and Deschaintre, Valentin},
+    year = {2023},
+    publisher = {The Eurographics Association},
+    ISSN = {1727-3463},
+    ISBN = {978-3-03868-229-5},
+    DOI = {10.2312/sr.20231122}
+}
+```
+
 Max, Nelson. *Optical Models for Direct Volume Rendering.* IEEE Transactions on Visualization and Computer Graphics (1995) - https://courses.cs.duke.edu/spring03/cps296.8/papers/max95opticalModelsForDirectVolumeRendering.pdf  
 Fawzi, A., Balog, M., Huang, A. et al. *Discovering faster matrix multiplication algorithms with reinforcement learning.* Nature 610, 47–53 (2022) - https://doi.org/10.1038/s41586-022-05172-4  
 Alman, Josh, and Virginia Vassilevska Williams. *A Refined Laser Method and Faster Matrix Multiplication.* arXiv, 2020, doi:10.48550/arxiv.2010.05846 - https://arxiv.org/abs/2010.05846  
