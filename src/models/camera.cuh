@@ -117,8 +117,8 @@ struct Camera {
         
         // this represents a position at a plane 1 unit away from the camera's origin
         float3 v = {
-            (x + offset_px.x) / focal_length.x,
-            (y + offset_px.y) / focal_length.y,
+            (x + offset_px.x + 0.5f) / focal_length.x,
+            (y + offset_px.y + 0.5f) / focal_length.y,
             1.0f
         };
 
