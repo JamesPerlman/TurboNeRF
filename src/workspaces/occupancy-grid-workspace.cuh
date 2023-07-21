@@ -29,10 +29,11 @@ struct OccupancyGridWorkspace: Workspace {
 
         bitfield = allocate<uint8_t>(stream, n_bitfield_elements);
 
-        if (is_trainable) {
-            values = allocate<float>(stream, n_total_elements);
-            bitcounts = allocate<uint8_t>(stream, n_bitfield_elements);
-        }
+        // TODO: figure out how to make this trainable or not
+        // if (is_trainable) {
+        values = allocate<float>(stream, n_total_elements);
+        bitcounts = allocate<uint8_t>(stream, n_bitfield_elements);
+        // }
     }
 
     void free_allocations() override {

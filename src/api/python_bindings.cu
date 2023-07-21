@@ -494,6 +494,8 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def("create_nerf", &BlenderBridge::create_nerf, py::arg("dataset"), py::return_value_policy::reference)
         .def("clone_nerf", &BlenderBridge::clone_nerf, py::arg("nerf"), py::return_value_policy::reference)
         .def("destroy_nerf", &BlenderBridge::destroy_nerf, py::arg("nerf"))
+        .def("load_nerf", &BlenderBridge::load_nerf, py::arg("path"), py::return_value_policy::reference)
+        .def("save_nerf", &BlenderBridge::save_nerf, py::arg("nerf"), py::arg("path"))
         .def("can_load_training_images", &BlenderBridge::can_load_training_images, py::arg("nerf"))
         .def("load_training_images", &BlenderBridge::load_training_images, py::arg("nerf"))
         .def("can_any_nerf_train", &BlenderBridge::can_any_nerf_train)

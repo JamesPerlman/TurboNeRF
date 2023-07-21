@@ -290,12 +290,17 @@ class BlenderBridge
         }
         return proxies;
     }
-    
-    NeRFProxy* create_nerf(const Dataset& dataset) {
+
+    NeRFProxy* create_empty_nerf() {
         auto proxy = _nerf_manager.create();
-        proxy->attach_dataset(dataset);
         auto trainer = trainer_for_proxy(proxy);
         trainer->proxy = proxy;
+        return proxy;
+    }
+
+    NeRFProxy* create_nerf(const Dataset& dataset) {
+        auto proxy = create_empty_nerf();
+        proxy->attach_dataset(dataset);
         return proxy;
     }
 
@@ -312,6 +317,16 @@ class BlenderBridge
         proxy->should_destroy = true;
         start_runloop(false);
     }
+
+    NeRFProxy* load_nerf(const std::string& snapshot_path) {
+        auto proxy = create_empty_nerf();
+        FileManager::load(proxy, snapshot_path);
+        return proxy;
+    };
+
+    void save_nerf(NeRFProxy* proxy, const std::string& snapshot_path) {
+        FileManager::save(proxy, snapshot_path);
+    };
 
     bool can_any_nerf_train() {
         for (int i = 0; i < _nerf_manager.n_proxies(); ++i) {

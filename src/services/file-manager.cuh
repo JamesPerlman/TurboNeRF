@@ -21,8 +21,14 @@ struct FileManager {
         uint32_t version;
         uint32_t n_color_params;
         uint32_t n_density_params;
+        uint32_t n_appearance_embedding_params;
         uint32_t n_occ_grid_bits;
         uint32_t aabb_scale;
+        uint32_t n_appearances;
+
+        size_t n_params() const {
+            return n_color_params + n_density_params + n_appearance_embedding_params;
+        }
     };
     
     static void save(
@@ -51,11 +57,13 @@ struct FileManager {
 
         data.n_color_params = nerf.params.n_color_params;
         data.n_density_params = nerf.params.n_density_params;
+        data.n_appearance_embedding_params = nerf.network.workspace.n_appearance_embedding_params;
         data.n_occ_grid_bits = nerf.occupancy_grid.workspace.n_bitfield_elements;
         data.aabb_scale = static_cast<uint32_t>(proxy->training_bbox.get().size());
+        data.n_appearances = proxy->n_appearances;
 
         // copy nerf params data to CPU
-        size_t n_params = data.n_color_params + data.n_density_params;
+        size_t n_params = data.n_params();
         std::vector<float> params(n_params);
         CUDA_CHECK_THROW(
             cudaMemcpy(
@@ -114,12 +122,10 @@ struct FileManager {
         }
 
         // load dataset
-        std::string dataset_path_str(data.dataset_path);
-        // TODO: fix this. it doesn't really do anything, the dataset is unusable here
-        proxy->dataset = Dataset(dataset_path_str);
-        
+        // std::string dataset_path_str(data.dataset_path);
+
         // load nerf params
-        size_t n_params = data.n_color_params + data.n_density_params;
+        size_t n_params = data.n_params();
         std::vector<float> params(n_params);
         std::streamsize param_bytes = n_params * sizeof(float) / sizeof(char);
         file.read(reinterpret_cast<char*>(params.data()), param_bytes);
@@ -128,7 +134,10 @@ struct FileManager {
         const BoundingBox bbox(static_cast<float>(data.aabb_scale));
         
         proxy->training_bbox = bbox;
+        proxy->render_bbox = bbox;
+        proxy->n_appearances = data.n_appearances;
 
+        proxy->nerfs.clear();
         proxy->nerfs.reserve(DeviceManager::get_device_count());
 
         DeviceManager::foreach_device([&](const int device_id, const cudaStream_t& stream) {
@@ -137,9 +146,10 @@ struct FileManager {
 
         // prep NeRF params
         auto& nerf = proxy->nerfs[0];
-        // TODO: fix appearance embeddings
-        nerf.params.enlarge(stream, data.n_density_params, data.n_color_params, 0);
-        
+        nerf.network.update_aabb_scale_if_needed(data.aabb_scale);
+        nerf.network.update_appearance_embedding_if_needed(data.n_appearances, data.n_appearance_embedding_params / data.n_appearances);
+        nerf.network.update_params_if_needed(stream, nerf.params);
+
         // copy to GPU
         CUDA_CHECK_THROW(
             cudaMemcpyAsync(

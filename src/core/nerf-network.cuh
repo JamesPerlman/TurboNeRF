@@ -32,6 +32,8 @@ struct NerfNetwork {
     
     NerfNetwork(const int& device_id) : workspace(device_id) {};
     
+    void update_aabb_scale_if_needed(const int& aabb_scale);
+
     void update_appearance_embedding_if_needed(
         const uint32_t& n_appearances,
         const uint32_t& appearance_embedding_dim = NeRFConstants::n_appearance_embedding_dims
@@ -100,8 +102,6 @@ private:
     int aabb_scale = 0;
     uint32_t batch_size = 0;
     bool _can_train = false;
-
-    void update_aabb_scale_if_needed(const int& aabb_scale);
 
     // Helper context
     struct ForwardContext : public tcnn::Context {
