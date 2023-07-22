@@ -226,6 +226,7 @@ float NerfNetwork::train(
     const uint32_t& batch_size,
     const uint32_t& n_rays,
     const uint32_t& n_samples,
+    const uint32_t& n_rays_per_image,
     const int& aabb_scale,
     const float* random_rgb,
     uint32_t* ray_steps,
@@ -303,6 +304,7 @@ float NerfNetwork::train(
         batch_size,
         n_rays,
         n_samples,
+        n_rays_per_image,
         t_batch,
         settings
     );
@@ -668,6 +670,7 @@ void NerfNetwork::backward(
     const uint32_t& batch_size,
     const uint32_t& n_rays,
     const uint32_t& n_samples,
+    const uint32_t& n_rays_per_image,
     const float* t_batch,
     const NerfNetwork::Settings& settings
 ) {
@@ -700,9 +703,6 @@ void NerfNetwork::backward(
 
     // Backpropagate through the appearance embedding
 
-    // zero out previous gradients
-    CUDA_CHECK_THROW(cudaMemsetAsync(workspace.appearance_embedding_dL_dinput, 0, appearance_embedding->n_params() * sizeof(float), stream));
-
     // appearance embedding's dL_doutput exists at the end part of the color network's dL_dinput
     uint32_t appearance_embedding_offset = (color_network->input_width() - appearance_embedding->padded_output_width()) * batch_size;
     GPUMatrixDynamic appearance_embedding_dL_doutput_matrix(
@@ -712,20 +712,12 @@ void NerfNetwork::backward(
         MatrixLayout::RowMajor
     );
 
-    GPUMatrixDynamic appearance_embedding_dL_dinput_matrix(
-        workspace.appearance_embedding_dL_dinput,
-        appearance_embedding->input_width(),
-        appearance_embedding->n_embeddings(),
-        MatrixLayout::RowMajor
-    );
-
     appearance_embedding->backward(
         stream,
         n_samples,
+        n_rays_per_image,
         fwd_ctx->appearance_embedding_input_matrix,
-        appearance_embedding_dL_doutput_matrix,
-        appearance_embedding_dL_dinput_matrix,
-        LOSS_SCALE
+        appearance_embedding_dL_doutput_matrix
     );
 
     // Backpropagate through the density network
@@ -796,8 +788,7 @@ void NerfNetwork::enlarge_workspace_if_needed(const cudaStream_t& stream, const 
         direction_encoding->input_width(),
         direction_encoding->padded_output_width(),
         color_network->input_width(),
-        color_network->padded_output_width(),
-        appearance_embedding->n_params()
+        color_network->padded_output_width()
     );
 
     this->batch_size = batch_size;

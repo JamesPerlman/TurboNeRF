@@ -29,6 +29,7 @@ public:
         uint32_t batch_size;
         uint32_t n_rays_in_batch;
         uint32_t n_samples_in_batch;
+        uint32_t n_rays_per_image;
         float alpha_selection_threshold = 1.0f;
         float alpha_selection_probability = 1.0f;
         float min_step_size = NeRFConstants::min_step_size;

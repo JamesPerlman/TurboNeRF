@@ -57,7 +57,7 @@ void Trainer::generate_next_training_batch(
      * for batch_size minus the number of rays that were used.
      */
 
-    const float n_rays_per_image = static_cast<float>(ctx.n_rays_in_batch) / static_cast<float>(ctx.dataset->images.size());
+    ctx.n_rays_per_image = static_cast<float>(ctx.n_rays_in_batch) / static_cast<float>(ctx.dataset->images.size());
 
     initialize_training_rays_and_pixels_kernel<<<n_blocks_linear(ctx.n_rays_in_batch), n_threads_linear, 0, ctx.stream>>>(
         ctx.n_rays_in_batch,
@@ -65,7 +65,7 @@ void Trainer::generate_next_training_batch(
         ctx.dataset->images.size(),
         ctx.dataset->n_pixels_per_image,
         ctx.dataset->image_dimensions,
-        n_rays_per_image,
+        ctx.n_rays_per_image,
 
         // input buffers
         ctx.nerf->dataset_ws.bounding_box,
@@ -327,6 +327,7 @@ float Trainer::train_step(
         ctx.workspace.batch_size,
         ctx.n_rays_in_batch,
         ctx.n_samples_in_batch,
+        ctx.n_rays_per_image,
         ctx.nerf->proxy->training_bbox.get().size(),
         ctx.workspace.random_float + ctx.workspace.batch_size,
         ctx.workspace.ray_step,

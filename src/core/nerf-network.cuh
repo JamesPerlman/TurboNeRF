@@ -53,6 +53,7 @@ struct NerfNetwork {
         const uint32_t& batch_size,
         const uint32_t& n_rays,
         const uint32_t& n_samples,
+        const uint32_t& n_rays_per_image,
         const int& aabb_scale,
         const float* random_rgb,
         uint32_t* ray_steps,
@@ -148,6 +149,7 @@ private:
         const uint32_t& batch_size,
         const uint32_t& n_rays,
         const uint32_t& n_samples,
+        const uint32_t& n_rays_per_image,
         const float* t_batch,
         const Settings& settings
     );

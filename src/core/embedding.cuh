@@ -68,28 +68,30 @@ __global__ void embedding_forward_kernel(
 
 template <typename PARAMS_T>
 __global__ void embedding_backward_kernel(
+    const uint32_t n_vocab,
+    const uint32_t n_dim,
     const uint32_t n_elements,
     const uint32_t stride,
-    const uint32_t n_dim,
-    const float scale,
+    const uint32_t n_rays_per_image,
     const PARAMS_T* __restrict__ dL_doutput,
     const uint32_t* __restrict__ indices,
-    float* __restrict__ param_gradients
+    PARAMS_T* __restrict__ param_gradients
 ) {
     const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= n_elements) {
+    if (idx >= n_vocab * n_dim) {
         return;
     }
 
-    const uint32_t vocab_idx = indices[idx];
+    const uint32_t vocab_idx = idx / n_dim;
+    const uint32_t dim_idx = idx % n_dim;
 
-    const PARAMS_T* dL_dout = dL_doutput + idx;
-    float* param_grad = param_gradients + vocab_idx * n_dim;
+    PARAMS_T grad = 0.0f;
 
-    for (uint32_t i = 0; i < n_dim; ++i) {
-        atomicAdd(&param_grad[i], (float)(*dL_dout) / scale);
-        dL_dout += stride;
+    for (int i = 0; i < n_rays_per_image; ++i) {
+        grad += dL_doutput[dim_idx * stride + vocab_idx * n_rays_per_image + i];
     }
+
+    param_gradients[idx] = grad;
 }
 
 template <typename PARAMS_T>
@@ -183,17 +185,14 @@ public:
     void backward(
 		cudaStream_t stream,
         const uint32_t& n_elements,
+        const uint32_t& n_rays_per_image,
 		const GPUMatrixDynamic<uint32_t>& input,
 		const GPUMatrixDynamic<COMPUTE_T>& dL_doutput,
-        const GPUMatrixDynamic<float>& dL_dinput_full_precision,
-        const float grad_scale,
 		bool use_inference_params = false
 	) {
 		// Width
 		CHECK_THROW(input.m() == input_width());
 		CHECK_THROW(dL_doutput.m() == padded_output_width());
-        CHECK_THROW(dL_dinput_full_precision.m() == input_width());
-        CHECK_THROW(dL_dinput_full_precision.n() == n_embeddings());
 
 		// Batch size
 		CHECK_THROW(input.n() == dL_doutput.n());
@@ -204,20 +203,14 @@ public:
         CHECK_THROW(this->params() != nullptr);
 
         embedding_backward_kernel<<<n_blocks_linear(n_elements), n_threads_linear, 0, stream>>>(
+            m_n_vocab,
+            m_n_dim,
             n_elements,
-            input.n(),
             input_width(),
-            grad_scale,
+            n_rays_per_image,
             dL_doutput.data(),
             input.data(),
-            dL_dinput_full_precision.data()
-        );
-
-        copy_embedding_gradients_kernel<<<n_blocks_linear(n_params()), n_threads_linear, 0, stream>>>(
-            n_params(),
-            grad_scale,
-            dL_dinput_full_precision.data(),
-            m_gradients
+            m_params
         );
     }
 

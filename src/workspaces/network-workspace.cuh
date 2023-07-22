@@ -31,7 +31,6 @@ struct NetworkWorkspace : Workspace {
     tcnn::network_precision_t* density_network_dL_doutput;
     tcnn::network_precision_t* color_network_dL_dinput;
     tcnn::network_precision_t* color_network_dL_doutput;
-    float* appearance_embedding_dL_dinput;
 
     uint32_t n_samples_per_batch = 0;
     uint32_t density_network_input_width = 0;
@@ -40,7 +39,6 @@ struct NetworkWorkspace : Workspace {
     uint32_t direction_encoding_output_width = 0;
     uint32_t color_network_input_width = 0;
     uint32_t color_network_output_width = 0;
-    uint32_t n_appearance_embedding_params = 0;
 
     void enlarge_if_needed(
         const cudaStream_t& stream,
@@ -50,8 +48,7 @@ struct NetworkWorkspace : Workspace {
         const uint32_t& direction_encoding_input_width,
         const uint32_t& direction_encoding_output_width,
         const uint32_t& color_network_input_width,
-        const uint32_t& color_network_output_width,
-        const uint32_t& n_appearance_embedding_params
+        const uint32_t& color_network_output_width
     ) {
 
         const uint32_t batch_size = tcnn::next_multiple(n_samples_per_batch, tcnn::batch_size_granularity);
@@ -63,8 +60,7 @@ struct NetworkWorkspace : Workspace {
             direction_encoding_input_width == this->direction_encoding_input_width &&
             direction_encoding_output_width == this->direction_encoding_output_width &&
             color_network_input_width == this->color_network_input_width &&
-            color_network_output_width == this->color_network_output_width &&
-            n_appearance_embedding_params == this->n_appearance_embedding_params
+            color_network_output_width == this->color_network_output_width
         ) {
             return;
         }
@@ -78,7 +74,6 @@ struct NetworkWorkspace : Workspace {
         this->direction_encoding_output_width = direction_encoding_output_width;
         this->color_network_input_width = color_network_input_width;
         this->color_network_output_width = color_network_output_width;
-        this->n_appearance_embedding_params = n_appearance_embedding_params;
       
         ray_recon_loss = allocate<float>(stream, 4 * batch_size);
         ray_dist_loss = allocate<float>(stream, batch_size);
@@ -97,7 +92,6 @@ struct NetworkWorkspace : Workspace {
         density_network_dL_doutput = allocate<tcnn::network_precision_t>(stream, density_network_output_width * batch_size);
         color_network_dL_doutput = allocate<tcnn::network_precision_t>(stream, color_network_output_width * batch_size);
         color_network_dL_dinput = allocate<tcnn::network_precision_t>(stream, color_network_input_width * batch_size);
-        appearance_embedding_dL_dinput = allocate<float>(stream, n_appearance_embedding_params);
     }
 
     // override free_allocations
@@ -110,7 +104,6 @@ struct NetworkWorkspace : Workspace {
         direction_encoding_output_width = 0;
         color_network_input_width = 0;
         color_network_output_width = 0;
-        n_appearance_embedding_params = 0;
         
         Workspace::free_allocations();
     }
