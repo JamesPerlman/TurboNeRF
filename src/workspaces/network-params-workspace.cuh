@@ -29,7 +29,7 @@ struct NetworkParamsWorkspace: Workspace {
 
     uint32_t n_density_params;
     uint32_t n_color_params;
-    uint32_t n_appearance_embedding_params;
+    uint32_t n_appearance_params;
 
     uint32_t n_total_params;
 
@@ -44,6 +44,7 @@ struct NetworkParamsWorkspace: Workspace {
 
         n_density_params = n_density_network_params;
         n_color_params = n_color_network_params;
+        n_appearance_params = n_appearance_embedding_params;
         n_total_params = n_density_params + n_color_params + n_appearance_embedding_params;
 
         params_fp = allocate<float>(stream, n_total_params);

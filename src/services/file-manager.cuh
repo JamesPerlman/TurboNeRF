@@ -57,7 +57,7 @@ struct FileManager {
 
         data.n_color_params = nerf.params.n_color_params;
         data.n_density_params = nerf.params.n_density_params;
-        data.n_appearance_embedding_params = nerf.params.n_appearance_embedding_params;
+        data.n_appearance_embedding_params = nerf.params.n_appearance_params;
         data.n_occ_grid_bits = nerf.occupancy_grid.workspace.n_bitfield_elements;
         data.aabb_scale = static_cast<uint32_t>(proxy->training_bbox.get().size());
         data.n_appearances = proxy->n_appearances;
