@@ -19,7 +19,10 @@ print("TurboNeRF loaded:", tn is not None)
 
 manager = tn.NeRFManager()
 
-dataset = tn.Dataset("E:\\2022\\nerf-library\\testdata\\lego\\transforms.json")
+LAYER_N = 3
+
+base_path = f"E:\\nerfs\\nvidia-siggraph-2023\\tesla-k80\\layer-{LAYER_N}"
+dataset = tn.Dataset(f"{base_path}\\video.transforms.json")
 dataset.load_transforms()
 
 nerf = manager.create()
@@ -80,14 +83,14 @@ def img_load_status(i, n):
 
 trainer.load_images(on_image_loaded=img_load_status)
 
-for i in range(16):
+for i in range(200000):
     print(f"Training step {i}...")
     trainer.train_step()
 
     if i % 16 == 0 and i > 0:
         trainer.update_occupancy_grid(i)
 
-    if i % 64 == 0 and i > 0:
+    if i % 5000 == 0:
 
         request = tn.RenderRequest(
             render_cam,
@@ -103,15 +106,17 @@ for i in range(16):
         rgba = np.array(render_buf.get_rgba())
         rgba_uint8 = (rgba * 255).astype(np.uint8)
         img = Image.fromarray(rgba_uint8, mode="RGBA")
-        img.save(f"H:\\render_{i:05d}.png")
+        # make dir
+        Path(f"{base_path}\\test").mkdir(parents=True, exist_ok=True)
+        img.save(f"{base_path}\\test\\render_{i:05d}.png")
 
         # if you don't need direct access to the rgba data, you can use a CUDARenderBuffer (or a CPURenderBuffer) and the save_image method.
         # it is likely that this method is slightly faster than using numpy for just saving an image.
         # render_buf.save_image(f"H:\\render_{i:05d}.png")
 
-        print(f"Saved render_{i:05d}.png!")
+        # print(f"Saved render_{i:05d}.png!")
 
-tn.FileManager.save(nerf, "H:\\dozer.turbo")
+tn.FileManager.save(nerf, f"{base_path}\\snapshots\\200k.turbo")
 
 # it is recommended to call these methods at the end of your program
 render_buf.free()
