@@ -58,6 +58,14 @@ struct BoundingBox {
             && z >= min_z && z <= max_z;
     }
 
+    inline NRC_HOST_DEVICE bool contains(const float3& p) const {
+        return contains(p.x, p.y, p.z);
+    }
+
+    inline NRC_HOST_DEVICE float size_x() const { return (max_x - min_x); };
+    inline NRC_HOST_DEVICE float size_y() const { return (max_y - min_y); };
+    inline NRC_HOST_DEVICE float size_z() const { return (max_z - min_z); };
+
     inline NRC_HOST_DEVICE float pos_to_unit_x(const float& x) const { return (x - min_x) / (max_x - min_x); }
     inline NRC_HOST_DEVICE float pos_to_unit_y(const float& y) const { return (y - min_y) / (max_y - min_y); }
     inline NRC_HOST_DEVICE float pos_to_unit_z(const float& z) const { return (z - min_z) / (max_z - min_z); }

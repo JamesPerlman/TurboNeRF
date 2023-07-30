@@ -290,6 +290,159 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
     }
 }
 
+
+// generate sample points in global space
+
+__global__ void march_rays_and_generate_global_sample_points_kernel(
+    const uint32_t n_rays,
+    const uint32_t batch_size,
+    const uint32_t n_samples_per_step,
+    const float dt,
+
+    // input buffers (read-only)
+    const float* __restrict__ ray_alive,
+    const float* __restrict__ ray_tmax,
+    const float* __restrict__ ray_ori,
+    const float* __restrict__ ray_dir,
+
+    // dual-use buffers (read-write)
+    float* __restrict__ ray_t,
+
+    // output buffers (write-only)
+    float* __restrict__ sample_t,
+    float* __restrict__ sample_pos,
+    float* __restrict__ sample_dir,
+    float* __restrict__ sample_dt
+) {
+    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // check if thread is out of bounds
+    if (idx >= n_rays) return;
+
+    // check if ray has terminated
+    if (!ray_alive[idx]) return;
+
+    // References to input buffers
+    const uint32_t idx_offset_0 = idx;
+    const uint32_t idx_offset_1 = idx_offset_0 + batch_size;
+    const uint32_t idx_offset_2 = idx_offset_1 + batch_size;
+
+    const float o_x = ray_ori[idx_offset_0];
+    const float o_y = ray_ori[idx_offset_1];
+    const float o_z = ray_ori[idx_offset_2];
+
+    const float d_x = ray_dir[idx_offset_0];
+    const float d_y = ray_dir[idx_offset_1];
+    const float d_z = ray_dir[idx_offset_2];
+    
+    // Perform raymarching
+    float tmax = ray_tmax[idx];
+    float t = ray_t[idx];
+
+    uint32_t n_steps = 0;
+    while (n_steps < n_samples_per_step) {
+        const float x = o_x + t * d_x;
+        const float y = o_y + t * d_y;
+        const float z = o_z + t * d_z;
+
+        const uint32_t sample_offset_0 = n_samples_per_step * n_steps + idx;
+        const uint32_t sample_offset_1 = sample_offset_0 + batch_size;
+        const uint32_t sample_offset_2 = sample_offset_1 + batch_size;
+
+        sample_t[sample_offset_0] = t;
+
+        sample_pos[sample_offset_0] = x;
+        sample_pos[sample_offset_1] = y;
+        sample_pos[sample_offset_2] = z;
+
+        sample_dir[sample_offset_0] = d_x;
+        sample_dir[sample_offset_1] = d_y;
+        sample_dir[sample_offset_2] = d_z;
+
+        sample_dt[sample_offset_0] = dt;
+
+        t += dt;
+    }
+
+    ray_t[idx] = t;
+}
+
+// For global sample points, determine which ones hit a particular NeRF
+__global__ void filter_and_assign_normalized_sample_points_for_nerf_kernel(
+    const uint32_t n_samples,
+    const uint32_t batch_size,
+    const Transform4f world_to_nerf,
+    const BoundingBox nerf_bbox, // this is the visible bbox of the NeRF for rendering
+    const OccupancyGrid nerf_occupancy_grid,
+
+    // input buffers (read-only)
+    const float* __restrict__ sample_pos,
+    const float* __restrict__ sample_dir,
+    const float* __restrict__ sample_dt,
+
+    // output buffers (write-only)
+    bool* __restrict__ sample_valid,
+    float* __restrict__ network_pos,
+    float* __restrict__ network_dir,
+    float* __restrict__ network_dt
+) {
+    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx >= n_samples) return;
+
+    const uint32_t sample_offset_0 = idx;
+    const uint32_t sample_offset_1 = sample_offset_0 + batch_size;
+    const uint32_t sample_offset_2 = sample_offset_1 + batch_size;
+
+    const float3 global_pos{
+        sample_pos[sample_offset_0],
+        sample_pos[sample_offset_1],
+        sample_pos[sample_offset_2]
+    };
+
+    const float3 local_pos = world_to_nerf * global_pos;
+
+    if (!nerf_bbox.contains(local_pos)) {
+        sample_valid[sample_offset_0] = false;
+        return;
+    }
+
+    // apply effects here
+
+    // check if the nerf is occupied at this point
+
+    const float3 global_dir{
+        sample_dir[sample_offset_0],
+        sample_dir[sample_offset_1],
+        sample_dir[sample_offset_2]
+    };
+    
+    const float3 local_dir = world_to_nerf.mmul_ul3x3(global_dir);
+
+    const float dt = sample_dt[sample_offset_0];
+    
+    const int grid_level = nerf_occupancy_grid.get_grid_level_at(local_pos, dt);
+
+    if (!nerf_occupancy_grid.is_occupied_at(local_pos, grid_level)) {
+        sample_valid[sample_offset_0] = false;
+        return;
+    }
+
+    sample_valid[sample_offset_0] = true;
+
+    network_pos[sample_offset_0] = local_pos.x;
+    network_pos[sample_offset_1] = local_pos.y;
+    network_pos[sample_offset_2] = local_pos.z;
+
+    network_dir[sample_offset_0] = local_dir.x;
+    network_dir[sample_offset_1] = local_dir.y;
+    network_dir[sample_offset_2] = local_dir.z;
+
+    network_dt[sample_offset_0] = dt;
+}
+
+// Only run the NeRF network on the sample points that are hit
+
 /**
  * The multi-nerf raymarching algorithm goes as follows:
  * 1. Filter only nerfs that intersect the ray

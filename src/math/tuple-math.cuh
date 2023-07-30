@@ -29,6 +29,12 @@ inline NRC_HOST_DEVICE float3 operator-(const float3& a, const float3& b)
     return {a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
+// division float / float3
+inline NRC_HOST_DEVICE float3 operator/(const float& s, const float3& v)
+{
+    return {s / v.x, s / v.y, s / v.z};
+}
+
 // equality float3 == float3
 inline NRC_HOST_DEVICE bool operator==(const float3& a, const float3& b)
 {
