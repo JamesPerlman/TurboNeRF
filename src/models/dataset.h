@@ -25,6 +25,7 @@ struct Dataset {
     int2 image_dimensions;
     BoundingBox bounding_box;
     std::optional<filesystem::path> file_path;
+    bool contains_multiple_image_dims = false;
 
     Dataset(const std::string& file_path) : file_path(file_path) {};
     Dataset(const BoundingBox& bounding_box, const std::vector<Camera>& cameras, const std::vector<TrainingImage>& images);
