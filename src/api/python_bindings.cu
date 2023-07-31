@@ -222,6 +222,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readwrite("cameras", &Dataset::cameras)
         .def_readwrite("bounding_box", &Dataset::bounding_box)
         .def_readonly("image_dimensions", &Dataset::image_dimensions)
+        .def_readonly("contains_multiple_image_dims", &Dataset::contains_multiple_image_dims)
     ;
     
     py::class_<BoundingBox>(m, "BoundingBox")

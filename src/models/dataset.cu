@@ -7,11 +7,19 @@
 
 #include "dataset.h"
 #include "../math/transform4f.cuh"
+#include "../math/tuple-math.cuh"
 
 using namespace std;
 using namespace filesystem;
 using json = nlohmann::json;
 using namespace turbo;
+
+// helper function for image dimension patch
+struct int2_less {
+    __host__ __device__ bool operator()(const int2& a, const int2& b) const {
+        return (a.x != b.x) ? a.x < b.x : a.y < b.y;
+    }
+};
 
 void Dataset::load_transforms() {
 
@@ -36,8 +44,7 @@ void Dataset::load_transforms() {
     float w = json_data.value("w", 0.0f);
     float h = json_data.value("h", 0.0f);
 
-    image_dimensions = make_int2((int)w, (int)h);
-    n_pixels_per_image = (uint32_t)(w * h);
+    int2 global_image_dims = make_int2((int)w, (int)h);
 
     uint32_t aabb_size = std::min(json_data.value("aabb_scale", 16), 128);
     float scene_scale = json_data.value("scene_scale", 1.0f);
@@ -82,8 +89,10 @@ void Dataset::load_transforms() {
         if (!exists(absolute_path)) {
             continue;
         }
-            
-        images.emplace_back(absolute_path.string(), image_dimensions);
+
+        int2 frame_image_dims = make_int2(frame.value("w", global_image_dims.x), frame.value("h", global_image_dims.y));
+
+        images.emplace_back(absolute_path.string(), frame_image_dims);
         
         float near = scene_scale * frame.value("near", global_near);
         float far = scene_scale * frame.value("far", global_far);
@@ -108,7 +117,7 @@ void Dataset::load_transforms() {
 
         // TODO: per-camera dimensions
         cameras.emplace_back(
-            image_dimensions,
+            frame_image_dims,
             near,
             far,
             float2{fl_x, fl_y},
@@ -117,8 +126,61 @@ void Dataset::load_transforms() {
             camera_matrix,
             dist_params
         );
-
     }
+
+    if (images.empty()) {
+        throw runtime_error("No valid images in this dataset!");
+    };
+
+    // TODO: support multiple image dimensions
+
+    // count number of images for each dimension
+    std::map<int2, int, int2_less> img_dims_and_counts;
+    for (const auto& img : images) {
+        if (img_dims_and_counts.find(img.dimensions) == img_dims_and_counts.end()) {
+            img_dims_and_counts[img.dimensions] = 0;
+        }
+        img_dims_and_counts[img.dimensions]++;
+    }
+
+    // if there are multiple image dimensions, we need to keep only the images with the most common dimensions
+    if (img_dims_and_counts.size() > 1) {
+        contains_multiple_image_dims = true;
+        int2 most_common_dimensions;
+        int most_common_dimensions_count = 0;
+        for (const auto& [dims, count] : img_dims_and_counts) {
+            if (count > most_common_dimensions_count) {
+                most_common_dimensions_count = count;
+                most_common_dimensions = dims;
+            }
+        }
+
+        // filter out all images with dimensions that are not the most common
+        images.erase(
+            std::remove_if(
+                images.begin(),
+                images.end(),
+                [&most_common_dimensions](const auto& img) {
+                    return img.dimensions != most_common_dimensions;
+                }
+            ),
+            images.end()
+        );
+
+        cameras.erase(
+            std::remove_if(
+                cameras.begin(),
+                cameras.end(),
+                [&most_common_dimensions](const auto& cam) {
+                    return cam.resolution != most_common_dimensions;
+                }
+            ),
+            cameras.end()
+        );
+    }
+
+    image_dimensions = images[0].dimensions;
+    n_pixels_per_image = image_dimensions.x * image_dimensions.y;
 
     // remove excess allocated images
     images.shrink_to_fit();
