@@ -202,6 +202,7 @@ class BlenderBridge
                     proxy->should_reset = false;
                     if (proxy->can_train()) {
                         trainer->reset_training();
+                        proxy->should_train = true;
                         event_bus.dispatch(Event::OnTrainingReset, {{"id", proxy->id}});
                     }
                 }
