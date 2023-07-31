@@ -72,7 +72,7 @@ __global__ void embedding_backward_kernel(
     const uint32_t n_dim,
     const uint32_t n_elements,
     const uint32_t stride,
-    const uint32_t n_rays_per_image,
+    const uint32_t n_uses_per_embedding,
     const PARAMS_T* __restrict__ dL_doutput,
     const uint32_t* __restrict__ indices,
     PARAMS_T* __restrict__ param_gradients
@@ -87,8 +87,12 @@ __global__ void embedding_backward_kernel(
 
     PARAMS_T grad = 0.0f;
 
-    for (int i = 0; i < n_rays_per_image; ++i) {
-        grad += dL_doutput[dim_idx * stride + vocab_idx * n_rays_per_image + i];
+    for (int i = 0; i < n_uses_per_embedding; ++i) {
+        const uint32_t element_idx = dim_idx * stride + vocab_idx * n_uses_per_embedding + i;
+        if (element_idx >= n_elements) {
+            break;
+        }
+        grad += dL_doutput[element_idx];
     }
 
     param_gradients[idx] = grad;
@@ -185,7 +189,7 @@ public:
     void backward(
 		cudaStream_t stream,
         const uint32_t& n_elements,
-        const uint32_t& n_rays_per_image,
+        const uint32_t& n_uses_per_embedding,
 		const GPUMatrixDynamic<uint32_t>& input,
 		const GPUMatrixDynamic<COMPUTE_T>& dL_doutput,
 		bool use_inference_params = false
@@ -207,7 +211,7 @@ public:
             m_n_dim,
             n_elements,
             input_width(),
-            n_rays_per_image,
+            n_uses_per_embedding,
             dL_doutput.data(),
             input.data(),
             m_params
