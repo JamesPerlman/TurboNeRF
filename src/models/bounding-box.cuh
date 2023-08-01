@@ -50,6 +50,21 @@ struct BoundingBox {
         return tmax >= tmin;
     }
 
+    inline __device__ bool get_ray_t_intersections(
+        const float3& ori,
+        const float3& dir,
+        const float3& idir,
+        float& tmin,
+        float& tmax
+    ) const {
+        return get_ray_t_intersections(
+            ori.x, ori.y, ori.z,
+            dir.x, dir.y, dir.z,
+            idir.x, idir.y, idir.z,
+            tmin, tmax
+        );
+    }
+
     // get if the point is inside the bounding box
 
     inline NRC_HOST_DEVICE bool contains(const float& x, const float& y, const float& z) const {

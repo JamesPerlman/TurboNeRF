@@ -24,11 +24,6 @@ struct SceneWorkspace: Workspace {
     OccupancyGrid* occupancy_grids;
     Transform4f* nerf_transforms;
 
-    bool* ray_active[2];
-    float* ray_t[2];
-    float* ray_tmax[2];
-    uint32_t* intersectors[2];
-
     uint32_t n_rays;
 
     void enlarge(
@@ -42,20 +37,6 @@ struct SceneWorkspace: Workspace {
         training_bboxes = allocate<BoundingBox>(stream, n_nerfs);
         occupancy_grids = allocate<OccupancyGrid>(stream, n_nerfs);
         nerf_transforms = allocate<Transform4f>(stream, n_nerfs);
-
-        const uint32_t n_elems = n_rays * n_nerfs;
-
-        ray_active[0]   = allocate<bool>(stream, n_elems);
-        ray_active[1]   = allocate<bool>(stream, n_elems);
-
-        ray_t[0]        = allocate<float>(stream, n_elems);
-        ray_t[1]        = allocate<float>(stream, n_elems);
-
-        ray_tmax[0]     = allocate<float>(stream, n_elems);
-        ray_tmax[1]     = allocate<float>(stream, n_elems);
-
-        intersectors[0] = allocate<uint32_t>(stream, n_rays * NeRFConstants::n_max_nerfs / sizeof(uint32_t));
-        intersectors[1] = allocate<uint32_t>(stream, n_rays * NeRFConstants::n_max_nerfs / sizeof(uint32_t));
 
         this->n_nerfs = n_nerfs;
         this->n_rays = n_rays;

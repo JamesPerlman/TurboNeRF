@@ -218,7 +218,6 @@ set(SOURCES
     src/utils/gpu-image.cu
     src/utils/occupancy-grid-kernels.cu
     src/utils/rendering-kernels.cu
-    src/utils/stream-compaction.cu
 
     # common
     src/main.cu
