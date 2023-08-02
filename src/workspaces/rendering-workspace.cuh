@@ -24,7 +24,6 @@ struct RenderingWorkspace: Workspace {
     float* ray_t[2];
     float* ray_tmax[2];
     float* ray_trans[2];
-    int* n_nerfs_for_ray[2];
 
     // 2D ray index (x + y * width)
     int* ray_idx[2]; 
@@ -90,9 +89,6 @@ struct RenderingWorkspace: Workspace {
 
         ray_trans[0]        = allocate<float>(stream, 2 * n_rays);
         ray_trans[1]        = ray_trans[0] + n_rays;
-
-        n_nerfs_for_ray[0]  = allocate<int>(stream, 2 * n_rays);
-        n_nerfs_for_ray[1]  = n_nerfs_for_ray[0] + n_rays;
 
         ray_idx[0]          = allocate<int>(stream, 2 * n_rays);
         ray_idx[1]          = ray_idx[0] + n_rays;

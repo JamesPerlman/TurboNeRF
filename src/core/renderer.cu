@@ -246,9 +246,7 @@ void Renderer::perform_task(
             );
         }
     }
-
-    CHECK_DATA(ray_ori1, float, render_ws.ray_origin[active_buf_idx], n_rays * 3, stream);
-
+    
     // this optimization only works if the camera rays travel in straight lines
     prepare_for_linear_raymarching_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
         n_rays,
@@ -265,14 +263,8 @@ void Renderer::perform_task(
         // dual-use buffers
         render_ws.ray_alive,
         render_ws.ray_t[active_buf_idx],
-        render_ws.ray_tmax[active_buf_idx],
-
-        // output buffers
-        render_ws.ray_idx[active_buf_idx],
-        render_ws.n_nerfs_for_ray[active_buf_idx]
+        render_ws.ray_tmax[active_buf_idx]
     );
-
-    CHECK_DATA(ray_alive1, uint32_t, render_ws.ray_alive, n_rays, stream);
 
     // ray marching loop
     int n_steps = 0;
@@ -284,11 +276,12 @@ void Renderer::perform_task(
         CHECK_IS_CANCELED(task);
 
         const uint32_t n_steps_per_ray = std::max(ctx.batch_size / n_rays_alive, (uint32_t)1);
-        const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_rays_alive, tcnn::batch_size_granularity);
+        const uint32_t n_samples_in_batch = n_steps_per_ray * n_rays_alive;
+        const uint32_t network_batch = tcnn::next_multiple(n_samples_in_batch, tcnn::batch_size_granularity);
 
         march_rays_and_generate_global_sample_points_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
             n_rays_alive,
-            n_rays,
+            n_rays_alive,
             n_steps_per_ray,
             dt_min,
 
@@ -314,7 +307,7 @@ void Renderer::perform_task(
             cudaMemsetAsync(
                 render_ws.sample_rgba,
                 0,
-                4 * network_batch * sizeof(float),
+                4 * n_samples_in_batch * sizeof(float),
                 stream
             )
         );
@@ -324,11 +317,7 @@ void Renderer::perform_task(
          * Then we will query each respective NeRF network and blend the samples into a sample rgba buffer
          */
         
-        uint32_t n_samples_computed = 0;
         for (int nerf_idx = 0; nerf_idx < n_nerfs; ++nerf_idx) {
-            if (n_samples_computed >= network_batch) {
-                break;
-            }
 
             auto& nerf = task.nerfs[nerf_idx];
             auto& proxy = nerf->proxy;
@@ -336,32 +325,16 @@ void Renderer::perform_task(
             if (!proxy->can_render || !proxy->is_visible) {
                 continue;
             }
-
-            // bool* rays_active_ptr = scene_ws.ray_active[active_buf_idx] + n * n_rays;
-            uint32_t n_nerf_samples = n_nerfs == 1
-                ? network_batch // minor optimization for single nerf
-                : count_valued_elements(
-                    stream,
-                    network_batch,
-                    render_ws.sample_valid,
-                    true
-                );
             
-            if (n_nerf_samples == 0) {
-                continue;
-            }
-            
-            n_samples_computed += n_nerf_samples;
-
-            const uint32_t mini_network_batch = tcnn::next_multiple(n_nerf_samples, tcnn::batch_size_granularity);
-
             // generate the normalized network inputs for this NeRF
-            filter_and_assign_network_inputs_for_nerf_kernel<<<n_blocks_linear(n_nerf_samples), n_threads_linear, 0, stream>>>(
-                n_nerf_samples,
-                n_rays,
-                mini_network_batch,
-                nerf->proxy->transform.get(),
-                nerf->proxy->render_bbox.get(),
+            filter_and_assign_network_inputs_for_nerf_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+                n_rays_alive,
+                n_rays_alive,
+                network_batch,
+                n_steps_per_ray,
+                proxy->transform.get().inverse(),
+                proxy->render_bbox.get(),
+                proxy->training_bbox.get(),
                 nerf->occupancy_grid,
 
                 // input buffers (read-only)
@@ -375,6 +348,19 @@ void Renderer::perform_task(
                 render_ws.network_pos[0],
                 render_ws.network_dir[0]
             );
+
+            uint32_t n_nerf_samples = count_valued_elements(
+                    stream,
+                    network_batch,
+                    render_ws.sample_valid,
+                    true
+                );
+            
+            if (n_nerf_samples == 0) {
+                continue;
+            }
+
+            const uint32_t mini_network_batch = tcnn::next_multiple(n_nerf_samples, tcnn::batch_size_granularity);
 
             float* network_pos;
             float* network_dir;
@@ -456,15 +442,16 @@ void Renderer::perform_task(
             // accumulate these samples into the sample_rgba buffer (they will be averaged in the composite step)
             accumulate_nerf_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
-                n_rays,
-                mini_network_batch,
+                n_rays_alive,
+                network_batch,
                 n_steps_per_ray,
 
                 // input buffers (read-only)
                 render_ws.ray_alive,
+                render_ws.sample_valid,
                 render_ws.sample_dt,
-                render_ws.net_concat[compacted ? 0 : 1],
-                render_ws.net_output[compacted ? 0 : 1],
+                render_ws.net_output[1],
+                render_ws.net_concat[1],
 
                 // dual-use buffers (read-write)
                 render_ws.sample_rgba
@@ -484,6 +471,7 @@ void Renderer::perform_task(
 
         // composite the samples into the output buffer
         composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+            n_rays_alive,
             n_rays_alive,
             n_rays,
             n_steps_per_ray,
@@ -550,13 +538,12 @@ void Renderer::perform_task(
             // compact ray properties via the indices
             compact_rays_kernel<<<n_blocks_linear(n_rays_to_keep), n_threads_linear, 0, stream>>>(
                 n_rays_to_keep,
-                n_nerfs,
-                n_rays,
+                n_rays_alive,
+                n_rays_to_keep,
                 render_ws.compact_idx,
 
                 // input
                 render_ws.ray_idx[active_buf_idx],
-                render_ws.n_nerfs_for_ray[active_buf_idx],
                 render_ws.ray_t[active_buf_idx],
                 render_ws.ray_tmax[active_buf_idx],
                 render_ws.ray_origin[active_buf_idx],
@@ -565,7 +552,6 @@ void Renderer::perform_task(
 
                 // output
                 render_ws.ray_idx[compact_buf_idx],
-                render_ws.n_nerfs_for_ray[compact_buf_idx],
                 render_ws.ray_t[compact_buf_idx],
                 render_ws.ray_tmax[compact_buf_idx],
                 render_ws.ray_origin[compact_buf_idx],

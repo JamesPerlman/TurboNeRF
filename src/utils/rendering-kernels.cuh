@@ -46,11 +46,7 @@ __global__ void prepare_for_linear_raymarching_kernel(
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
     float* __restrict__ ray_tmin,
-    float* __restrict__ ray_tmax,
-
-    // output buffers (write-only)
-    int* __restrict__ ray_idx,
-    int* __restrict__ n_nerfs_for_ray
+    float* __restrict__ ray_tmax
 );
 
 // generate sample points in global space
@@ -80,12 +76,14 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
 
 // For global sample points, determine which ones hit a particular NeRF
 __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
-    const uint32_t n_samples,
+    const uint32_t n_rays,
     const uint32_t batch_size,
     const uint32_t network_size,
+    const uint32_t n_steps_per_ray,
     const Transform4f world_to_nerf,
-    const BoundingBox nerf_bbox,
-    const OccupancyGrid nerf_occupancy_grid,
+    const BoundingBox render_bbox,
+    const BoundingBox training_bbox,
+    const OccupancyGrid occupancy_grid,
 
     // input buffers (read-only)
     const float* __restrict__ sample_pos,
@@ -93,7 +91,7 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
     const float* __restrict__ sample_dt,
 
     // output buffers (write-only)
-    int* __restrict__ n_nerfs_for_sample,
+    int* __restrict__ n_nerfs_per_sample,
     bool* __restrict__ sample_valid,
     float* __restrict__ network_pos,
     float* __restrict__ network_dir
@@ -107,6 +105,7 @@ __global__ void accumulate_nerf_samples_kernel(
 
     // input buffers (read-only)
     bool* __restrict__ ray_alive,
+    bool* __restrict__ sample_valid,
     const float* __restrict__ sample_dt,
     const tcnn::network_precision_t* __restrict__ network_rgb,
     const tcnn::network_precision_t* __restrict__ network_density,
@@ -118,6 +117,7 @@ __global__ void accumulate_nerf_samples_kernel(
 __global__ void composite_samples_kernel(
     const uint32_t n_rays,
     const uint32_t batch_size,
+    const uint32_t output_stride,
     const uint32_t n_steps_per_ray,
 
     // read-only
@@ -177,13 +177,12 @@ __global__ void expand_network_outputs_kernel(
 // ray compaction
 __global__ void compact_rays_kernel(
     const int n_compacted_rays,
-    const int n_nerfs,
-    const int batch_size,
+    const int old_batch_size,
+    const int new_batch_size,
     const int* __restrict__ indices,
 
     // input buffers (read-only)
     const int* __restrict__ in_idx, // this is the ray-pixel index
-    const int* __restrict__ in_n_nerfs_for_ray,
     const float* __restrict__ in_ray_t,
     const float* __restrict__ in_ray_tmax,
     const float* __restrict__ in_ori,
@@ -192,7 +191,6 @@ __global__ void compact_rays_kernel(
 
     // compacted output buffers (write-only)
     int* __restrict__ out_idx,
-    int* __restrict__ out_n_nerfs_for_ray,
     float* __restrict__ out_ray_t,
     float* __restrict__ out_ray_tmax,
     float* __restrict__ out_ori,

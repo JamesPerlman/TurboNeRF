@@ -85,9 +85,25 @@ struct BoundingBox {
     inline NRC_HOST_DEVICE float pos_to_unit_y(const float& y) const { return (y - min_y) / (max_y - min_y); }
     inline NRC_HOST_DEVICE float pos_to_unit_z(const float& z) const { return (z - min_z) / (max_z - min_z); }
 
+    inline NRC_HOST_DEVICE float3 pos_to_unit(const float3& p) const {
+        return {
+            pos_to_unit_x(p.x),
+            pos_to_unit_y(p.y),
+            pos_to_unit_z(p.z)
+        };
+    }
+
     inline NRC_HOST_DEVICE float unit_to_pos_x(const float& x) const { return x * (max_x - min_x) + min_x; }
     inline NRC_HOST_DEVICE float unit_to_pos_y(const float& y) const { return y * (max_y - min_y) + min_y; }
     inline NRC_HOST_DEVICE float unit_to_pos_z(const float& z) const { return z * (max_z - min_z) + min_z; }
+
+    inline NRC_HOST_DEVICE float3 unit_to_pos(const float3& p) const {
+        return {
+            unit_to_pos_x(p.x),
+            unit_to_pos_y(p.y),
+            unit_to_pos_z(p.z)
+        };
+    }
 
     inline NRC_HOST_DEVICE float size() const { return (max_x - min_x); };
 
