@@ -282,6 +282,7 @@ void Renderer::perform_task(
         march_rays_and_generate_global_sample_points_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
             n_rays_alive,
             n_rays_alive,
+            n_samples_in_batch,
             n_steps_per_ray,
             dt_min,
 
@@ -329,7 +330,7 @@ void Renderer::perform_task(
             // generate the normalized network inputs for this NeRF
             filter_and_assign_network_inputs_for_nerf_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
-                n_rays_alive,
+                n_samples_in_batch,
                 network_batch,
                 n_steps_per_ray,
                 proxy->transform.get().inverse(),
@@ -442,7 +443,7 @@ void Renderer::perform_task(
             // accumulate these samples into the sample_rgba buffer (they will be averaged in the composite step)
             accumulate_nerf_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
-                n_rays_alive,
+                n_samples_in_batch,
                 network_batch,
                 n_steps_per_ray,
 
@@ -472,7 +473,7 @@ void Renderer::perform_task(
         // composite the samples into the output buffer
         composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
             n_rays_alive,
-            n_rays_alive,
+            n_samples_in_batch,
             n_rays,
             n_steps_per_ray,
 
