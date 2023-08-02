@@ -48,7 +48,8 @@ TCNN_NAMESPACE_BEGIN
 template <typename T>
 __global__ void ngp_adam_step(
     const uint32_t n_elements,
-    const uint32_t n_hash_grid_weights,
+    const uint32_t hash_grid_weights_final_index,
+    const uint32_t network_weights_final_index,
     const float loss_scale,
     float learning_rate,
     const float beta1,
@@ -66,14 +67,14 @@ __global__ void ngp_adam_step(
     if (i >= n_elements) return;
 
     float gradient = (float)gradients[i] / loss_scale;
-    if (i < n_hash_grid_weights && gradient == 0) {
+    if (i < hash_grid_weights_final_index && gradient == 0) {
         return;
     }
 
     const float weight_fp = weights_full_precision[i];
 
-    // No L2 reg for hash grid params
-    if (i >= n_hash_grid_weights) {
+    // L2 regularization only for network weights
+    if (i >= hash_grid_weights_final_index && i < network_weights_final_index) {
         gradient += l2_reg * weight_fp;
     }
 
@@ -105,6 +106,8 @@ public:
         m_n_weights = n_weights;
         m_n_hash_grid_weights = grid_layer[0].first;
 
+        m_n_network_weights = grid_layer[1].first;
+
         m_first_moments.resize(m_n_weights);
         m_first_moments.memset(0);
 
@@ -123,6 +126,7 @@ public:
         linear_kernel(ngp_adam_step<T>, 0, stream,
             n_weights_to_optimize,
             m_n_hash_grid_weights,
+            m_n_hash_grid_weights + m_n_network_weights,
             loss_scale,
             m_base_learning_rate,
             m_beta1,
@@ -222,6 +226,7 @@ public:
 private:
     uint32_t m_n_weights;
     uint32_t m_n_hash_grid_weights;
+    uint32_t m_n_network_weights;
 
     GPUMemory<float> m_first_moments;
     GPUMemory<float> m_second_moments;

@@ -183,9 +183,10 @@ void NerfNetwork::update_params_if_needed(const cudaStream_t& stream, NetworkPar
         new NGPAdamOptimizer<network_precision_t>(optimizer_config)
     );
 
-    size_t n_params = density_network->n_params() + color_network->n_params();
+    size_t n_params = density_network->n_params() + color_network->n_params() + appearance_embedding->n_params();
     uint32_t n_grid_params = density_network->encoding()->n_params();
-    optimizer->allocate(n_params, {{n_grid_params, 1}});
+    uint32_t n_network_params = color_network->n_params() + density_network->n_params();
+    optimizer->allocate(n_params, {{n_grid_params, 1}, {n_network_params, 1}});
 }
 
 void NerfNetwork::free_device_memory() {
