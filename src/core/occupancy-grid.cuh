@@ -199,6 +199,13 @@ public:
         return is_occupied_at(level, byte_idx);
     }
 
+    inline NRC_HOST_DEVICE bool is_occupied_at(
+        const float3& p,
+        const int& level
+    ) const {
+        return is_occupied_at(level, p.x, p.y, p.z);
+    }
+
     // returns the density at a morton index of the given level
     inline __device__ float get_sigma_at(
         const int& level,
@@ -238,6 +245,13 @@ public:
         }
         // fallthrough - return largest grid
         return n_levels - 1;
+    }
+
+    inline NRC_HOST_DEVICE int get_grid_level_at(
+        const float3& p,
+        const float& dt
+    ) const {
+        return get_grid_level_at(p.x, p.y, p.z, dt);
     }
 
     // Gets the t-value required to step the ray to the next voxel

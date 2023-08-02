@@ -181,6 +181,22 @@ struct alignas(float) Transform4f
         return {m03, m13, m23};
     }
 
+    // convenience getter, returns the scale of this matrix as a float3
+    inline NRC_HOST_DEVICE float3 get_scale() const
+    {
+        return {
+            sqrtf(m00 * m00 + m10 * m10 + m20 * m20),
+            sqrtf(m01 * m01 + m11 * m11 + m21 * m21),
+            sqrtf(m02 * m02 + m12 * m12 + m22 * m22)
+        };
+    }
+
+    // product of scales x * y * z
+    inline NRC_HOST_DEVICE float get_scale_product() const
+    {
+        return sqrtf(m00 * m00 + m10 * m10 + m20 * m20) * sqrtf(m01 * m01 + m11 * m11 + m21 * m21) * sqrtf(m02 * m02 + m12 * m12 + m22 * m22);
+    }
+
     inline __host__ __device__ float determinant() const
     {
         return 0.0f

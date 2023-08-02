@@ -21,6 +21,7 @@ struct RenderingWorkspace: Workspace {
     bool* ray_alive;
     float* ray_origin[2];
     float* ray_dir[2];
+    float* ray_t[2];
     float* ray_tmax[2];
     float* ray_trans[2];
 
@@ -29,16 +30,20 @@ struct RenderingWorkspace: Workspace {
     
     // samples
     uint32_t* appearance_ids;
-    float* network_pos[2];
-    float* network_dir[2];
-    float* network_dt;
+    bool* sample_valid;
+    float* sample_t;
+    float* sample_pos;
+    float* sample_dir;
+    float* sample_dt;
     int* net_compact_idx;
-    int* sample_nerf_id;
-    int* n_steps_total;
+    int* n_nerfs_for_sample;
+    float* sample_rgba;
 
     // network buffers
     tcnn::network_precision_t* net_concat[2];
     tcnn::network_precision_t* net_output[2];
+    float* network_pos[2];
+    float* network_dir[2];
 
     // output buffers
     float* rgba;
@@ -63,55 +68,61 @@ struct RenderingWorkspace: Workspace {
         uint32_t n_rays = n_pixels;
 
         // compaction
-        compact_idx     = allocate<int>(stream, n_rays);
+        compact_idx         = allocate<int>(stream, n_rays);
 
         // rays
-        ray_alive       = allocate<bool>(stream, n_rays); // no need to double buffer
+        ray_alive           = allocate<bool>(stream, n_rays); // no need to double buffer
 
         // double buffers
 
-        ray_origin[0]   = allocate<float>(stream, 3 * n_rays);
-        ray_origin[1]   = allocate<float>(stream, 3 * n_rays);
+        ray_origin[0]       = allocate<float>(stream, 2 * 3 * n_rays);
+        ray_origin[1]       = ray_origin[0] + 3 * n_rays;
         
-        ray_dir[0]      = allocate<float>(stream, 3 * n_rays);
-        ray_dir[1]      = allocate<float>(stream, 3 * n_rays);
+        ray_dir[0]          = allocate<float>(stream, 2 * 3 * n_rays);
+        ray_dir[1]          = ray_dir[0] + 3 * n_rays;
+
+        ray_t[0]            = allocate<float>(stream, 2 * n_rays);
+        ray_t[1]            = ray_t[0] + n_rays;
         
-        ray_tmax[0]     = allocate<float>(stream, n_rays);
-        ray_tmax[1]     = allocate<float>(stream, n_rays);
+        ray_tmax[0]         = allocate<float>(stream, 2 * n_rays);
+        ray_tmax[1]         = ray_tmax[0] + n_rays;
 
-        ray_idx[0]      = allocate<int>(stream, n_rays);
-        ray_idx[1]      = allocate<int>(stream, n_rays);
+        ray_trans[0]        = allocate<float>(stream, 2 * n_rays);
+        ray_trans[1]        = ray_trans[0] + n_rays;
 
-        ray_trans[0]    = allocate<float>(stream, n_rays);
-        ray_trans[1]    = allocate<float>(stream, n_rays);
+        ray_idx[0]          = allocate<int>(stream, 2 * n_rays);
+        ray_idx[1]          = ray_idx[0] + n_rays;
 
         // samples
-        appearance_ids  = allocate<uint32_t>(stream, batch_size);
-        
-        network_pos[0]  = allocate<float>(stream, 3 * batch_size);
-        network_pos[1]  = allocate<float>(stream, 3 * batch_size);
+        appearance_ids      = allocate<uint32_t>(stream, batch_size);
 
-        network_dir[0]  = allocate<float>(stream, 3 * batch_size);
-        network_dir[1]  = allocate<float>(stream, 3 * batch_size);
+        sample_valid        = allocate<bool>(stream, batch_size);
+        sample_t            = allocate<float>(stream, batch_size);
+        sample_dt           = allocate<float>(stream, batch_size);
+        sample_pos          = allocate<float>(stream, 3 * batch_size);
+        sample_dir          = allocate<float>(stream, 3 * batch_size);
 
-        network_dt      = allocate<float>(stream, batch_size);
+        net_compact_idx     = allocate<int>(stream, batch_size);
+        n_nerfs_for_sample  = allocate<int>(stream, batch_size);
+        sample_rgba         = allocate<float>(stream, 4 * batch_size);
 
-        net_compact_idx = allocate<int>(stream, batch_size);
-
-        sample_nerf_id  = allocate<int>(stream, batch_size);
-
-        n_steps_total   = allocate<int>(stream, batch_size);
 
         // network
-        net_concat[0]   = allocate<tcnn::network_precision_t>(stream, n_network_concat_elements * batch_size);
-        net_concat[1]   = allocate<tcnn::network_precision_t>(stream, n_network_concat_elements * batch_size);
+        net_concat[0]       = allocate<tcnn::network_precision_t>(stream, 2 * n_network_concat_elements * batch_size);
+        net_concat[1]       = net_concat[0] + n_network_concat_elements * batch_size;
 
-        net_output[0]   = allocate<tcnn::network_precision_t>(stream, n_network_output_elements * batch_size);
-        net_output[1]   = allocate<tcnn::network_precision_t>(stream, n_network_output_elements * batch_size);
+        net_output[0]       = allocate<tcnn::network_precision_t>(stream, 2 * n_network_output_elements * batch_size);
+        net_output[1]       = net_output[0] + n_network_output_elements * batch_size;
+        
+        network_pos[0]      = allocate<float>(stream, 2 * 3 * batch_size);
+        network_pos[1]      = network_pos[0] + 3 * batch_size;
+
+        network_dir[0]      = allocate<float>(stream, 2 * 3 * batch_size);
+        network_dir[1]      = network_dir[0] + 3 * batch_size;
 
         // output
-        rgba            = allocate<float>(stream, n_output_pixel_elements);
-        bg_rgba         = allocate<float>(stream, n_output_pixel_elements);
+        rgba                = allocate<float>(stream, n_output_pixel_elements);
+        bg_rgba             = allocate<float>(stream, n_output_pixel_elements);
 
         this->n_rays = n_rays;
         this->n_network_concat_elements = n_network_concat_elements;

@@ -246,7 +246,7 @@ void Renderer::perform_task(
             );
         }
     }
-
+    
     // this optimization only works if the camera rays travel in straight lines
     prepare_for_linear_raymarching_kernel<<<n_blocks_linear(n_rays), n_threads_linear, 0, stream>>>(
         n_rays,
@@ -255,8 +255,6 @@ void Renderer::perform_task(
         scene_ws.occupancy_grids,
         scene_ws.render_bboxes,
         scene_ws.nerf_transforms,
-        dt_min,
-        cone_angle,
 
         // input buffers
         render_ws.ray_origin[active_buf_idx],
@@ -264,13 +262,8 @@ void Renderer::perform_task(
 
         // dual-use buffers
         render_ws.ray_alive,
-        render_ws.ray_tmax[active_buf_idx],
-
-        // output buffers
-        scene_ws.intersectors[active_buf_idx],
-        scene_ws.ray_active[active_buf_idx],
-        scene_ws.ray_t[active_buf_idx],
-        scene_ws.ray_tmax[active_buf_idx]
+        render_ws.ray_t[active_buf_idx],
+        render_ws.ray_tmax[active_buf_idx]
     );
 
     // ray marching loop
@@ -282,84 +275,100 @@ void Renderer::perform_task(
     while (n_rays_alive > 0) {
         CHECK_IS_CANCELED(task);
 
-        const uint32_t n_steps_per_ray = std::max(ctx.batch_size / (n_rays_alive * (uint32_t)n_nerfs), (uint32_t)1);
-        const uint32_t n_samples_per_step = n_rays_alive * (uint32_t)n_nerfs;
-        const uint32_t network_batch = tcnn::next_multiple(n_steps_per_ray * n_samples_per_step, tcnn::batch_size_granularity);
+        const uint32_t n_steps_per_ray = std::max(ctx.batch_size / n_rays_alive, (uint32_t)1);
+        const uint32_t n_samples_in_batch = n_steps_per_ray * n_rays_alive;
+        const uint32_t network_batch = tcnn::next_multiple(n_samples_in_batch, tcnn::batch_size_granularity);
 
-        march_rays_and_generate_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+        march_rays_and_generate_global_sample_points_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
             n_rays_alive,
-            n_nerfs,
-            n_rays,
-            network_batch,
-            n_samples_per_step,
+            n_rays_alive,
+            n_samples_in_batch,
             n_steps_per_ray,
-            scene_ws.occupancy_grids,
-            scene_ws.training_bboxes,
-            scene_ws.nerf_transforms,
             dt_min,
-            cone_angle,
 
-            // input buffers
+            // input buffers (read-only)
+            render_ws.ray_alive,
+            render_ws.ray_tmax[active_buf_idx],
             render_ws.ray_origin[active_buf_idx],
             render_ws.ray_dir[active_buf_idx],
-            render_ws.ray_tmax[active_buf_idx],
-            scene_ws.ray_tmax[active_buf_idx],
-            scene_ws.intersectors[active_buf_idx],
 
-            // dual-use buffers
-            render_ws.ray_alive,
-            scene_ws.ray_active[active_buf_idx],
-            scene_ws.ray_t[active_buf_idx],
+            // dual-use buffers (read-write)
+            render_ws.ray_t[active_buf_idx],
+            
+            // output buffers (write-only)
+            render_ws.sample_t,
+            render_ws.sample_pos,
+            render_ws.sample_dir,
+            render_ws.sample_dt,
+            render_ws.n_nerfs_for_sample
+        );
 
-            // output buffers
-            render_ws.n_steps_total,
-            render_ws.sample_nerf_id,
-            render_ws.network_pos[0],
-            render_ws.network_dir[0],
-            render_ws.network_dt
+        // clear out sample rgba buffer
+        CUDA_CHECK_THROW(
+            cudaMemsetAsync(
+                render_ws.sample_rgba,
+                0,
+                4 * n_samples_in_batch * sizeof(float),
+                stream
+            )
         );
 
         /**
-         * Next we compact the network inputs for the active rays of each NeRF
-         * Then we will query each respective NeRF network and composite the samples into the output buffer
+         * Next we localize the global sample points for each NeRF, and generate the normalized the network inputs.
+         * Then we will query each respective NeRF network and blend the samples into a sample rgba buffer
          */
         
-        uint32_t n_samples_computed = 0;
-        for (int n = 0; n < n_nerfs; ++n) {
-            if (n_samples_computed >= network_batch) {
-                break;
-            }
+        for (int nerf_idx = 0; nerf_idx < n_nerfs; ++nerf_idx) {
 
-            auto& nerf = task.nerfs[n];
+            auto& nerf = task.nerfs[nerf_idx];
             auto& proxy = nerf->proxy;
 
             if (!proxy->can_render || !proxy->is_visible) {
                 continue;
             }
+            
+            // generate the normalized network inputs for this NeRF
+            filter_and_assign_network_inputs_for_nerf_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+                n_rays_alive,
+                n_samples_in_batch,
+                network_batch,
+                n_steps_per_ray,
+                proxy->transform.get().inverse(),
+                1.0f / proxy->transform.get().get_scale_product(),
+                proxy->render_bbox.get(),
+                proxy->training_bbox.get(),
+                nerf->occupancy_grid,
 
-            // bool* rays_active_ptr = scene_ws.ray_active[active_buf_idx] + n * n_rays;
-            uint32_t n_nerf_samples = n_nerfs == 1
-                ? network_batch // minor optimization for single nerf
-                : count_valued_elements(
+                // input buffers (read-only)
+                render_ws.sample_pos,
+                render_ws.sample_dir,
+                render_ws.sample_dt,
+                render_ws.n_nerfs_for_sample,
+                
+                // output buffers (write-only)
+                render_ws.sample_valid,
+                render_ws.network_pos[0],
+                render_ws.network_dir[0]
+            );
+
+            uint32_t n_nerf_samples = count_valued_elements(
                     stream,
                     network_batch,
-                    render_ws.sample_nerf_id,
-                    n
+                    render_ws.sample_valid,
+                    true
                 );
             
             if (n_nerf_samples == 0) {
                 continue;
             }
-            
-            n_samples_computed += n_nerf_samples;
-                        
-            const uint32_t mini_network_batch = tcnn::next_multiple(n_nerf_samples, tcnn::batch_size_granularity);
 
-            // no need to compact if the network batch is the same size as the number of samples
+            const uint32_t mini_network_batch = tcnn::next_multiple(n_nerf_samples, tcnn::batch_size_granularity);
 
             float* network_pos;
             float* network_dir;
             bool compacted = false;
+
+            // no need to compact if the network batch is the same size as the number of samples
 
             if (mini_network_batch == network_batch) {
                 
@@ -367,11 +376,12 @@ void Renderer::perform_task(
                 network_dir = render_ws.network_dir[0];
 
             } else {
+
                 generate_valued_compaction_indices(
                     stream,
                     network_batch,
-                    render_ws.sample_nerf_id,
-                    n,
+                    render_ws.sample_valid,
+                    true,
                     render_ws.net_compact_idx
                 );
 
@@ -384,7 +394,7 @@ void Renderer::perform_task(
 
                     // input buffers
                     render_ws.network_pos[0],
-                    render_ws.network_dir[0],
+                    render_ws.network_pos[0],
 
                     // output buffers
                     render_ws.network_pos[1],
@@ -430,6 +440,24 @@ void Renderer::perform_task(
                     render_ws.net_concat[1]
                 );
             }
+
+            // accumulate these samples into the sample_rgba buffer (they will be averaged in the composite step)
+            accumulate_nerf_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+                n_rays_alive,
+                n_samples_in_batch,
+                network_batch,
+                n_steps_per_ray,
+
+                // input buffers (read-only)
+                render_ws.ray_alive,
+                render_ws.sample_valid,
+                render_ws.sample_dt,
+                render_ws.net_output[1],
+                render_ws.net_concat[1],
+
+                // dual-use buffers (read-write)
+                render_ws.sample_rgba
+            );
         }
 
         /**
@@ -446,25 +474,30 @@ void Renderer::perform_task(
         // composite the samples into the output buffer
         composite_samples_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
             n_rays_alive,
+            n_samples_in_batch,
             n_rays,
-            network_batch,
-            n_rays,
-            n_samples_per_step,
             n_steps_per_ray,
-            n_nerfs,
 
-            // input buffers
+            // input buffers (read-only)
             render_ws.ray_idx[active_buf_idx],
-            render_ws.network_dt,
-            render_ws.net_output[1],
-            render_ws.net_concat[1],
-            render_ws.n_steps_total,
+            render_ws.n_nerfs_for_sample,
+            render_ws.sample_rgba,
 
-            // dual-use buffers
+            // dual-use buffers (read-write)
+            render_ws.ray_alive,
             render_ws.ray_trans[active_buf_idx],
-            render_ws.rgba,
+            render_ws.rgba
+        );
 
-            // write-only buffers
+        // kill rays that have gone beyond the t max
+        kill_terminated_rays_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+            n_rays_alive,
+
+            // input buffers (read-only)
+            render_ws.ray_t[active_buf_idx],
+            render_ws.ray_tmax[active_buf_idx],
+            
+            // dual-use buffers (read-write)
             render_ws.ray_alive
         );
 
@@ -479,13 +512,14 @@ void Renderer::perform_task(
         }
 
         // update how many rays are still alive
-        const int n_rays_to_keep = count_true_elements(
+        const int n_rays_to_keep = count_valued_elements(
             stream,
             n_rays_alive,
-            render_ws.ray_alive
+            render_ws.ray_alive,
+            true
         );
 
-        // if no rays are alive, we can skip compositing
+        // if no rays are alive, we end the loop
         if (n_rays_to_keep == 0) {
             break;
         }
@@ -495,26 +529,24 @@ void Renderer::perform_task(
             CHECK_IS_CANCELED(task);
 
             // get compacted ray indices
-            generate_compaction_indices(
+            generate_valued_compaction_indices(
                 stream,
                 n_rays_alive,
                 render_ws.ray_alive,
+                true,
                 render_ws.compact_idx
             );
 
             // compact ray properties via the indices
             compact_rays_kernel<<<n_blocks_linear(n_rays_to_keep), n_threads_linear, 0, stream>>>(
                 n_rays_to_keep,
-                n_nerfs,
-                n_rays,
+                n_rays_alive,
+                n_rays_to_keep,
                 render_ws.compact_idx,
 
                 // input
                 render_ws.ray_idx[active_buf_idx],
-                scene_ws.ray_active[active_buf_idx],
-                scene_ws.ray_t[active_buf_idx],
-                scene_ws.ray_tmax[active_buf_idx],
-                scene_ws.intersectors[active_buf_idx],
+                render_ws.ray_t[active_buf_idx],
                 render_ws.ray_tmax[active_buf_idx],
                 render_ws.ray_origin[active_buf_idx],
                 render_ws.ray_dir[active_buf_idx],
@@ -522,10 +554,7 @@ void Renderer::perform_task(
 
                 // output
                 render_ws.ray_idx[compact_buf_idx],
-                scene_ws.ray_active[compact_buf_idx],
-                scene_ws.ray_t[compact_buf_idx],
-                scene_ws.ray_tmax[compact_buf_idx],
-                scene_ws.intersectors[compact_buf_idx],
+                render_ws.ray_t[compact_buf_idx],
                 render_ws.ray_tmax[compact_buf_idx],
                 render_ws.ray_origin[compact_buf_idx],
                 render_ws.ray_dir[compact_buf_idx],

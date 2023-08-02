@@ -13,31 +13,6 @@
 
 TURBO_NAMESPACE_BEGIN
 
-__global__ void prepare_for_linear_raymarching_kernel(
-    const uint32_t n_rays,
-    const uint32_t batch_size,
-    const uint32_t n_nerfs,
-    const OccupancyGrid* grids,
-    const BoundingBox* render_bboxes,
-    const Transform4f* transforms,
-    const float dt_min,
-    const float cone_angle,
-    
-    // input buffers (read-only)
-    const float* __restrict__ ray_ori,
-    const float* __restrict__ ray_dir,
-
-    // dual-use buffers (read/write)
-    bool* __restrict__ ray_alive,
-    float* __restrict__ ray_tmax,
-
-    // output buffers (write-only)
-    uint32_t* __restrict__ intersectors,
-    bool* __restrict__ nerf_ray_active,
-    float* __restrict__ nerf_ray_t,
-    float* __restrict__ nerf_tmax
-);
-
 __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
     const uint32_t n_rays,
     const uint32_t batch_size,
@@ -52,43 +27,124 @@ __global__ void draw_training_img_clipping_planes_and_assign_t_max_kernel(
     const stbi_uc* __restrict__ train_img_data,
     const float* __restrict__ ray_ori,
     const float* __restrict__ ray_dir,
-    float* __restrict__ ray_t_max,
+    float* __restrict__ ray_tmax,
     float* __restrict__ out_rgba_buf
 );
 
-__global__ void march_rays_and_generate_network_inputs_kernel(
+__global__ void prepare_for_linear_raymarching_kernel(
     const uint32_t n_rays,
-    const uint32_t n_nerfs,
     const uint32_t batch_size,
-    const uint32_t network_batch,
-    const uint32_t n_samples_per_step,
-    const uint32_t n_steps_max,
-    const OccupancyGrid* grids,
-    const BoundingBox* training_bboxes,
-    const Transform4f* transforms,
-    const float dt_min,
-    const float cone_angle,
+    const uint32_t n_nerfs,
+    const OccupancyGrid* __restrict__ grids,
+    const BoundingBox* __restrict__ render_bboxes,
+    const Transform4f* __restrict__ transforms,
     
     // input buffers (read-only)
     const float* __restrict__ ray_ori,
     const float* __restrict__ ray_dir,
-    const float* __restrict__ ray_tmax,
-    const float* __restrict__ nerf_tmax,
-    const uint32_t* __restrict__ intersectors,
 
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
-    bool* __restrict__ nerf_ray_active,
-    float* __restrict__ nerf_ray_t,
-
-    // output buffers (write-only)
-    int* __restrict__ n_steps_total,
-    int* __restrict__ sample_nerf_id,
-    float* __restrict__ network_pos,
-    float* __restrict__ network_dir,
-    float* __restrict__ network_dt
+    float* __restrict__ ray_tmin,
+    float* __restrict__ ray_tmax
 );
 
+// generate sample points in global space
+
+__global__ void march_rays_and_generate_global_sample_points_kernel(
+    const uint32_t n_rays,
+    const uint32_t ray_batch_size,
+    const uint32_t sample_stride,
+    const uint32_t n_steps_per_ray,
+    const float dt,
+
+    // input buffers (read-only)
+    const bool* __restrict__ ray_alive,
+    const float* __restrict__ ray_tmax,
+    const float* __restrict__ ray_ori,
+    const float* __restrict__ ray_dir,
+
+    // dual-use buffers (read-write)
+    float* __restrict__ ray_t,
+
+    // output buffers (write-only)
+    float* __restrict__ sample_t,
+    float* __restrict__ sample_pos,
+    float* __restrict__ sample_dir,
+    float* __restrict__ sample_dt,
+    int* __restrict__ n_nerfs_for_sample
+);
+
+// For global sample points, determine which ones hit a particular NeRF
+__global__ void filter_and_assign_network_inputs_for_nerf_kernel(
+    const uint32_t n_rays,
+    const uint32_t sample_stride,
+    const uint32_t network_stride,
+    const uint32_t n_steps_per_ray,
+    const Transform4f world_to_nerf,
+    const float inv_nerf_scale,
+    const BoundingBox render_bbox,
+    const BoundingBox training_bbox,
+    const OccupancyGrid occupancy_grid,
+
+    // input buffers (read-only)
+    const float* __restrict__ sample_pos,
+    const float* __restrict__ sample_dir,
+    const float* __restrict__ sample_dt,
+
+    // output buffers (write-only)
+    int* __restrict__ n_nerfs_per_sample,
+    bool* __restrict__ sample_valid,
+    float* __restrict__ network_pos,
+    float* __restrict__ network_dir
+);
+
+__global__ void accumulate_nerf_samples_kernel(
+    const uint32_t n_rays,
+    const uint32_t sample_stride,
+    const uint32_t network_stride,
+    const uint32_t n_steps_per_ray,
+
+    // input buffers (read-only)
+    bool* __restrict__ ray_alive,
+    bool* __restrict__ sample_valid,
+    const float* __restrict__ sample_dt,
+    const tcnn::network_precision_t* __restrict__ network_rgb,
+    const tcnn::network_precision_t* __restrict__ network_density,
+
+    // dual-use buffers (read-write)
+    float* __restrict__ sample_rgba
+);
+
+__global__ void composite_samples_kernel(
+    const uint32_t n_rays,
+    const uint32_t sample_stride,
+    const uint32_t output_stride,
+    const uint32_t n_steps_per_ray,
+
+    // read-only
+    const int* __restrict__ ray_idx,
+    const int* __restrict__ n_nerfs_for_sample,
+    const float* __restrict__ sample_rgba,
+
+    // read/write
+    bool* __restrict__ ray_alive,
+    float* __restrict__ ray_trans,
+    float* __restrict__ output_rgba
+);
+
+__global__ void kill_terminated_rays_kernel(
+    const uint32_t n_rays,
+
+    // input buffers (read-only)
+    const float* __restrict__ ray_t,
+    const float* __restrict__ ray_tmax,
+    
+    // dual-use buffers (read-write)
+    bool* __restrict__ ray_alive
+);
+
+// sample compaction
 __global__ void compact_network_inputs_kernel(
     const uint32_t n_compacted_samples,
     const uint32_t old_batch_size,
@@ -104,6 +160,7 @@ __global__ void compact_network_inputs_kernel(
     float* __restrict__ out_network_dir
 );
 
+// sample re-expansion
 __global__ void expand_network_outputs_kernel(
     const uint32_t n_compacted_samples,
     const uint32_t old_batch_size,
@@ -119,42 +176,16 @@ __global__ void expand_network_outputs_kernel(
     tcnn::network_precision_t* __restrict__ out_network_density
 );
 
-__global__ void composite_samples_kernel(
-    const uint32_t n_rays,
-    const uint32_t batch_size,
-    const uint32_t network_stride,
-    const uint32_t output_stride,
-    const uint32_t n_samples_per_step,
-    const uint32_t n_steps_max,
-    const uint32_t n_nerfs,
-
-    // read-only
-    const int* __restrict__ ray_idx,
-    const float* __restrict__ ray_dt,
-    const tcnn::network_precision_t* __restrict__ network_rgb,
-    const tcnn::network_precision_t* __restrict__ network_density,
-    const int* __restrict__ n_steps_total,
-
-    // read/write
-    float* __restrict__ ray_trans,
-    float* __restrict__ output_rgba,
-
-    // write-only
-    bool* __restrict__ ray_alive
-);
-
+// ray compaction
 __global__ void compact_rays_kernel(
     const int n_compacted_rays,
-    const int n_nerfs,
-    const int batch_size,
+    const int old_batch_size,
+    const int new_batch_size,
     const int* __restrict__ indices,
 
     // input buffers (read-only)
     const int* __restrict__ in_idx, // this is the ray-pixel index
-    const bool* __restrict__ in_nerf_ray_active,
-    const float* __restrict__ in_nerf_ray_t,
-    const float* __restrict__ in_nerf_ray_tmax,
-    const uint32_t* __restrict__ in_intersectors,
+    const float* __restrict__ in_ray_t,
     const float* __restrict__ in_ray_tmax,
     const float* __restrict__ in_ori,
     const float* __restrict__ in_dir,
@@ -162,16 +193,14 @@ __global__ void compact_rays_kernel(
 
     // compacted output buffers (write-only)
     int* __restrict__ out_idx,
-    bool* __restrict__ out_nerf_ray_active,
-    float* __restrict__ out_nerf_ray_t,
-    float* __restrict__ out_nerf_ray_tmax,
-    uint32_t* __restrict__ out_intersectors,
+    float* __restrict__ out_ray_t,
     float* __restrict__ out_ray_tmax,
     float* __restrict__ out_ori,
     float* __restrict__ out_dir,
     float* __restrict__ out_trans
 );
 
+// Thank you Copilot + GPT-4!
 __global__ void alpha_composite_kernel(
     const uint32_t n_pixels,
     const uint32_t img_stride,
@@ -179,5 +208,6 @@ __global__ void alpha_composite_kernel(
     const float* rgba_bg,
     float* rgba_out
 );
+
 
 TURBO_NAMESPACE_END

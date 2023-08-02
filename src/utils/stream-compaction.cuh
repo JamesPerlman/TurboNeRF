@@ -10,31 +10,49 @@
 
 TURBO_NAMESPACE_BEGIN
 
-size_t count_true_elements(
-    const cudaStream_t& stream,
-    const size_t n_elements,
-    const bool* predicate
-);
+template <typename T>
+struct nonzero {
+    __host__ __device__
+    bool operator()(const T& x) const {
+        return x != 0;
+    }
+};
 
-void generate_compaction_indices(
-    const cudaStream_t& stream,
-    const size_t n_elements,
-    const bool* predicate,
-    int* indices
-);
-
+template <typename T>
 size_t count_nonzero_elements(
     const cudaStream_t& stream,
     const size_t n_elements,
-    const uint32_t* input
-);
+    const T* predicate
+) {
+    thrust::device_ptr<const T> predicate_ptr(predicate);
+    return thrust::count_if(
+        MAKE_EXEC_POLICY(stream),
+        predicate_ptr,
+        predicate_ptr + n_elements,
+        nonzero<T>()
+    );
+};
 
+template <typename T>
 void generate_nonzero_compaction_indices(
     const cudaStream_t& stream,
     const size_t n_elements,
-    const uint32_t* values,
+    const T* values,
     int* indices
-);
+) {
+    thrust::device_ptr<const T> values_ptr(values);
+    thrust::device_ptr<int> indices_ptr(indices);
+
+    thrust::counting_iterator<int> counting(0);
+    thrust::copy_if(
+        MAKE_EXEC_POLICY(stream),
+        counting,
+        counting + n_elements,
+        values_ptr,
+        indices_ptr,
+        nonzero<T>()
+    );
+}
 
 template <typename T>
 size_t count_valued_elements(

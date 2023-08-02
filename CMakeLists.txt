@@ -110,6 +110,10 @@ set(HEADERS
     src/core/renderer.cuh
     src/core/trainer.cuh
 
+    # effects
+    src/effects/spatial-effect.cuh
+    src/effects/spatial/repeater.cuh
+
     # math
     src/math/device-math.cuh
     src/math/hexagon-grid.cuh
@@ -214,7 +218,6 @@ set(SOURCES
     src/utils/gpu-image.cu
     src/utils/occupancy-grid-kernels.cu
     src/utils/rendering-kernels.cu
-    src/utils/stream-compaction.cu
 
     # common
     src/main.cu
