@@ -263,7 +263,7 @@ __global__ void prepare_for_linear_raymarching_kernel(
 __global__ void march_rays_and_generate_global_sample_points_kernel(
     const uint32_t n_rays,
     const uint32_t ray_batch_size,
-    const uint32_t sample_batch_size,
+    const uint32_t sample_stride,
     const uint32_t n_steps_per_ray,
     const float dt,
 
@@ -312,8 +312,8 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
         const float z = o_z + t * d_z;
 
         const uint32_t sample_offset_0 = n_rays * s + i;
-        const uint32_t sample_offset_1 = sample_offset_0 + sample_batch_size;
-        const uint32_t sample_offset_2 = sample_offset_1 + sample_batch_size;
+        const uint32_t sample_offset_1 = sample_offset_0 + sample_stride;
+        const uint32_t sample_offset_2 = sample_offset_1 + sample_stride;
 
         sample_t[sample_offset_0] = t;
 
@@ -338,10 +338,11 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
 // For global sample points, determine which ones hit a particular NeRF
 __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
     const uint32_t n_rays,
-    const uint32_t sample_batch_size,
-    const uint32_t network_size,
+    const uint32_t sample_stride,
+    const uint32_t network_stride,
     const uint32_t n_steps_per_ray,
     const Transform4f world_to_nerf,
+    const float inv_nerf_scale,
     const BoundingBox render_bbox,
     const BoundingBox training_bbox,
     const OccupancyGrid occupancy_grid,
@@ -364,8 +365,8 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
     for (uint32_t s = 0; s < n_steps_per_ray; ++s) {
 
         const uint32_t sample_offset_0 = n_rays * s + i;
-        const uint32_t sample_offset_1 = sample_offset_0 + sample_batch_size;
-        const uint32_t sample_offset_2 = sample_offset_1 + sample_batch_size;
+        const uint32_t sample_offset_1 = sample_offset_0 + sample_stride;
+        const uint32_t sample_offset_2 = sample_offset_1 + sample_stride;
 
         const float3 global_pos{
             sample_pos[sample_offset_0],
@@ -379,7 +380,7 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
 
         if (!is_valid) {
             sample_valid[sample_offset_0] = false;
-            return;
+            continue;
         }
 
         // apply effects here
@@ -392,13 +393,13 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
         
         const float3 local_dir = world_to_nerf.mmul_ul3x3(global_dir);
 
-        const float dt = sample_dt[sample_offset_0];
+        const float dt = inv_nerf_scale * sample_dt[sample_offset_0];
         
         const int grid_level = occupancy_grid.get_grid_level_at(local_pos, dt);
 
         if (!occupancy_grid.is_occupied_at(local_pos, grid_level)) {
             sample_valid[sample_offset_0] = false;
-            return;
+            continue;
         }
 
         const float3 normalized_pos = training_bbox.pos_to_unit(local_pos);
@@ -406,8 +407,8 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
         n_nerfs_per_sample[sample_offset_0] += 1;
 
         const uint32_t network_offset_0 = sample_offset_0;
-        const uint32_t network_offset_1 = network_offset_0 + network_size;
-        const uint32_t network_offset_2 = network_offset_1 + network_size;
+        const uint32_t network_offset_1 = network_offset_0 + network_stride;
+        const uint32_t network_offset_2 = network_offset_1 + network_stride;
 
         network_pos[network_offset_0] = tcnn::clamp(normalized_pos.x, 0.0f, 1.0f);
         network_pos[network_offset_1] = tcnn::clamp(normalized_pos.y, 0.0f, 1.0f);
@@ -423,8 +424,8 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
 
 __global__ void accumulate_nerf_samples_kernel(
     const uint32_t n_rays,
-    const uint32_t sample_batch_size,
-    const uint32_t network_size,
+    const uint32_t sample_stride,
+    const uint32_t network_stride,
     const uint32_t n_steps_per_ray,
 
     // input buffers (read-only)
@@ -444,15 +445,15 @@ __global__ void accumulate_nerf_samples_kernel(
     for (uint32_t s = 0; s < n_steps_per_ray; ++s) {
 
         const uint32_t sample_offset_0 = n_rays * s + i;
-        const uint32_t sample_offset_1 = sample_offset_0 + sample_batch_size;
-        const uint32_t sample_offset_2 = sample_offset_1 + sample_batch_size;
-        const uint32_t sample_offset_3 = sample_offset_2 + sample_batch_size;
+        const uint32_t sample_offset_1 = sample_offset_0 + sample_stride;
+        const uint32_t sample_offset_2 = sample_offset_1 + sample_stride;
+        const uint32_t sample_offset_3 = sample_offset_2 + sample_stride;
 
         if (!sample_valid[sample_offset_0]) continue;
 
         const uint32_t network_offset_0 = sample_offset_0;
-        const uint32_t network_offset_1 = network_offset_0 + network_size;
-        const uint32_t network_offset_2 = network_offset_1 + network_size;
+        const uint32_t network_offset_1 = network_offset_0 + network_stride;
+        const uint32_t network_offset_2 = network_offset_1 + network_stride;
 
         const float network_r = (float)network_rgb[network_offset_0];
         const float network_g = (float)network_rgb[network_offset_1];
@@ -463,16 +464,17 @@ __global__ void accumulate_nerf_samples_kernel(
             sample_dt[sample_offset_0]
         );
 
-        sample_rgba[sample_offset_0] += network_r;
-        sample_rgba[sample_offset_1] += network_g;
-        sample_rgba[sample_offset_2] += network_b;
+        // accumulate weighted samples
+        sample_rgba[sample_offset_0] += network_r * network_a;
+        sample_rgba[sample_offset_1] += network_g * network_a;
+        sample_rgba[sample_offset_2] += network_b * network_a;
         sample_rgba[sample_offset_3] += network_a;
     }
 }
 
 __global__ void composite_samples_kernel(
     const uint32_t n_rays,
-    const uint32_t sample_batch_size,
+    const uint32_t sample_stride,
     const uint32_t output_stride,
     const uint32_t n_steps_per_ray,
 
@@ -501,9 +503,9 @@ __global__ void composite_samples_kernel(
     for (uint32_t s = 0; s < n_steps_per_ray; ++s) {
             
         const uint32_t sample_offset_0 = n_rays * s + i;
-        const uint32_t sample_offset_1 = sample_offset_0 + sample_batch_size;
-        const uint32_t sample_offset_2 = sample_offset_1 + sample_batch_size;
-        const uint32_t sample_offset_3 = sample_offset_2 + sample_batch_size;
+        const uint32_t sample_offset_1 = sample_offset_0 + sample_stride;
+        const uint32_t sample_offset_2 = sample_offset_1 + sample_stride;
+        const uint32_t sample_offset_3 = sample_offset_2 + sample_stride;
 
         const uint32_t n_nerfs = n_nerfs_for_sample[sample_offset_0];
 
@@ -511,24 +513,35 @@ __global__ void composite_samples_kernel(
             continue;
         }
 
-        const float k = 1.0f / (float)n_nerfs;
+        // normalize accumulated color
 
-        const float sample_r = k * sample_rgba[sample_offset_0];
-        const float sample_g = k * sample_rgba[sample_offset_1];
-        const float sample_b = k * sample_rgba[sample_offset_2];
-        const float sample_a = k * sample_rgba[sample_offset_3];
+        const float sample_r = sample_rgba[sample_offset_0];
+        const float sample_g = sample_rgba[sample_offset_1];
+        const float sample_b = sample_rgba[sample_offset_2];
+        const float sample_a = sample_rgba[sample_offset_3];
 
-        const float weight = sample_a * trans;
+        const float inv_a = (sample_a > 0.0001f) ? (1.0f / sample_a) : 0.0f;
 
-        // composite the same way we do accumulation during training
-        out_r += weight * sample_r;
-        out_g += weight * sample_g;
-        out_b += weight * sample_b;
+        const float r = sample_r * inv_a;
+        const float g = sample_g * inv_a;
+        const float b = sample_b * inv_a;
+        const float a = fminf(sample_a, 1.0f); // alpha is additive
+
+        // accumulate
+
+        const float weight = a * trans;
+
+        out_r += weight * r;
+        out_g += weight * g;
+        out_b += weight * b;
         out_a += weight;
 
-        // update and threshold transmittance
-        trans *= 1.0f - sample_a;
+        // update transmittance
 
+        trans *= 1.0f - a;
+
+        // threshold
+        
         if (trans < NeRFConstants::min_transmittance) {
             ray_alive[i] = false;
             break;

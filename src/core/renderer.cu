@@ -334,6 +334,7 @@ void Renderer::perform_task(
                 network_batch,
                 n_steps_per_ray,
                 proxy->transform.get().inverse(),
+                1.0f / proxy->transform.get().get_scale_product(),
                 proxy->render_bbox.get(),
                 proxy->training_bbox.get(),
                 nerf->occupancy_grid,

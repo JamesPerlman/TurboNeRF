@@ -54,7 +54,7 @@ __global__ void prepare_for_linear_raymarching_kernel(
 __global__ void march_rays_and_generate_global_sample_points_kernel(
     const uint32_t n_rays,
     const uint32_t ray_batch_size,
-    const uint32_t sample_batch_size,
+    const uint32_t sample_stride,
     const uint32_t n_steps_per_ray,
     const float dt,
 
@@ -78,10 +78,11 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
 // For global sample points, determine which ones hit a particular NeRF
 __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
     const uint32_t n_rays,
-    const uint32_t sample_batch_size,
-    const uint32_t network_size,
+    const uint32_t sample_stride,
+    const uint32_t network_stride,
     const uint32_t n_steps_per_ray,
     const Transform4f world_to_nerf,
+    const float inv_nerf_scale,
     const BoundingBox render_bbox,
     const BoundingBox training_bbox,
     const OccupancyGrid occupancy_grid,
@@ -100,8 +101,8 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
 
 __global__ void accumulate_nerf_samples_kernel(
     const uint32_t n_rays,
-    const uint32_t sample_batch_size,
-    const uint32_t network_size,
+    const uint32_t sample_stride,
+    const uint32_t network_stride,
     const uint32_t n_steps_per_ray,
 
     // input buffers (read-only)
@@ -117,7 +118,7 @@ __global__ void accumulate_nerf_samples_kernel(
 
 __global__ void composite_samples_kernel(
     const uint32_t n_rays,
-    const uint32_t sample_batch_size,
+    const uint32_t sample_stride,
     const uint32_t output_stride,
     const uint32_t n_steps_per_ray,
 
