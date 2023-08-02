@@ -44,6 +44,7 @@ struct RenderingWorkspace: Workspace {
     tcnn::network_precision_t* net_output[2];
     float* network_pos[2];
     float* network_dir[2];
+    float* network_dt;
 
     // output buffers
     float* rgba;
@@ -119,6 +120,8 @@ struct RenderingWorkspace: Workspace {
 
         network_dir[0]      = allocate<float>(stream, 2 * 3 * batch_size);
         network_dir[1]      = network_dir[0] + 3 * batch_size;
+
+        network_dt          = allocate<float>(stream, batch_size);
 
         // output
         rgba                = allocate<float>(stream, n_output_pixel_elements);

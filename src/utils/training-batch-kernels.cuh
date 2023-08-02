@@ -5,11 +5,12 @@
 #include <stbi/stb_image.h>
 #include <tiny-cuda-nn/common.h>
 
+#include "color-utils.cuh"
+#include "raymarching-utils.cuh"
 #include "../common.h"
 #include "../core/occupancy-grid.cuh"
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
-#include "../utils/color-utils.cuh"
 #include "../math/transform4f.cuh"
 
 TURBO_NAMESPACE_BEGIN
@@ -268,7 +269,7 @@ __global__ void march_and_count_steps_per_ray_kernel(
             break;
         }
 
-        const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
+        const float dt = get_dt(t, cone_angle, dt_min, dt_max);
         const int grid_level = grid->get_grid_level_at(x, y, z, dt);
 
         if (grid->is_occupied_at(grid_level, x, y, z)) {
@@ -414,7 +415,7 @@ __global__ void march_and_generate_network_positions_kernel(
         const float y = o_y + t * d_y;
         const float z = o_z + t * d_z;
 
-        const float dt = grid->get_dt(t, cone_angle, dt_min, dt_max);
+        const float dt = get_dt(t, cone_angle, dt_min, dt_max);
 
         const uint32_t sample_id = sample_offset + n_steps_taken;
 

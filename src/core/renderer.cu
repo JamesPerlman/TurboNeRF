@@ -173,8 +173,10 @@ void Renderer::perform_task(
 
     // ray.transmittance = 1.0
     float* __restrict__ T = render_ws.ray_trans[active_buf_idx];
-    parallel_for_gpu(stream, n_rays, [T] __device__ (uint32_t i) {
+    float* __restrict__ t = render_ws.ray_t[active_buf_idx];
+    parallel_for_gpu(stream, n_rays, [T, t] __device__ (uint32_t i) {
         T[i] = 1.0f;
+        t[i] = 0.0f;
     });
 
     // generate rays for the pixels in this batch
@@ -256,14 +258,21 @@ void Renderer::perform_task(
         scene_ws.render_bboxes,
         scene_ws.nerf_transforms,
 
-        // input buffers
+        // dual-use buffers (read-write)
+        render_ws.ray_alive,
         render_ws.ray_origin[active_buf_idx],
         render_ws.ray_dir[active_buf_idx],
-
-        // dual-use buffers
-        render_ws.ray_alive,
-        render_ws.ray_t[active_buf_idx],
         render_ws.ray_tmax[active_buf_idx]
+    );
+
+    // clear n_nerfs_for_sample
+    CUDA_CHECK_THROW(
+        cudaMemsetAsync(
+            render_ws.n_nerfs_for_sample,
+            0,
+            ctx.batch_size * sizeof(int),
+            stream
+        )
     );
 
     // ray marching loop
@@ -279,16 +288,18 @@ void Renderer::perform_task(
         const uint32_t n_samples_in_batch = n_steps_per_ray * n_rays_alive;
         const uint32_t network_batch = tcnn::next_multiple(n_samples_in_batch, tcnn::batch_size_granularity);
 
+        const float dt_max = 8.0f * dt_min;
         march_rays_and_generate_global_sample_points_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
             n_rays_alive,
             n_rays_alive,
             n_samples_in_batch,
             n_steps_per_ray,
+            cone_angle,
             dt_min,
+            dt_max,
 
             // input buffers (read-only)
             render_ws.ray_alive,
-            render_ws.ray_tmax[active_buf_idx],
             render_ws.ray_origin[active_buf_idx],
             render_ws.ray_dir[active_buf_idx],
 
@@ -299,11 +310,10 @@ void Renderer::perform_task(
             render_ws.sample_t,
             render_ws.sample_pos,
             render_ws.sample_dir,
-            render_ws.sample_dt,
-            render_ws.n_nerfs_for_sample
+            render_ws.sample_dt
         );
 
-        // clear out sample rgba buffer
+        // clear out reusable sample buffers
         CUDA_CHECK_THROW(
             cudaMemsetAsync(
                 render_ws.sample_rgba,
@@ -334,7 +344,7 @@ void Renderer::perform_task(
                 network_batch,
                 n_steps_per_ray,
                 proxy->transform.get().inverse(),
-                1.0f / proxy->transform.get().get_scale_product(),
+                1.0f / (proxy->training_bbox.get().size()),
                 proxy->render_bbox.get(),
                 proxy->training_bbox.get(),
                 nerf->occupancy_grid,
@@ -343,12 +353,13 @@ void Renderer::perform_task(
                 render_ws.sample_pos,
                 render_ws.sample_dir,
                 render_ws.sample_dt,
-                render_ws.n_nerfs_for_sample,
                 
                 // output buffers (write-only)
+                render_ws.n_nerfs_for_sample,
                 render_ws.sample_valid,
                 render_ws.network_pos[0],
-                render_ws.network_dir[0]
+                render_ws.network_dir[0],
+                render_ws.network_dt
             );
 
             uint32_t n_nerf_samples = count_valued_elements(
@@ -394,7 +405,7 @@ void Renderer::perform_task(
 
                     // input buffers
                     render_ws.network_pos[0],
-                    render_ws.network_pos[0],
+                    render_ws.network_dir[0],
 
                     // output buffers
                     render_ws.network_pos[1],
@@ -451,9 +462,9 @@ void Renderer::perform_task(
                 // input buffers (read-only)
                 render_ws.ray_alive,
                 render_ws.sample_valid,
-                render_ws.sample_dt,
                 render_ws.net_output[1],
                 render_ws.net_concat[1],
+                render_ws.network_dt,
 
                 // dual-use buffers (read-write)
                 render_ws.sample_rgba

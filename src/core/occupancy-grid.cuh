@@ -281,15 +281,6 @@ public:
         return __fdiv_ru(t_target, dt_min) * dt_min;
     }
 
-    inline NRC_HOST_DEVICE float get_dt(
-        const float& t,
-        const float& cone_angle,
-        const float& dt_min,
-        const float& dt_max
-    ) const {
-        return tcnn::clamp(t * cone_angle, dt_min, dt_max);
-    }
-
     void free_device_memory() {
         workspace.free_allocations();
     }

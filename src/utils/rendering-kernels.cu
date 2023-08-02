@@ -2,14 +2,15 @@
 #include <device_launch_parameters.h>
 #include <stbi/stb_image.h>
 
+#include "color-utils.cuh"
+#include "common-network-kernels.cuh"
+#include "nerf-constants.cuh"
+#include "raymarching-utils.cuh"
 #include "rendering-kernels.cuh"
 #include "../core/occupancy-grid.cuh"
 #include "../math/geometric-intersections.cuh"
 #include "../models/bounding-box.cuh"
 #include "../models/camera.cuh"
-#include "../utils/color-utils.cuh"
-#include "../utils/common-network-kernels.cuh"
-#include "../utils/nerf-constants.cuh"
 
 using namespace tcnn;
 
@@ -179,13 +180,10 @@ __global__ void prepare_for_linear_raymarching_kernel(
     const BoundingBox* __restrict__ render_bboxes,
     const Transform4f* __restrict__ transforms,
     
-    // input buffers (read-only)
-    const float* __restrict__ ray_ori,
-    const float* __restrict__ ray_dir,
-
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
-    float* __restrict__ ray_tmin,
+    float* __restrict__ ray_ori,
+    float* __restrict__ ray_dir,
     float* __restrict__ ray_tmax
 ) {
     // get thread index
@@ -254,8 +252,11 @@ __global__ void prepare_for_linear_raymarching_kernel(
         return;
     }
 
-    ray_tmin[i] = t_min;
     ray_tmax[i] = fminf(t_max, ray_tmax[i]);
+
+    ray_ori[ray_offset_0] = global_ori.x + t_min * global_dir.x;
+    ray_ori[ray_offset_1] = global_ori.y + t_min * global_dir.y;
+    ray_ori[ray_offset_2] = global_ori.z + t_min * global_dir.z;
 }
 
 // generate sample points in global space
@@ -265,11 +266,12 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
     const uint32_t ray_batch_size,
     const uint32_t sample_stride,
     const uint32_t n_steps_per_ray,
-    const float dt,
+    const float cone_angle,
+    const float dt_min,
+    const float dt_max,
 
     // input buffers (read-only)
     const bool* __restrict__ ray_alive,
-    const float* __restrict__ ray_tmax,
     const float* __restrict__ ray_ori,
     const float* __restrict__ ray_dir,
 
@@ -280,8 +282,7 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
     float* __restrict__ sample_t,
     float* __restrict__ sample_pos,
     float* __restrict__ sample_dir,
-    float* __restrict__ sample_dt,
-    int* __restrict__ n_nerfs_for_sample
+    float* __restrict__ sample_dt
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -303,7 +304,6 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
 
     
     // Perform raymarching
-    float tmax = ray_tmax[ray_offset_0];
     float t = ray_t[ray_offset_0];
 
     for (uint32_t s = 0; s < n_steps_per_ray; ++s) {
@@ -325,9 +325,9 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
         sample_dir[sample_offset_1] = d_y;
         sample_dir[sample_offset_2] = d_z;
 
-        sample_dt[sample_offset_0] = dt;
+        const float dt = get_dt(t, cone_angle, dt_min, dt_max);
 
-        n_nerfs_for_sample[sample_offset_0] = 0;
+        sample_dt[sample_offset_0] = dt;
 
         t += dt;
     }
@@ -356,7 +356,8 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
     int* __restrict__ n_nerfs_per_sample,
     bool* __restrict__ sample_valid,
     float* __restrict__ network_pos,
-    float* __restrict__ network_dir
+    float* __restrict__ network_dir,
+    float* __restrict__ network_dt
 ) {
     const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -393,7 +394,8 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
         
         const float3 local_dir = world_to_nerf.mmul_ul3x3(global_dir);
 
-        const float dt = inv_nerf_scale * sample_dt[sample_offset_0];
+        const float dt_scale = l2_norm(local_dir);
+        const float dt = dt_scale * inv_nerf_scale * sample_dt[sample_offset_0];
         
         const int grid_level = occupancy_grid.get_grid_level_at(local_pos, dt);
 
@@ -403,6 +405,7 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
         }
 
         const float3 normalized_pos = training_bbox.pos_to_unit(local_pos);
+        const float3 normalized_dir = normalized(local_dir);
 
         n_nerfs_per_sample[sample_offset_0] += 1;
 
@@ -418,6 +421,8 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
         network_dir[network_offset_1] = 0.5f * local_dir.y + 0.5f;
         network_dir[network_offset_2] = 0.5f * local_dir.z + 0.5f;
 
+        network_dt[network_offset_0] = dt;
+
         sample_valid[sample_offset_0] = true;
     }
 }
@@ -431,9 +436,9 @@ __global__ void accumulate_nerf_samples_kernel(
     // input buffers (read-only)
     bool* __restrict__ ray_alive,
     bool* __restrict__ sample_valid,
-    const float* __restrict__ sample_dt,
     const tcnn::network_precision_t* __restrict__ network_rgb,
     const tcnn::network_precision_t* __restrict__ network_density,
+    const float* __restrict__ network_dt,
 
     // dual-use buffers (read-write)
     float* __restrict__ sample_rgba
@@ -461,7 +466,7 @@ __global__ void accumulate_nerf_samples_kernel(
 
         const float network_a = density_to_alpha(
             network_density[network_offset_0],
-            sample_dt[sample_offset_0]
+            network_dt[network_offset_0]
         );
 
         // accumulate weighted samples

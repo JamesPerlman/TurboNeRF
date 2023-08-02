@@ -39,13 +39,10 @@ __global__ void prepare_for_linear_raymarching_kernel(
     const BoundingBox* __restrict__ render_bboxes,
     const Transform4f* __restrict__ transforms,
     
-    // input buffers (read-only)
-    const float* __restrict__ ray_ori,
-    const float* __restrict__ ray_dir,
-
     // dual-use buffers (read/write)
     bool* __restrict__ ray_alive,
-    float* __restrict__ ray_tmin,
+    float* __restrict__ ray_ori,
+    float* __restrict__ ray_dir,
     float* __restrict__ ray_tmax
 );
 
@@ -56,11 +53,12 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
     const uint32_t ray_batch_size,
     const uint32_t sample_stride,
     const uint32_t n_steps_per_ray,
-    const float dt,
+    const float cone_angle,
+    const float dt_min,
+    const float dt_max,
 
     // input buffers (read-only)
     const bool* __restrict__ ray_alive,
-    const float* __restrict__ ray_tmax,
     const float* __restrict__ ray_ori,
     const float* __restrict__ ray_dir,
 
@@ -71,8 +69,7 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
     float* __restrict__ sample_t,
     float* __restrict__ sample_pos,
     float* __restrict__ sample_dir,
-    float* __restrict__ sample_dt,
-    int* __restrict__ n_nerfs_for_sample
+    float* __restrict__ sample_dt
 );
 
 // For global sample points, determine which ones hit a particular NeRF
@@ -96,7 +93,8 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
     int* __restrict__ n_nerfs_per_sample,
     bool* __restrict__ sample_valid,
     float* __restrict__ network_pos,
-    float* __restrict__ network_dir
+    float* __restrict__ network_dir,
+    float* __restrict__ network_dt
 );
 
 __global__ void accumulate_nerf_samples_kernel(
@@ -108,9 +106,9 @@ __global__ void accumulate_nerf_samples_kernel(
     // input buffers (read-only)
     bool* __restrict__ ray_alive,
     bool* __restrict__ sample_valid,
-    const float* __restrict__ sample_dt,
     const tcnn::network_precision_t* __restrict__ network_rgb,
     const tcnn::network_precision_t* __restrict__ network_density,
+    const float* __restrict__ network_dt,
 
     // dual-use buffers (read-write)
     float* __restrict__ sample_rgba
