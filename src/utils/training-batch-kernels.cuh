@@ -160,9 +160,9 @@ __global__ void initialize_training_rays_and_pixels_kernel(
     const size_t local_pixel_idx = std::min((size_t)local_pixel_idx_f, (size_t)n_pixels_per_image - 1);
     const stbi_uc* __restrict__ pixel = image_data + 4 * (img_offset + local_pixel_idx);
 
-    const float r = __srgb_to_linear((float)pixel[0] / 255.0f);
-    const float g = __srgb_to_linear((float)pixel[1] / 255.0f);
-    const float b = __srgb_to_linear((float)pixel[2] / 255.0f);
+    const float r = (float)pixel[0] / 255.0f;
+    const float g = (float)pixel[1] / 255.0f;
+    const float b = (float)pixel[2] / 255.0f;
     const float a = (float)pixel[3] / 255.0f;
 
     pix_rgba[i_offset_0] = r;
