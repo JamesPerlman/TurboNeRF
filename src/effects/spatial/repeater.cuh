@@ -17,16 +17,24 @@ struct RepeaterEffectParams {
 };
 
 class RepeaterEffect : public SpatialEffect<RepeaterEffectParams> {
-    public:
-    __device__ void apply(
-        const RepeaterEffectParams& params,
-        const float& in_x, const float& in_y, const float& in_z,
-        float& out_x, float& out_y, float& out_z
-    ) override {
-        out_x = fmodf(in_x, params.source_bbox.size_x());
-        out_y = fmodf(in_y, params.source_bbox.size_y());
-        out_z = fmodf(in_z, params.source_bbox.size_z());
-    }
+
+public:
+    RepeaterEffect(
+        const BoundingBox& source_bbox,
+        const BoundingBox& extension_bbox,
+        const Transform4f& transform
+    ) : SpatialEffect<RepeaterEffectParams>(
+        { source_bbox, extension_bbox, transform }
+    ) {};
+
+    __host__ void apply(
+        const cudaStream_t& stream,
+        const uint32_t n_points,
+        const uint32_t in_stride,
+        const uint32_t out_stride,
+        const float* in_xyz,
+        float* out_xyz
+    ) override;
 };
 
 TURBO_NAMESPACE_END

@@ -127,6 +127,7 @@ set(HEADERS
     src/models/dataset.h
     src/models/nerf.cuh
     src/models/nerf-proxy.cuh
+    src/models/nerf-renderable.cuh
     src/models/ray.h
     src/models/ray-batch.cuh
     src/models/render-pattern.cuh
@@ -201,6 +202,9 @@ set(SOURCES
     src/core/nerf-network.cu
     src/core/renderer.cu
     src/core/trainer.cu
+
+    # effects
+    src/effects/spatial/repeater.cu
 
     # models
     src/models/dataset.cu

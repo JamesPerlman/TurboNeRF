@@ -197,7 +197,7 @@ void Renderer::perform_task(
         stream
     );
 
-    size_t n_nerfs = task.nerfs.size();
+    size_t n_nerfs = task.renderables.size();
 
     const float dt_min = ctx.min_step_size;
     const float cone_angle = NeRFConstants::cone_angle;
@@ -206,11 +206,12 @@ void Renderer::perform_task(
     if (show_training_cameras) {
         NeRF* nerf = nullptr;
         int nerf_idx = 0;
-        for (auto& task_nerf : task.nerfs) {
-            auto& task_proxy = task_nerf->proxy;
+        for (auto& task_renderable : task.renderables) {
+            auto& task_proxy = task_renderable.proxy;
+            auto& task_nerf = task_proxy->nerfs[task.device_id];
             const bool has_dataset = task_proxy->dataset.has_value();
             if (has_dataset) {
-                nerf = task_nerf;
+                nerf = &task_proxy->nerfs[task.device_id];
                 // only one nerf can have a dataset for now
                 break;
             }
@@ -330,8 +331,8 @@ void Renderer::perform_task(
         
         for (int nerf_idx = 0; nerf_idx < n_nerfs; ++nerf_idx) {
 
-            auto& nerf = task.nerfs[nerf_idx];
-            auto& proxy = nerf->proxy;
+            auto& proxy = task.renderables[nerf_idx].proxy;
+            NeRF* nerf = &proxy->nerfs[task.device_id];
 
             if (!proxy->can_render || !proxy->is_visible) {
                 continue;

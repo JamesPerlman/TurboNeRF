@@ -12,6 +12,7 @@
 #include "../controllers/nerf-rendering-controller.h"
 #include "../controllers/nerf-training-controller.h"
 #include "../integrations/blender.cuh"
+#include "../effects/spatial/repeater.cuh"
 #include "../math/transform4f.cuh"
 #include "../math/matrix4f.cuh"
 #include "../models/bounding-box.cuh"
@@ -60,7 +61,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     m.doc() = "TurboNeRF Python Bindings";
     m.attr("__version__") = "0.0.19";
-    m.attr("__build__") = 18;
+    m.attr("__build__") = 25;
 
     /**
      * Global functions
@@ -262,6 +263,34 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("id", &NeRFProxy::id)
     ;
 
+    py::class_<ISpatialEffect, std::shared_ptr<ISpatialEffect>>(m, "ISpatialEffect");
+
+    py::class_<RepeaterEffect, ISpatialEffect, std::shared_ptr<RepeaterEffect>>(m, "RepeaterEffect")
+        .def(
+            py::init<
+                BoundingBox,
+                BoundingBox,
+                Transform4f
+            >(),
+            py::arg("source_bbox"),
+            py::arg("extension_bbox"),
+            py::arg("transform")
+        )
+    ;
+
+    py::class_<NeRFRenderable>(m, "Renderable")
+        .def(
+            py::init<
+                NeRFProxy*,
+                std::vector<std::shared_ptr<ISpatialEffect>>
+            >(),
+            py::arg("nerf"),
+            py::arg("spatial_effects") = std::vector<std::shared_ptr<ISpatialEffect>>()
+        )
+        .def_readonly("nerf", &NeRFRenderable::proxy)
+        .def_readonly("spatial_effects", &NeRFRenderable::spatial_effects)
+    ;
+
     py::enum_<RenderPattern>(m, "RenderPattern")
         .value("LinearChunks", RenderPattern::LinearChunks)
         .value("HexagonalGrid", RenderPattern::HexagonalGrid)
@@ -341,7 +370,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def(
             py::init<
                 const Camera&,
-                std::vector<NeRFProxy*>&,
+                std::vector<NeRFRenderable>&,
                 RenderTarget*,
                 const RenderModifiers&,
                 const RenderFlags&,
@@ -516,7 +545,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             "request_render",
             &BlenderBridge::request_render,
             py::arg("camera"),
-            py::arg("proxies"),
+            py::arg("renderables"),
             py::arg("modifiers") = RenderModifiers()
         )
         .def("get_render_rgba", [](BlenderBridge& bb) {
@@ -546,7 +575,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
             "request_preview",
             &BlenderBridge::request_preview,
             py::arg("camera"),
-            py::arg("proxies"),
+            py::arg("renderables"),
             py::arg("flags"),
             py::arg("modifiers") = RenderModifiers()
         )

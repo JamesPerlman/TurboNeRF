@@ -21,8 +21,8 @@ manager = tn.NeRFManager()
 
 LAYER_N = 3
 
-base_path = f"E:\\nerfs\\nvidia-siggraph-2023\\tesla-k80\\layer-{LAYER_N}"
-dataset = tn.Dataset(f"{base_path}\\video.transforms.json")
+base_path = f"E:\\nerfs\\nvidia-siggraph-2023\\jperl-tests-jhuang\\outdoor-vertical-1080p"
+dataset = tn.Dataset(f"{base_path}\\transforms.json")
 dataset.load_transforms()
 
 nerf = manager.create()
@@ -83,18 +83,20 @@ def img_load_status(i, n):
 
 trainer.load_images(on_image_loaded=img_load_status)
 
-for i in range(200000):
+for i in range(1000):
     print(f"Training step {i}...")
     trainer.train_step()
 
     if i % 16 == 0 and i > 0:
         trainer.update_occupancy_grid(i)
 
-    if i % 5000 == 0:
+    if i % 250 == 0:
+        
+        renderables = [tn.Renderable(nerf)]
 
         request = tn.RenderRequest(
             render_cam,
-            [nerf],
+            renderables,
             render_buf,
             tn.RenderModifiers(),
             tn.RenderFlags.Final

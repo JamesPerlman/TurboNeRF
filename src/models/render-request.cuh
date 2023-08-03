@@ -8,8 +8,8 @@
 #include "../utils/render-flags.cuh"
 #include "../common.h"
 #include "camera.cuh"
+#include "nerf-renderable.cuh"
 #include "render-modifiers.cuh"
-#include "nerf-proxy.cuh"
 
 TURBO_NAMESPACE_BEGIN
 
@@ -25,14 +25,14 @@ private:
     OnCancelCallback _on_cancel;
 public:
     const Camera camera;
-    std::vector<NeRFProxy*> proxies;
+    std::vector<NeRFRenderable> renderables;
     RenderModifiers modifiers;
     RenderTarget* output;
     const RenderFlags flags;
 
     RenderRequest(
         const Camera camera,
-        std::vector<NeRFProxy*> proxies,
+        const std::vector<NeRFRenderable>& renderables,
         RenderTarget* output,
         const RenderModifiers& modifiers,
         const RenderFlags& flags = RenderFlags::Final,
@@ -41,7 +41,7 @@ public:
         OnCancelCallback on_cancel = nullptr
     )
         : camera(camera)
-        , proxies(proxies)
+        , renderables(renderables)
         , modifiers(modifiers)
         , output(output)
         , flags(flags)
@@ -78,9 +78,9 @@ public:
 
     std::vector<NeRF*> get_nerfs(const int& device_id) const {
         std::vector<NeRF*> nerfs;
-        nerfs.reserve(proxies.size());
-        for (auto proxy : proxies) {
-            nerfs.push_back(&proxy->nerfs[device_id]);
+        nerfs.reserve(renderables.size());
+        for (auto renderable : renderables) {
+            nerfs.push_back(&renderable.proxy->nerfs[device_id]);
         }
         return nerfs;
     }

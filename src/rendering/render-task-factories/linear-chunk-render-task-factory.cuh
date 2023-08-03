@@ -33,9 +33,10 @@ public:
             const int start_idx = i * n_rays_per_task;
             const int n_rays = std::min(n_rays_per_task, n_pixels_total - start_idx);
             tasks.emplace_back(
+                device_id,
                 n_rays,
                 request->camera,
-                request->get_nerfs(device_id),
+                request->renderables,
                 request->modifiers,
                 std::unique_ptr<RayBatchCoordinator>(
                     new LinearBufferRayBatchCoordinator(

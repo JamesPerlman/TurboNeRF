@@ -1,9 +1,12 @@
 #pragma once
 
+#include <vector>
+#include <memory>
+
 #include "../rendering/ray-batch-coordinators/ray-batch-coordinator.cuh"
 #include "../common.h"
 #include "camera.cuh"
-#include "nerf.cuh"
+#include "nerf-renderable.cuh"
 #include "render-modifiers.cuh"
 
 TURBO_NAMESPACE_BEGIN
@@ -18,29 +21,32 @@ private:
     bool _canceled = false;
 
 public:
+    const int device_id;
     const int n_rays;
     const Camera camera;
-    std::vector<NeRF*> nerfs;
+    std::vector<NeRFRenderable> renderables;
     const RenderModifiers modifiers;
 
     // this is a bit smelly.  batch_coordinator performs the task of creating a ray batch and writing the results to the output buffer
     std::unique_ptr<RayBatchCoordinator> batch_coordinator;
 
     RenderTask(
+        const int& device_id,
         const int& n_rays,
         const Camera& camera,
-        const std::vector<NeRF*>& nerfs,
+        const std::vector<NeRFRenderable>& renderables,
         const RenderModifiers& modifiers,
         std::unique_ptr<RayBatchCoordinator> batch_coordinator
     )
-        : n_rays(n_rays)
+        : device_id(device_id)
+        , n_rays(n_rays)
         , camera(camera)
-        , nerfs(nerfs)
+        , renderables(renderables)
         , modifiers(modifiers)
         , batch_coordinator(std::move(batch_coordinator))
     { };
 
-    RenderTask() : n_rays(0), camera(), nerfs(), batch_coordinator(nullptr) { };
+    RenderTask() : device_id(0), n_rays(0), camera(), renderables(), batch_coordinator(nullptr) { };
 
     void cancel() {
         _canceled = true;

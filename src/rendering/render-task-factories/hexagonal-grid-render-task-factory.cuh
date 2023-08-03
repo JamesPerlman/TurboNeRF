@@ -143,13 +143,12 @@ public:
         std::vector<RenderTask> tasks;
         tasks.reserve(n_hex + 1);
 
-        const auto& nerfs = request->get_nerfs(device_id);
-
         // the fist task is a hexagonal grid for a low-resolution preview.
         tasks.emplace_back(
+            device_id,
             pn_w * pn_h,
             request->camera,
-            nerfs,
+            request->renderables,
             request->modifiers,
             std::unique_ptr<RayBatchCoordinator>(
                 new HexagonalGridRayBatchCoordinator(
@@ -165,9 +164,10 @@ public:
         // next we create a task for each hexagonal tile to fill it in with higher detail.
         for (const auto& coords : hex_coords) {
             tasks.emplace_back(
+                device_id,
                 n_rays,
                 request->camera,
-                nerfs,
+                request->renderables,
                 request->modifiers,
                 std::unique_ptr<RayBatchCoordinator>(
                     new HexagonalTileRayBatchCoordinator(

@@ -148,6 +148,12 @@ int main(int argc, char* argv[])
     proxy->transform = turbo::Transform4f::Translation(0.0f, 0.5f, 0.0f);
     std::vector<NeRFProxy*> nerf_proxies{ proxy, proxy2 };
 
+    std::vector<NeRFRenderable> renderables;
+    renderables.reserve(nerf_proxies.size());
+    for (auto& p : nerf_proxies) {
+        renderables.emplace_back(p);
+    }
+
     for (int i = 0; i < 3360; ++i) {
         const auto& info = trainer.train_step();
         printf("step: %d, loss: %f\n", info.step, info.loss);
@@ -175,7 +181,7 @@ int main(int argc, char* argv[])
             auto mods = RenderModifiers();
             auto render_request = std::make_shared<RenderRequest>(
                 render_cam,
-                nerf_proxies,
+                renderables,
                 &render_buffer,
                 mods,
                 RenderFlags::Final,
