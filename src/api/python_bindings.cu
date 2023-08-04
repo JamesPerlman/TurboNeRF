@@ -61,7 +61,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     m.doc() = "TurboNeRF Python Bindings";
     m.attr("__version__") = "0.0.19";
-    m.attr("__build__") = 25;
+    m.attr("__build__") = 226;
 
     /**
      * Global functions
@@ -263,7 +263,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readonly("id", &NeRFProxy::id)
     ;
 
-    py::class_<ISpatialEffect, std::shared_ptr<ISpatialEffect>>(m, "ISpatialEffect");
+    py::class_<ISpatialEffect, std::shared_ptr<ISpatialEffect>>(m, "SpatialEffect");
 
     py::class_<RepeaterEffect, ISpatialEffect, std::shared_ptr<RepeaterEffect>>(m, "RepeaterEffect")
         .def(
@@ -273,7 +273,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
                 Transform4f
             >(),
             py::arg("source_bbox"),
-            py::arg("extension_bbox"),
+            py::arg("extend_bbox"),
             py::arg("transform")
         )
     ;

@@ -12,7 +12,7 @@ TURBO_NAMESPACE_BEGIN
 
 struct RepeaterEffectParams {
     BoundingBox source_bbox;
-    BoundingBox extension_bbox;
+    BoundingBox extend_bbox;
     Transform4f transform;
 };
 
@@ -21,10 +21,10 @@ class RepeaterEffect : public SpatialEffect<RepeaterEffectParams> {
 public:
     RepeaterEffect(
         const BoundingBox& source_bbox,
-        const BoundingBox& extension_bbox,
+        const BoundingBox& extend_bbox,
         const Transform4f& transform
     ) : SpatialEffect<RepeaterEffectParams>(
-        { source_bbox, extension_bbox, transform }
+        { source_bbox, extend_bbox, transform }
     ) {};
 
     __host__ void apply(
