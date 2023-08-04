@@ -29,6 +29,12 @@ inline NRC_HOST_DEVICE float3 operator-(const float3& a, const float3& b)
     return {a.x - b.x, a.y - b.y, a.z - b.z};
 }
 
+// float3 % float3
+inline NRC_HOST_DEVICE float3 operator%(const float3& a, const float3& b)
+{
+    return {fmodf(a.x, b.x), fmodf(a.y, b.y), fmodf(a.z, b.z)};
+}
+
 // division float / float3
 inline NRC_HOST_DEVICE float3 operator/(const float& s, const float3& v)
 {

@@ -279,7 +279,6 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
     float* __restrict__ ray_t,
 
     // output buffers (write-only)
-    float* __restrict__ sample_t,
     float* __restrict__ sample_pos,
     float* __restrict__ sample_dir,
     float* __restrict__ sample_dt
@@ -315,8 +314,6 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
         const uint32_t sample_offset_1 = sample_offset_0 + sample_stride;
         const uint32_t sample_offset_2 = sample_offset_1 + sample_stride;
 
-        sample_t[sample_offset_0] = t;
-
         sample_pos[sample_offset_0] = x;
         sample_pos[sample_offset_1] = y;
         sample_pos[sample_offset_2] = z;
@@ -336,14 +333,80 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
 }
 
 // For global sample points, determine which ones hit a particular NeRF
-__global__ void filter_and_assign_network_inputs_for_nerf_kernel(
+__global__ void filter_and_localize_samples_for_nerf_kernel(
+    const uint32_t n_rays,
+    const uint32_t sample_stride,
+    const uint32_t n_steps_per_ray,
+    const Transform4f world_to_nerf,
+    const BoundingBox render_bbox,
+
+    // input buffers (read-only)
+    const float* __restrict__ in_pos,
+    const float* __restrict__ in_dir,
+    const float* __restrict__ in_dt,
+
+    // output buffers (write-only)
+    int* __restrict__ n_nerfs_for_sample,
+    bool* __restrict__ sample_valid,
+    float* __restrict__ out_pos,
+    float* __restrict__ out_dir,
+    float* __restrict__ out_dt
+) {
+    const uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (i >= n_rays) return;
+
+    for (uint32_t s = 0; s < n_steps_per_ray; ++s) {
+
+        const uint32_t sample_offset_0 = n_rays * s + i;
+        const uint32_t sample_offset_1 = sample_offset_0 + sample_stride;
+        const uint32_t sample_offset_2 = sample_offset_1 + sample_stride;
+
+        const float3 global_pos{
+            in_pos[sample_offset_0],
+            in_pos[sample_offset_1],
+            in_pos[sample_offset_2]
+        };
+
+        const float3 local_pos = world_to_nerf * global_pos;
+
+        if (!render_bbox.contains(local_pos)) {
+            sample_valid[sample_offset_0] = false;
+            continue;
+        }
+
+        const float3 global_dir{
+            in_dir[sample_offset_0],
+            in_dir[sample_offset_1],
+            in_dir[sample_offset_2]
+        };
+        
+        const float3 local_dir = world_to_nerf.mmul_ul3x3(global_dir);
+
+        const float dt_scale = l2_norm(local_dir);
+        const float dt = dt_scale * in_dt[sample_offset_0];
+
+        out_pos[sample_offset_0] = local_pos.x;
+        out_pos[sample_offset_1] = local_pos.y;
+        out_pos[sample_offset_2] = local_pos.z;
+
+        out_dir[sample_offset_0] = local_dir.x;
+        out_dir[sample_offset_1] = local_dir.y;
+        out_dir[sample_offset_2] = local_dir.z;
+
+        out_dt[sample_offset_0] = dt;
+
+        n_nerfs_for_sample[sample_offset_0] += 1;
+        sample_valid[sample_offset_0] = true;
+    }
+}
+
+__global__ void assign_normalized_network_inputs_kernel(
     const uint32_t n_rays,
     const uint32_t sample_stride,
     const uint32_t network_stride,
     const uint32_t n_steps_per_ray,
-    const Transform4f world_to_nerf,
     const float inv_nerf_scale,
-    const BoundingBox render_bbox,
     const BoundingBox training_bbox,
     const OccupancyGrid occupancy_grid,
 
@@ -352,9 +415,11 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
     const float* __restrict__ sample_dir,
     const float* __restrict__ sample_dt,
 
-    // output buffers (write-only)
-    int* __restrict__ n_nerfs_per_sample,
+    // dual-use buffers (read-write)
     bool* __restrict__ sample_valid,
+
+    // output buffers (write-only)
+    int* __restrict__ n_nerfs_for_sample,
     float* __restrict__ network_pos,
     float* __restrict__ network_dir,
     float* __restrict__ network_dt
@@ -369,45 +434,32 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
         const uint32_t sample_offset_1 = sample_offset_0 + sample_stride;
         const uint32_t sample_offset_2 = sample_offset_1 + sample_stride;
 
-        const float3 global_pos{
+        if (!sample_valid[sample_offset_0]) continue;
+
+        const float3 local_pos{
             sample_pos[sample_offset_0],
             sample_pos[sample_offset_1],
             sample_pos[sample_offset_2]
         };
 
-        const float3 local_pos = world_to_nerf * global_pos;
+        const float dt = inv_nerf_scale * sample_dt[sample_offset_0];
 
-        const bool is_valid = render_bbox.contains(local_pos);
+        const int grid_level = occupancy_grid.get_grid_level_at(local_pos, dt);
+        const float3 normalized_pos = training_bbox.pos_to_unit(local_pos);
 
-        if (!is_valid) {
+        if (!occupancy_grid.is_occupied_at(local_pos, grid_level) || !training_bbox.contains(normalized_pos)) {
             sample_valid[sample_offset_0] = false;
+            n_nerfs_for_sample[sample_offset_0] -= 1;
             continue;
         }
 
-        // apply effects here
-
-        const float3 global_dir{
+        const float3 local_dir{
             sample_dir[sample_offset_0],
             sample_dir[sample_offset_1],
             sample_dir[sample_offset_2]
         };
-        
-        const float3 local_dir = world_to_nerf.mmul_ul3x3(global_dir);
 
-        const float dt_scale = l2_norm(local_dir);
-        const float dt = dt_scale * inv_nerf_scale * sample_dt[sample_offset_0];
-        
-        const int grid_level = occupancy_grid.get_grid_level_at(local_pos, dt);
-
-        if (!occupancy_grid.is_occupied_at(local_pos, grid_level)) {
-            sample_valid[sample_offset_0] = false;
-            continue;
-        }
-
-        const float3 normalized_pos = training_bbox.pos_to_unit(local_pos);
         const float3 normalized_dir = normalized(local_dir);
-
-        n_nerfs_per_sample[sample_offset_0] += 1;
 
         const uint32_t network_offset_0 = sample_offset_0;
         const uint32_t network_offset_1 = network_offset_0 + network_stride;
@@ -422,8 +474,6 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
         network_dir[network_offset_2] = 0.5f * local_dir.z + 0.5f;
 
         network_dt[network_offset_0] = dt;
-
-        sample_valid[sample_offset_0] = true;
     }
 }
 

@@ -31,10 +31,9 @@ struct RenderingWorkspace: Workspace {
     // samples
     uint32_t* appearance_ids;
     bool* sample_valid;
-    float* sample_t;
-    float* sample_pos;
-    float* sample_dir;
-    float* sample_dt;
+    float* sample_pos[2];
+    float* sample_dir[2];
+    float* sample_dt[2];
     int* net_compact_idx;
     int* n_nerfs_for_sample;
     float* sample_rgba;
@@ -98,11 +97,16 @@ struct RenderingWorkspace: Workspace {
         appearance_ids      = allocate<uint32_t>(stream, batch_size);
 
         sample_valid        = allocate<bool>(stream, batch_size);
-        sample_t            = allocate<float>(stream, batch_size);
-        sample_dt           = allocate<float>(stream, batch_size);
-        sample_pos          = allocate<float>(stream, 3 * batch_size);
-        sample_dir          = allocate<float>(stream, 3 * batch_size);
 
+        sample_pos[0]       = allocate<float>(stream, 2 * 3 * batch_size);
+        sample_pos[1]       = sample_pos[0] + 3 * batch_size;
+
+        sample_dir[0]       = allocate<float>(stream, 2 * 3 * batch_size);
+        sample_dir[1]       = sample_dir[0] + 3 * batch_size;
+
+        sample_dt[0]        = allocate<float>(stream, 2 * batch_size);
+        sample_dt[1]        = sample_dt[0] + batch_size;
+        
         net_compact_idx     = allocate<int>(stream, batch_size);
         n_nerfs_for_sample  = allocate<int>(stream, batch_size);
         sample_rgba         = allocate<float>(stream, 4 * batch_size);

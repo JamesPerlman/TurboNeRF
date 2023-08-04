@@ -66,21 +66,38 @@ __global__ void march_rays_and_generate_global_sample_points_kernel(
     float* __restrict__ ray_t,
 
     // output buffers (write-only)
-    float* __restrict__ sample_t,
     float* __restrict__ sample_pos,
     float* __restrict__ sample_dir,
     float* __restrict__ sample_dt
 );
 
-// For global sample points, determine which ones hit a particular NeRF
-__global__ void filter_and_assign_network_inputs_for_nerf_kernel(
+// localize sample points before applying effects
+__global__ void filter_and_localize_samples_for_nerf_kernel(
+    const uint32_t n_rays,
+    const uint32_t sample_stride,
+    const uint32_t n_steps_per_ray,
+    const Transform4f world_to_nerf,
+    const BoundingBox render_bbox,
+
+    // input buffers (read-only)
+    const float* __restrict__ in_pos,
+    const float* __restrict__ in_dir,
+    const float* __restrict__ in_dt,
+
+    // output buffers (write-only)
+    int* __restrict__ n_nerfs_for_sample,
+    bool* __restrict__ sample_valid,
+    float* __restrict__ out_pos,
+    float* __restrict__ out_dir,
+    float* __restrict__ out_dt
+);
+
+__global__ void assign_normalized_network_inputs_kernel(
     const uint32_t n_rays,
     const uint32_t sample_stride,
     const uint32_t network_stride,
     const uint32_t n_steps_per_ray,
-    const Transform4f world_to_nerf,
     const float inv_nerf_scale,
-    const BoundingBox render_bbox,
     const BoundingBox training_bbox,
     const OccupancyGrid occupancy_grid,
 
@@ -89,9 +106,11 @@ __global__ void filter_and_assign_network_inputs_for_nerf_kernel(
     const float* __restrict__ sample_dir,
     const float* __restrict__ sample_dt,
 
-    // output buffers (write-only)
-    int* __restrict__ n_nerfs_per_sample,
+    // dual-use buffers (read-write)
     bool* __restrict__ sample_valid,
+
+    // output buffers (write-only)
+    int* __restrict__ n_nerfs_for_sample,
     float* __restrict__ network_pos,
     float* __restrict__ network_dir,
     float* __restrict__ network_dt

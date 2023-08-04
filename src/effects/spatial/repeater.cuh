@@ -32,9 +32,12 @@ public:
         const uint32_t n_points,
         const uint32_t in_stride,
         const uint32_t out_stride,
+        const bool* should_apply,
         const float* in_xyz,
         float* out_xyz
-    ) override;
+    ) const override;
+
+    __host__ BoundingBox get_bbox(const BoundingBox& bbox) const override;
 };
 
 TURBO_NAMESPACE_END

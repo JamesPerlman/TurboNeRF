@@ -308,10 +308,9 @@ void Renderer::perform_task(
             render_ws.ray_t[active_buf_idx],
             
             // output buffers (write-only)
-            render_ws.sample_t,
-            render_ws.sample_pos,
-            render_ws.sample_dir,
-            render_ws.sample_dt
+            render_ws.sample_pos[0],
+            render_ws.sample_dir[0],
+            render_ws.sample_dt[0]
         );
 
         // clear out reusable sample buffers
@@ -330,34 +329,77 @@ void Renderer::perform_task(
          */
         
         for (int nerf_idx = 0; nerf_idx < n_nerfs; ++nerf_idx) {
-
-            auto& proxy = task.renderables[nerf_idx].proxy;
+            auto& renderable = task.renderables[nerf_idx];
+            auto& proxy = renderable.proxy;
             NeRF* nerf = &proxy->nerfs[task.device_id];
 
             if (!proxy->can_render || !proxy->is_visible) {
                 continue;
             }
+
+            // find the maximum bounding box for this NeRF
+            // TODO: maximum bbox needs to be calculated earlier than this
+            BoundingBox maximum_bbox = proxy->render_bbox.get();
+            for (const auto& spatial_effect : renderable.spatial_effects) {
+                maximum_bbox = spatial_effect->get_bbox(maximum_bbox);
+            }
             
             // generate the normalized network inputs for this NeRF
-            filter_and_assign_network_inputs_for_nerf_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+            filter_and_localize_samples_for_nerf_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
                 n_rays_alive,
                 n_samples_in_batch,
-                network_batch,
                 n_steps_per_ray,
                 proxy->transform.get().inverse(),
-                1.0f / (proxy->training_bbox.get().size()),
-                proxy->render_bbox.get(),
-                proxy->training_bbox.get(),
-                nerf->occupancy_grid,
+                maximum_bbox,
 
                 // input buffers (read-only)
-                render_ws.sample_pos,
-                render_ws.sample_dir,
-                render_ws.sample_dt,
+                render_ws.sample_pos[0],
+                render_ws.sample_dir[0],
+                render_ws.sample_dt[0],
                 
                 // output buffers (write-only)
                 render_ws.n_nerfs_for_sample,
                 render_ws.sample_valid,
+                render_ws.sample_pos[1],
+                render_ws.sample_dir[1],
+                render_ws.sample_dt[1]
+            );
+
+            // apply effects
+
+            BoundingBox render_bbox = proxy->render_bbox.get();
+            
+            for (const auto& spatial_effect : renderable.spatial_effects) {
+                render_bbox = spatial_effect->get_bbox(render_bbox);
+
+                spatial_effect->apply(
+                    stream,
+                    n_samples_in_batch,
+                    n_samples_in_batch,
+                    n_samples_in_batch,
+                    render_ws.sample_valid,
+                    render_ws.sample_pos[1],
+                    render_ws.sample_pos[1]
+                );
+            }
+
+            assign_normalized_network_inputs_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
+                n_rays_alive,
+                n_samples_in_batch,
+                network_batch,
+                n_steps_per_ray,
+                1.0f / (proxy->training_bbox.get().size()),
+                proxy->training_bbox.get(),
+                nerf->occupancy_grid,
+
+                // input buffers (read-only)
+                render_ws.sample_pos[1],
+                render_ws.sample_dir[1],
+                render_ws.sample_dt[1],
+
+                // dual-use buffers (read-write)
+                render_ws.sample_valid,
+                render_ws.n_nerfs_for_sample,
                 render_ws.network_pos[0],
                 render_ws.network_dir[0],
                 render_ws.network_dt
