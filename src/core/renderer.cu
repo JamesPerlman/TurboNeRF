@@ -27,16 +27,16 @@ using namespace tcnn;
 void Renderer::prepare_for_rendering(
     Renderer::Context& ctx,
     const Camera& camera,
-    const std::vector<NeRF*>& nerfs,
+    const std::vector<NeRFRenderable>& renderables,
     const uint32_t& n_rays,
     bool always_copy_new_props
 ) {
     cudaStream_t stream = ctx.stream;
 
-    enlarge_render_workspace_if_needed(ctx, nerfs, n_rays);
+    enlarge_render_workspace_if_needed(ctx, renderables, n_rays);
 
     auto& scene_ws = ctx.scene_ws;
-    const uint32_t n_nerfs = nerfs.size();
+    const uint32_t n_nerfs = renderables.size();
     
     const bool needs_update = scene_ws.n_nerfs != n_nerfs || scene_ws.n_rays != n_rays;
 
@@ -62,18 +62,16 @@ void Renderer::prepare_for_rendering(
     bool needs_copy = always_copy_new_props || needs_update;
 
     for (int i = 0; i < n_nerfs; i++) {
-        const NeRF* nerf = nerfs[i];
+        const auto& renderable = renderables[i];
+        const auto& proxy = renderable.proxy;
+        const auto& nerf = proxy->nerfs[scene_ws.device_id];
 
-        NeRFProxy* proxy = nerf->proxy;
 
         if (!proxy->can_render) {
             continue;
         }
 
         // copy updatable properties (these only get copied if their is_dirty flag is set)
-        if (needs_copy || proxy->render_bbox.is_dirty()) {
-            proxy->render_bbox.copy_to_device(scene_ws.render_bboxes + i, stream);
-        }
         
         if (needs_copy || proxy->training_bbox.is_dirty()) {
             proxy->training_bbox.copy_to_device(scene_ws.training_bboxes + i, stream);
@@ -83,12 +81,25 @@ void Renderer::prepare_for_rendering(
             proxy->transform.copy_to_device(scene_ws.nerf_transforms + i, stream);
         }
 
+        // copy renderable bbox
+        proxy->render_bbox.set_dirty(false);
+        
+        CUDA_CHECK_THROW(
+            cudaMemcpyAsync(
+                scene_ws.render_bboxes + i,
+                &renderable.bounding_box,
+                sizeof(BoundingBox),
+                cudaMemcpyHostToDevice,
+                stream
+            )
+        );
+
         // copy occupancy grids
         // TODO: turn this into an UpdatableProperty
         CUDA_CHECK_THROW(
             cudaMemcpyAsync(
                 scene_ws.occupancy_grids + i,
-                &nerf->occupancy_grid,
+                &nerf.occupancy_grid,
                 sizeof(OccupancyGrid),
                 cudaMemcpyHostToDevice,
                 stream
@@ -99,7 +110,7 @@ void Renderer::prepare_for_rendering(
 
 void Renderer::enlarge_render_workspace_if_needed(
     Renderer::Context& ctx,
-    const std::vector<NeRF*>& nerfs,
+    const std::vector<NeRFRenderable>& renderables,
     const uint32_t& n_rays
 ) {
     auto& render_ws = ctx.render_ws;
@@ -108,14 +119,16 @@ void Renderer::enlarge_render_workspace_if_needed(
     size_t padded_output_width = 0;
 
     // need to find the largest network sizes of all nerfs
-    for (auto& nerf : nerfs) {
-        auto& proxy = nerf->proxy;
+    for (auto& renderable : renderables) {
+        auto& proxy = renderable.proxy;
+        auto& nerf = proxy->nerfs[render_ws.device_id];
+
         if (!proxy->can_render) {
             continue;
         }
 
-        concat_buffer_width = std::max(concat_buffer_width, nerf->network.get_concat_buffer_width());
-        padded_output_width = std::max(padded_output_width, nerf->network.get_padded_output_width());
+        concat_buffer_width = std::max(concat_buffer_width, nerf.network.get_concat_buffer_width());
+        padded_output_width = std::max(padded_output_width, nerf.network.get_padded_output_width());
     }
 
     if (render_ws.n_rays != n_rays ||
@@ -336,13 +349,6 @@ void Renderer::perform_task(
             if (!proxy->can_render || !proxy->is_visible) {
                 continue;
             }
-
-            // find the maximum bounding box for this NeRF
-            // TODO: maximum bbox needs to be calculated earlier than this
-            BoundingBox maximum_bbox = proxy->render_bbox.get();
-            for (const auto& spatial_effect : renderable.spatial_effects) {
-                maximum_bbox = spatial_effect->get_bbox(maximum_bbox);
-            }
             
             // generate the normalized network inputs for this NeRF
             filter_and_localize_samples_for_nerf_kernel<<<n_blocks_linear(n_rays_alive), n_threads_linear, 0, stream>>>(
@@ -350,7 +356,7 @@ void Renderer::perform_task(
                 n_samples_in_batch,
                 n_steps_per_ray,
                 proxy->transform.get().inverse(),
-                maximum_bbox,
+                renderable.bounding_box,
 
                 // input buffers (read-only)
                 render_ws.sample_pos[0],

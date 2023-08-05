@@ -58,20 +58,16 @@ void NeRFRenderingController::submit(
 
     std::vector<NeRFRenderable> renderables;
     renderables.reserve(request->renderables.size());
-    std::vector<NeRF*> nerfs;
-    nerfs.reserve(renderables.size());
 
     for (auto& renderable : request->renderables) {
         NeRFProxy* proxy = renderable.proxy;
         if (proxy->can_render && proxy->is_visible && !proxy->should_destroy) {
             proxy->update_dataset_if_necessary(ctx.stream);
             renderables.push_back(renderable);
-            nerfs.push_back(&proxy->nerfs[device_id]);
         }
     }
 
     renderables.shrink_to_fit();
-    nerfs.shrink_to_fit();
 
     // this is not great but it will work for now...
     request->renderables = renderables;
@@ -109,7 +105,7 @@ void NeRFRenderingController::submit(
     bool requested_preview = (request->flags & RenderFlags::Preview) == RenderFlags::Preview;
     bool requested_final = (request->flags & RenderFlags::Final) == RenderFlags::Final;
 
-    renderer.prepare_for_rendering(ctx, request->camera, nerfs, n_rays_max, requested_final);
+    renderer.prepare_for_rendering(ctx, request->camera, renderables, n_rays_max, requested_final);
 
     // preview task cannot be canceled
     if (factory->can_preview() && requested_preview) {

@@ -52,14 +52,14 @@ struct Renderer {
     void prepare_for_rendering(
         Context& ctx,
         const Camera& camera,
-        const std::vector<NeRF*>& nerfs,
+        const std::vector<NeRFRenderable>& renderables,
         const uint32_t& n_rays,
         bool always_copy_new_props
     );
 
     void enlarge_render_workspace_if_needed(
         Renderer::Context& ctx,
-        const std::vector<NeRF*>& nerfs,
+        const std::vector<NeRFRenderable>& renderables,
         const uint32_t& n_rays
     );
 };

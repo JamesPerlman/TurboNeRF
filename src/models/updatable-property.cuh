@@ -71,8 +71,8 @@ public:
     }
     
     __host__
-    void set_dirty() {
-        _is_dirty = true;
+    void set_dirty(const bool& is_dirty = true) {
+        _is_dirty = is_dirty;
     }
 };
 
