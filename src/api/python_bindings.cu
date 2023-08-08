@@ -61,7 +61,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
 
     m.doc() = "TurboNeRF Python Bindings";
     m.attr("__version__") = "0.0.19";
-    m.attr("__build__") = 0;
+    m.attr("__build__") = 1;
 
     /**
      * Global functions
@@ -205,6 +205,16 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def(py::self != py::self)
     ;
 
+    py::class_<TrainingImage>(m, "TrainingImage")
+        .def(
+            py::init<const string&, const int2&>(),
+            py::arg("file_path"),
+            py::arg("dimensions")
+        )
+        .def_readonly("file_path", &TrainingImage::file_path)
+        .def_readonly("dimensions", &TrainingImage::dimensions)
+    ;
+
     py::class_<Dataset>(m, "Dataset")
         .def(
             py::init<const string&>(),
@@ -222,6 +232,7 @@ PYBIND11_MODULE(PyTurboNeRF, m) {
         .def_readwrite("file_path", &Dataset::file_path)
         .def_readwrite("cameras", &Dataset::cameras)
         .def_readwrite("bounding_box", &Dataset::bounding_box)
+        .def_readonly("images", &Dataset::images)
         .def_readonly("image_dimensions", &Dataset::image_dimensions)
         .def_readonly("contains_multiple_image_dims", &Dataset::contains_multiple_image_dims)
     ;
