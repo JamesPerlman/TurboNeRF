@@ -105,7 +105,7 @@ void Dataset::load_transforms() {
         const float cy = frame.value("cy", global_cy);
 
         const float fl_x = frame.value("fl_x", global_fl_x);
-        const float fl_y = frame.value("fl_y", fl_x); // potential bug, global_fl_y is not used
+        const float fl_y = frame.value("fl_y", global_fl_y); // potential bug, global_fl_y is not used
 
         DistortionParams dist_params(
             frame.value("k1", global_dist_params.k1),
